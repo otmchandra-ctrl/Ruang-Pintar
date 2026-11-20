@@ -1,5 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 
+// Ensure DIRECT_URL fallback for Postgres in serverless environments (e.g. Vercel)
+if (typeof process !== "undefined" && process.env) {
+  if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
+    process.env.DIRECT_URL = process.env.DATABASE_URL;
+  }
+}
+
 declare global {
   var __ruangPintarPrisma__: PrismaClient | undefined;
 }
