@@ -1,4 +1,4 @@
-import React, { use } from "react";
+import React from "react";
 import { AuthLoginLayout } from "@/shared/components/auth/auth-login-layout";
 import { LoginForm } from "./login-form";
 
@@ -7,29 +7,21 @@ export const metadata = {
   description: "Masuk ke School Digital Operating Platform Ruang Pintar",
 };
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?:
-    | { reset?: string; registered?: string; error?: string }
-    | Promise<{ reset?: string; registered?: string; error?: string }>;
+  searchParams?: Promise<{ reset?: string; registered?: string; error?: string }>;
 }) {
+  const params = searchParams ? await searchParams : undefined;
   let statusMessage: string | undefined = undefined;
 
-  if (searchParams) {
-    const params =
-      typeof (searchParams as any)?.then === "function"
-        ? use(searchParams as Promise<{ reset?: string; registered?: string; error?: string }>)
-        : (searchParams as { reset?: string; registered?: string; error?: string });
-
-    if (params?.reset === "success") {
-      statusMessage = "Kata sandi Anda berhasil diperbarui. Silakan masuk dengan kata sandi baru.";
-    } else if (params?.registered === "success") {
-      statusMessage = "Pendaftaran berhasil. Silakan masuk dengan akun baru Anda.";
-    } else if (params?.error === "google_failed") {
-      statusMessage =
-        "Google Login gagal atau belum terdaftar. Silakan coba lagi atau gunakan akun lokal.";
-    }
+  if (params?.reset === "success") {
+    statusMessage = "Kata sandi Anda berhasil diperbarui. Silakan masuk dengan kata sandi baru.";
+  } else if (params?.registered === "success") {
+    statusMessage = "Pendaftaran berhasil. Silakan masuk dengan akun baru Anda.";
+  } else if (params?.error === "google_failed") {
+    statusMessage =
+      "Google Login gagal atau belum terdaftar. Silakan coba lagi atau gunakan akun lokal.";
   }
 
   return (

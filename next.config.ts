@@ -33,6 +33,8 @@ const localOrigins = [
   "127.0.0.1:3001",
   "*.trycloudflare.com",
   "trycloudflare.com",
+  "*.vercel.app",
+  "vercel.app",
 ];
 
 const nextConfig: NextConfig = {
