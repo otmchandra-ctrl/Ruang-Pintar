@@ -24,18 +24,25 @@ export function LoginForm({ status }: { status?: string }) {
     const formData = new FormData(form);
 
     startTransition(async () => {
-      const result: AuthActionResult = await loginAction(null, formData);
-      if (!result.success) {
-        setErrorMessage(result.error ?? "Login gagal. Silakan coba lagi.");
-        // Reset password input on failure for security
-        const passwordInput = form.querySelector<HTMLInputElement>('input[name="password"]');
-        if (passwordInput) {
-          passwordInput.value = "";
-          passwordInput.focus();
+      try {
+        const result: AuthActionResult = await loginAction(null, formData);
+        if (!result.success) {
+          setErrorMessage(result.error ?? "Login gagal. Silakan coba lagi.");
+          // Reset password input on failure for security
+          const passwordInput = form.querySelector<HTMLInputElement>('input[name="password"]');
+          if (passwordInput) {
+            passwordInput.value = "";
+            passwordInput.focus();
+          }
+        } else if (result.redirectUrl) {
+          router.push(result.redirectUrl);
+          router.refresh();
         }
-      } else if (result.redirectUrl) {
-        router.push(result.redirectUrl);
-        router.refresh();
+      } catch (err: unknown) {
+        console.error("[LoginForm] Client submission error:", err);
+        setErrorMessage(
+          "Tidak dapat terhubung ke server. Periksa koneksi internet Anda atau coba lagi beberapa saat lagi."
+        );
       }
     });
   };

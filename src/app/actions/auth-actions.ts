@@ -25,63 +25,95 @@ export async function loginAction(
   _prevState: AuthActionResult | null,
   formData: FormData
 ): Promise<AuthActionResult> {
-  const username = formData.get("username")?.toString() ?? "";
-  const password = formData.get("password")?.toString() ?? "";
-  const rememberMe = formData.get("remember") === "on" || formData.get("remember") === "true";
+  try {
+    const username = formData.get("username")?.toString() ?? "";
+    const password = formData.get("password")?.toString() ?? "";
+    const rememberMe = formData.get("remember") === "on" || formData.get("remember") === "true";
 
-  if (!username.trim() || !password) {
-    return {
-      success: false,
-      error: "Username dan kata sandi wajib diisi.",
-    };
-  }
+    if (!username.trim() || !password) {
+      return {
+        success: false,
+        error: "Username dan kata sandi wajib diisi.",
+      };
+    }
 
-  const reqHeaders = await headers();
-  const ipAddress =
-    reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    reqHeaders.get("x-real-ip") ||
-    "127.0.0.1";
-  const userAgent = reqHeaders.get("user-agent") || undefined;
+    const reqHeaders = await headers();
+    const ipAddress =
+      reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      reqHeaders.get("x-real-ip") ||
+      "127.0.0.1";
+    const userAgent = reqHeaders.get("user-agent") || undefined;
 
-  const result = await authService.loginWithCredentials({
-    username,
-    password,
-    rememberMe,
-    ipAddress,
-    userAgent,
-  });
+    const result = await authService.loginWithCredentials({
+      username,
+      password,
+      rememberMe,
+      ipAddress,
+      userAgent,
+    });
 
-  if (!result.success || !result.sessionToken || !result.user) {
-    return {
-      success: false,
-      error: result.error ?? "Login gagal. Periksa kembali akun Anda.",
-    };
-  }
+    if (!result.success || !result.sessionToken || !result.user) {
+      return {
+        success: false,
+        error: result.error ?? "Login gagal. Periksa kembali akun Anda.",
+      };
+    }
 
-  // Set session cookie
-  const cookieOptions = getSessionCookieOptions(result.sessionToken, rememberMe);
-  const cookieStore = await cookies();
-  cookieStore.set(cookieOptions.name, cookieOptions.value, {
-    httpOnly: cookieOptions.httpOnly,
-    secure: cookieOptions.secure,
-    sameSite: cookieOptions.sameSite,
-    path: cookieOptions.path,
-    expires: cookieOptions.expires,
-    maxAge: cookieOptions.maxAge,
-  });
+    // Set session cookie
+    const cookieOptions = getSessionCookieOptions(result.sessionToken, rememberMe);
+    const cookieStore = await cookies();
+    cookieStore.set(cookieOptions.name, cookieOptions.value, {
+      httpOnly: cookieOptions.httpOnly,
+      secure: cookieOptions.secure,
+      sameSite: cookieOptions.sameSite,
+      path: cookieOptions.path,
+      expires: cookieOptions.expires,
+      maxAge: cookieOptions.maxAge,
+    });
 
-  if (result.user.harus_ganti_password) {
+    if (result.user.harus_ganti_password) {
+      return {
+        success: true,
+        mustChangePassword: true,
+        redirectUrl: "/ganti-password",
+      };
+    }
+
     return {
       success: true,
-      mustChangePassword: true,
-      redirectUrl: "/ganti-password",
+      redirectUrl: "/dashboard",
+    };
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string };
+    console.error("[loginAction] Unhandled exception during login:", err);
+
+    const msg = err?.message || "";
+    const isDbConfigError =
+      msg.includes("datasource") ||
+      msg.includes("DATABASE_URL") ||
+      msg.includes("protocol") ||
+      msg.includes("PrismaClientInitializationError");
+
+    const isDbConnectionError =
+      msg.includes("connect") ||
+      msg.includes("Can't reach database") ||
+      err?.code?.startsWith("P10") ||
+      err?.code?.startsWith("P20");
+
+    let userFriendlyError = "Terjadi kesalahan internal pada server. Silakan coba lagi beberapa saat lagi.";
+    if (isDbConfigError) {
+      userFriendlyError =
+        "Basis data belum terkonfigurasi. Pastikan variabel DATABASE_URL telah didaftarkan di Vercel.";
+    } else if (isDbConnectionError) {
+      userFriendlyError =
+        "Tidak dapat terhubung ke server basis data Supabase. Periksa status koneksi jaringan atau URL database.";
+    }
+
+    return {
+      success: false,
+      error: userFriendlyError,
     };
   }
-
-  return {
-    success: true,
-    redirectUrl: "/dashboard",
-  };
 }
 
 /**
