@@ -360,10 +360,10 @@ export function AcademicDataTable<T extends Record<string, any>>({
               {isFilterDropdownOpen && (
                 <>
                   <div
-                    className="fixed inset-0 z-20"
+                    className="fixed inset-0 z-40"
                     onClick={() => setIsFilterDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-30 p-4 space-y-3.5 animate-in fade-in-0 zoom-in-95 duration-150">
+                  <div className="fixed sm:absolute left-4 sm:left-0 sm:right-auto top-[5.25rem] sm:top-full mt-0 sm:mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-4 space-y-3.5 animate-in fade-in-0 zoom-in-95 duration-150">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                       <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                         <Filter className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -436,10 +436,10 @@ export function AcademicDataTable<T extends Record<string, any>>({
             {isColumnDropdownOpen && (
               <>
                 <div
-                  className="fixed inset-0 z-20"
+                  className="fixed inset-0 z-40"
                   onClick={() => setIsColumnDropdownOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-30 p-2.5 space-y-1 animate-in fade-in-0 zoom-in-95 duration-150">
+                <div className="fixed sm:absolute left-4 sm:left-0 sm:right-auto top-[5.25rem] sm:top-full mt-0 sm:mt-2 w-[calc(100vw-2rem)] sm:w-52 max-w-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-2.5 space-y-1 animate-in fade-in-0 zoom-in-95 duration-150">
                   <span className="text-[11px] font-bold text-slate-400 px-2 py-1 block uppercase tracking-wider">
                     Kolom Tampil
                   </span>

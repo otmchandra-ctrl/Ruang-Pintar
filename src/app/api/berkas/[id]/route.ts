@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/shared/infrastructure/auth/auth-guard";
 import { prisma } from "@/shared/infrastructure/database/prisma";
-import { LocalStorageAdapter } from "@/shared/infrastructure/storage/local-storage-adapter";
+import { storageService } from "@/shared/infrastructure/storage/storage-service";
 
 export async function GET(
   _request: NextRequest,
@@ -38,8 +38,7 @@ export async function GET(
   }
 
   try {
-    const storage = new LocalStorageAdapter();
-    const stored = await storage.readFile(metadata.storage_key);
+    const stored = await storageService.readFile(metadata.storage_key);
 
     const filename = encodeURIComponent(metadata.nama_file_asli);
     return new NextResponse(new Uint8Array(stored.content), {

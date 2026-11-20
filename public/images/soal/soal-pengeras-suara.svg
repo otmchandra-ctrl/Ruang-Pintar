@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgAudio" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#EFF6FF" />
+    </linearGradient>
+    <linearGradient id="speakerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <linearGradient id="coneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+    <filter id="shadowAudio" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#1E40AF" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="600" height="360" rx="16" fill="url(#bgAudio)" />
+
+  <g transform="translate(140, 50)" filter="url(#shadowAudio)">
+    <!-- Speaker Body Left Base -->
+    <rect x="30" y="70" width="55" height="100" rx="12" fill="url(#speakerGrad)" />
+
+    <!-- Speaker Cone Expanding to Right -->
+    <path d="M 80 75 L 170 30 C 178 26 186 32 186 42 L 186 198 C 186 208 178 214 170 210 L 80 165 Z" fill="url(#coneGrad)" />
+
+    <!-- Speaker Inner Rim Accent -->
+    <ellipse cx="186" cy="120" rx="10" ry="85" fill="#1E40AF" />
+    <ellipse cx="186" cy="120" rx="6" ry="60" fill="#93C5FD" opacity="0.8" />
+
+    <!-- Sound Wave Pulses -->
+    <!-- Wave 1 (Small) -->
+    <path d="M 220 75 C 245 95 245 145 220 165" fill="none" stroke="#3B82F6" stroke-width="7" stroke-linecap="round" />
+    <!-- Wave 2 (Medium) -->
+    <path d="M 255 55 C 295 85 295 155 255 185" fill="none" stroke="#2563EB" stroke-width="8" stroke-linecap="round" />
+    <!-- Wave 3 (Large) -->
+    <path d="M 290 35 C 345 75 345 165 290 205" fill="none" stroke="#1D4ED8" stroke-width="9" stroke-linecap="round" opacity="0.85" />
+
+    <!-- Musical & Audio Note Accents -->
+    <g transform="translate(240, 10)">
+      <circle cx="15" cy="20" r="6" fill="#F59E0B" />
+      <circle cx="35" cy="14" r="6" fill="#F59E0B" />
+      <path d="M 20 20 L 20 2 L 40 -4 L 40 14" stroke="#F59E0B" stroke-width="3" fill="none" />
+      <line x1="20" y1="2" x2="40" y2="-4" stroke="#F59E0B" stroke-width="5" />
+    </g>
+    <g transform="translate(270, 215)">
+      <circle cx="10" cy="15" r="5" fill="#10B981" />
+      <path d="M 15 15 L 15 0 C 22 2 25 8 25 8" stroke="#10B981" stroke-width="2.5" fill="none" />
+    </g>
+  </g>
+
+  <!-- Descriptive Label Banner -->
+  <g transform="translate(140, 305)">
+    <rect x="0" y="0" width="320" height="34" rx="17" fill="#2563EB" opacity="0.1" stroke="#2563EB" stroke-width="1.5" />
+    <text x="160" y="22" font-family="sans-serif" font-size="12" font-weight="bold" fill="#1E40AF" text-anchor="middle">
+      Stimulus: Pengeras Suara / Sinyal Bunyi (Audio)
+    </text>
+  </g>
+</svg>

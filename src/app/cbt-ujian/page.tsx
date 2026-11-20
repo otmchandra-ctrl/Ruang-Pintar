@@ -8,6 +8,7 @@ import {
   CbtHubOverviewView,
   TeacherCbtClassItem,
   StudentCbtExamItem,
+  CbtBankSoalFolderItem,
 } from "@/modules/cbt/presentation/cbt-hub-overview-view";
 
 export const metadata: Metadata = {
@@ -32,6 +33,8 @@ export default async function CbtUjianPage() {
 
   let teacherClasses: TeacherCbtClassItem[] = [];
   const studentExams: StudentCbtExamItem[] = [];
+  let bankSoalCount = 0;
+  let bankSoalFolders: CbtBankSoalFolderItem[] = [];
 
   // 1. Context Guru & Super Admin
   if (role === "TEACHER" || role === "SUPER_ADMIN") {
@@ -47,6 +50,20 @@ export default async function CbtUjianPage() {
         guruId = guru.id;
       }
     }
+
+    bankSoalCount = await prisma.bankSoal.count({
+      where: {
+        sekolah_id: user.sekolah_id,
+        status: "AKTIF",
+        ...(isSuperAdmin
+          ? {}
+          : guruId
+            ? {
+                OR: [{ guru_id: guruId }, { scope_kepemilikan: "SEKOLAH" }],
+              }
+            : {}),
+      },
+    });
 
     const whereClause: any = {
       sekolah_id: user.sekolah_id,
@@ -81,12 +98,31 @@ export default async function CbtUjianPage() {
             status: true,
             gunakan_token: true,
             token_masuk: true,
+            waktu_mulai: true,
+            waktu_selesai: true,
+            created_at: true,
+            asesmen_id: true,
+            kkm_kktp: true,
+            acak_soal: true,
+            acak_opsi: true,
+            tampilkan_nilai: true,
+            tampilkan_pembahasan: true,
+            snapshot_ujian: {
+              select: {
+                total_soal: true,
+              },
+              take: 1,
+              orderBy: { nomor_snapshot: "desc" },
+            },
             sesi_ujian_siswa: {
               select: {
+                id: true,
                 status: true,
                 hasil: {
                   select: {
+                    id: true,
                     skor_mentah: true,
+                    status_penilaian: true,
                   },
                 },
               },
@@ -111,6 +147,9 @@ export default async function CbtUjianPage() {
         const totalSelesaiPeserta = u.sesi_ujian_siswa.filter(
           (s) => s.status === "DIKUMPULKAN" || s.status === "WAKTU_HABIS"
         ).length;
+        const totalSedangMengerjakan = u.sesi_ujian_siswa.filter(
+          (s) => s.status === "SEDANG_MENGERJAKAN"
+        ).length;
 
         const scores = u.sesi_ujian_siswa
           .map((s) => s.hasil?.skor_mentah)
@@ -121,6 +160,15 @@ export default async function CbtUjianPage() {
             ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1))
             : null;
 
+        const totalPerluKoreksi = u.sesi_ujian_siswa.filter(
+          (s) =>
+            s.hasil?.status_penilaian === "PERLU_KOREKSI_MANUAL" ||
+            ((s.status === "DIKUMPULKAN" || s.status === "WAKTU_HABIS") &&
+              (s.hasil?.skor_mentah === null || s.hasil?.skor_mentah === undefined))
+        ).length;
+
+        const totalSoal = u.snapshot_ujian?.[0]?.total_soal ?? null;
+
         return {
           id: u.id,
           judul: u.judul,
@@ -129,9 +177,21 @@ export default async function CbtUjianPage() {
           status: u.status,
           total_peserta: totalPeserta,
           total_selesai: totalSelesaiPeserta,
+          total_sedang_mengerjakan: totalSedangMengerjakan,
+          total_soal: totalSoal,
+          waktu_mulai: u.waktu_mulai ? u.waktu_mulai.toISOString() : null,
+          waktu_selesai: u.waktu_selesai ? u.waktu_selesai.toISOString() : null,
+          created_at: u.created_at.toISOString(),
+          asesmen_id: u.asesmen_id,
           rata_rata: rataRata,
           gunakan_token: u.gunakan_token,
           token_masuk: u.token_masuk,
+          total_perlu_koreksi: totalPerluKoreksi,
+          kkm_kktp: u.kkm_kktp,
+          acak_soal: u.acak_soal,
+          acak_opsi: u.acak_opsi,
+          tampilkan_nilai: u.tampilkan_nilai,
+          tampilkan_pembahasan: u.tampilkan_pembahasan,
         };
       });
 
@@ -149,6 +209,49 @@ export default async function CbtUjianPage() {
         exams,
       };
     });
+
+    // Agregasi jumlah butir Bank Soal per Mata Pelajaran untuk kumpulan folder
+    const bankSoalByMapelCounts = await prisma.bankSoal.groupBy({
+      by: ["mata_pelajaran_id"],
+      where: {
+        sekolah_id: user.sekolah_id,
+        status: "AKTIF",
+        ...(isSuperAdmin
+          ? {}
+          : guruId
+            ? {
+                OR: [{ guru_id: guruId }, { scope_kepemilikan: "SEKOLAH" }],
+              }
+            : {}),
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const mapelCountMap = new Map<string, number>();
+    for (const item of bankSoalByMapelCounts) {
+      mapelCountMap.set(item.mata_pelajaran_id, item._count.id);
+    }
+
+    const allMapelRecords = await prisma.mataPelajaran.findMany({
+      where: { sekolah_id: user.sekolah_id },
+      select: { id: true, nama: true, kode: true },
+      orderBy: { nama: "asc" },
+    });
+
+    const teacherMapelIds = new Set(penugasanList.map((p) => p.mata_pelajaran_id));
+
+    bankSoalFolders = allMapelRecords
+      .filter(
+        (m) => isSuperAdmin || teacherMapelIds.has(m.id) || (mapelCountMap.get(m.id) ?? 0) > 0
+      )
+      .map((m) => ({
+        mapel_id: m.id,
+        mapel_nama: m.nama,
+        mapel_kode: m.kode,
+        total_soal: mapelCountMap.get(m.id) ?? 0,
+      }));
   }
 
   // 2. Context Siswa (Student)
@@ -291,6 +394,8 @@ export default async function CbtUjianPage() {
         teacherClasses={teacherClasses}
         studentExams={studentExams}
         isSuperAdmin={isSuperAdmin}
+        bankSoalCount={bankSoalCount}
+        bankSoalFolders={bankSoalFolders}
       />
     </AcademicShell>
   );

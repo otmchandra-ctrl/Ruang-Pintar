@@ -163,7 +163,7 @@ describe("M08 — Teacher Presentation Views & Tabs (Academic Glass UI v1.2)", (
     expect(screen.getByPlaceholderText(/search guru/i)).toBeInTheDocument();
     expect(screen.getByText("Total Beban Jam (JP)")).toBeInTheDocument();
     expect(screen.getAllByText("4 JP")[0]).toBeInTheDocument();
-    expect(screen.getByText(/\+ Tetapkan Penugasan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tetapkan Penugasan/i)).toBeInTheDocument();
   });
 
   it("keeps the teaching-assignment filter popover above the table without clipping", () => {

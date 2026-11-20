@@ -11,9 +11,9 @@
  * - High-Contrast Dark Mode & Academic Glass Aesthetics
  */
 
-import React, { useState, useTransition, useRef } from "react";
+import React, { useState, useTransition, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Layers,
@@ -32,19 +32,26 @@ import {
   FileAudio,
   Check,
   RotateCcw,
-  Sparkles,
+  Lightbulb,
+  Pencil,
 } from "lucide-react";
-import { JenisSoalCbt, TingkatKesulitanCbt, OpsiJawaban } from "../domain/cbt-types";
-import { createQuestionAction } from "@/app/actions/cbt-actions";
+import { JenisSoalCbt, TingkatKesulitanCbt, OpsiJawaban, BankSoalDTO } from "../domain/cbt-types";
+import {
+  createQuestionAction,
+  createQuestionVersionAction,
+  getQuestionDetailAction,
+} from "@/app/actions/cbt-actions";
 import { MathFormulaToolbar } from "@/shared/components/cbt/math-formula-toolbar";
 import { MathRenderer } from "@/shared/components/cbt/math-renderer";
 import { ImageStimulus } from "@/shared/components/cbt/image-stimulus";
 import { AudioStimulusPlayer } from "@/shared/components/cbt/audio-stimulus-player";
+import { ResizableImageEditor } from "@/shared/components/cbt/resizable-image-editor";
 
 export interface CreateQuestionFullViewProps {
   sekolahId: string;
   mapelList: Array<{ id: string; nama: string; kode: string }>;
   initialMapelId?: string;
+  initialQuestion?: BankSoalDTO | null;
 }
 
 export type ImageSizeMode = "SM" | "MD" | "LG" | "FULL";
@@ -53,67 +60,320 @@ export function CreateQuestionFullView({
   sekolahId,
   mapelList,
   initialMapelId,
+  initialQuestion,
 }: CreateQuestionFullViewProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const searchParams = useSearchParams();
+  const urlEditId = searchParams?.get("editId");
+  const urlMapelId = searchParams?.get("mapelId");
 
-  // Form Fields
-  const [selectedMapelId, setSelectedMapelId] = useState<string>(
-    initialMapelId || (mapelList.length > 0 ? mapelList[0].id : "")
+  const [currentQuestion, setCurrentQuestion] = useState<BankSoalDTO | null>(
+    initialQuestion || null
   );
-  const [kode, setKode] = useState("");
-  const [jenisSoal, setJenisSoal] = useState<JenisSoalCbt>("PILIHAN_GANDA");
-  const [tingkatKesulitan, setTingkatKesulitan] = useState<TingkatKesulitanCbt>("SEDANG");
-  const [bobotDefault, setBobotDefault] = useState(1);
-  const [kontenPertanyaan, setKontenPertanyaan] = useState("");
-  const [pembahasan, setPembahasan] = useState("");
+  const activeQuestion = currentQuestion || initialQuestion;
+  const isEditMode = Boolean(activeQuestion);
 
-  // Stimulus Gambar State
-  const [gambarUrl, setGambarUrl] = useState("");
-  const [gambarSize, setGambarSize] = useState<ImageSizeMode>("MD");
-  const [isInputtingImageUrl, setIsInputtingImageUrl] = useState(false);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  // Parsing initial question values if in edit mode
+  let initPertanyaan = initialQuestion?.pertanyaan || "";
+  let initAudioUrl = "";
+  let initAudioLimit = 2;
+  const audioMatch = initPertanyaan.match(/\[audio:(https?:\/\/[^\s|\]]+)(?:\|limit:(\d+))?\]/i);
+  if (audioMatch) {
+    initAudioUrl = audioMatch[1];
+    initAudioLimit = audioMatch[2] ? parseInt(audioMatch[2], 10) : 2;
+    initPertanyaan = initPertanyaan.replace(/\[audio:[^\]]+\]/gi, "").trim();
+  } else {
+    const gUrl = initialQuestion?.gambar_url || "";
+    if (/\.(mp3|wav|ogg|m4a)(\?.*)?$/i.test(gUrl)) {
+      initAudioUrl = gUrl;
+    }
+  }
 
-  // Stimulus Audio State
-  const [audioUrl, setAudioUrl] = useState("");
-  const [audioPlayLimit, setAudioPlayLimit] = useState(2);
-  const [isInputtingAudioUrl, setIsInputtingAudioUrl] = useState(false);
-  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  let initTeksPengantar = initPertanyaan;
+  let initTeksPertanyaanBawah = "";
+  const initialGambarSplit = initPertanyaan.split(/\[(?:gambar|image)\]/i);
+  if (initialGambarSplit.length > 1) {
+    initTeksPengantar = initialGambarSplit[0].trim();
+    initTeksPertanyaanBawah = initialGambarSplit.slice(1).join("\n\n[gambar]\n\n").trim();
+  } else if (
+    initialQuestion?.gambar_url &&
+    !/\.(mp3|wav|ogg|m4a)(\?.*)?$/i.test(initialQuestion.gambar_url) &&
+    initPertanyaan.includes("\n")
+  ) {
+    const lines = initPertanyaan
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length >= 2) {
+      initTeksPengantar = lines[0];
+      initTeksPertanyaanBawah = lines.slice(1).join("\n\n");
+    }
+  }
 
-  // Options State: Pilihan Ganda & Benar/Salah
-  const [opsiList, setOpsiList] = useState<
-    Array<{ label: string; teks: string; isCorrect: boolean }>
-  >([
+  let initGambarUrl = "";
+  let initGambarSize: ImageSizeMode = "MD";
+  if (
+    initialQuestion?.gambar_url &&
+    !/\.(mp3|wav|ogg|m4a)(\?.*)?$/i.test(initialQuestion.gambar_url)
+  ) {
+    const [cleanImg, hash] = initialQuestion.gambar_url.split("#");
+    initGambarUrl = cleanImg || "";
+    const sizeParam = hash?.match(/size=([a-zA-Z]+)/i)?.[1]?.toUpperCase();
+    if (sizeParam && ["SM", "MD", "LG", "FULL"].includes(sizeParam)) {
+      initGambarSize = sizeParam as ImageSizeMode;
+    }
+  }
+
+  const rawOptions = initialQuestion?.opsi_jawaban || initialQuestion?.opsi;
+  const rawKunci = initialQuestion?.kunci_jawaban;
+  const correctKeys: string[] = Array.isArray(rawKunci)
+    ? rawKunci
+    : Array.isArray(rawKunci?.pilihan_benar)
+      ? rawKunci.pilihan_benar
+      : typeof rawKunci?.pilihan_benar === "string"
+        ? [rawKunci.pilihan_benar]
+        : typeof rawKunci === "string"
+          ? [rawKunci]
+          : [];
+
+  let initOpsiList = [
     { label: "A", teks: "", isCorrect: true },
     { label: "B", teks: "", isCorrect: false },
     { label: "C", teks: "", isCorrect: false },
     { label: "D", teks: "", isCorrect: false },
-  ]);
+  ];
+  if (rawOptions && Array.isArray(rawOptions) && rawOptions.length > 0) {
+    initOpsiList = rawOptions.map((op: any, idx: number) => {
+      const label = op.label || op.id || String.fromCharCode(65 + idx);
+      return {
+        label,
+        teks: op.teks || "",
+        isCorrect: correctKeys.includes(label),
+      };
+    });
+  }
 
-  // Options State: Menjodohkan (Premis Kiri, Pilihan Jawaban Kanan dengan Pengecoh, dan Kunci Pasangan)
-  const [menjodohkanPremis, setMenjodohkanPremis] = useState<Array<{ id: number; teks: string }>>([
+  let initMenjodohkanPremis = [
     { id: 1, teks: "" },
     { id: 2, teks: "" },
     { id: 3, teks: "" },
-  ]);
-  const [menjodohkanPilihan, setMenjodohkanPilihan] = useState<
-    Array<{ label: string; teks: string }>
-  >([
+  ];
+  let initMenjodohkanPilihan = [
     { label: "A", teks: "" },
     { label: "B", teks: "" },
     { label: "C", teks: "" },
     { label: "D", teks: "" },
     { label: "E", teks: "" },
-  ]);
-  // Mapping Premis ID -> Pilihan Label (misal { 1: "C", 2: "A", 3: "E" })
-  const [kunciPasanganMap, setKunciPasanganMap] = useState<Record<number, string>>({
-    1: "A",
-    2: "B",
-    3: "C",
-  });
+  ];
+  let initKunciPasanganMap: Record<number, string> = { 1: "A", 2: "B", 3: "C" };
 
-  const [kunciSingkat, setKunciSingkat] = useState("");
-  const [rubrikEsai, setRubrikEsai] = useState("");
+  if (initialQuestion?.tipe_soal === "MENJODOHKAN") {
+    if (rawKunci?.premis && Array.isArray(rawKunci.premis)) {
+      initMenjodohkanPremis = rawKunci.premis.map((p: any, i: number) => ({
+        id: Number(p.id) || i + 1,
+        teks: p.teks || "",
+      }));
+    }
+    if (rawKunci?.pilihan && Array.isArray(rawKunci.pilihan)) {
+      initMenjodohkanPilihan = rawKunci.pilihan.map((c: any, i: number) => ({
+        label: c.label || String.fromCharCode(65 + i),
+        teks: c.teks || "",
+      }));
+    }
+    if (rawKunci?.kunci_pasangan && typeof rawKunci.kunci_pasangan === "object") {
+      initKunciPasanganMap = rawKunci.kunci_pasangan;
+    }
+  }
+
+  const initKunciSingkat = Array.isArray(rawKunci?.kata_kunci)
+    ? rawKunci.kata_kunci.join(", ")
+    : Array.isArray(rawKunci)
+      ? rawKunci.join(", ")
+      : typeof rawKunci === "string"
+        ? rawKunci
+        : "";
+
+  const initRubrikEsai = rawKunci?.rubrik_penilaian || "";
+
+  // Form Fields
+  const [selectedMapelId, setSelectedMapelId] = useState<string>(() => {
+    if (initialQuestion?.mata_pelajaran_id) return initialQuestion.mata_pelajaran_id;
+    if (urlMapelId && mapelList.some((m) => m.id === urlMapelId)) return urlMapelId;
+    if (initialMapelId && mapelList.some((m) => m.id === initialMapelId)) return initialMapelId;
+    return mapelList.length > 0 ? mapelList[0].id : "";
+  });
+  const [kode, setKode] = useState(initialQuestion?.kode || "");
+  const [jenisSoal, setJenisSoal] = useState<JenisSoalCbt>(
+    (initialQuestion?.jenis_soal || initialQuestion?.tipe_soal || "PILIHAN_GANDA") as JenisSoalCbt
+  );
+  const [tingkatKesulitan, setTingkatKesulitan] = useState<TingkatKesulitanCbt>(
+    (initialQuestion?.tingkat_kesulitan || "SEDANG") as TingkatKesulitanCbt
+  );
+  const [bobotDefault, setBobotDefault] = useState<number | string>(
+    initialQuestion?.bobot_default ?? 1
+  );
+  const [kontenPertanyaan, setKontenPertanyaan] = useState(initTeksPengantar);
+  const [kontenPertanyaanBawah, setKontenPertanyaanBawah] = useState(initTeksPertanyaanBawah);
+  const [pembahasan, setPembahasan] = useState(initialQuestion?.pembahasan || "");
+
+  // Stimulus Gambar State
+  const [gambarUrl, setGambarUrl] = useState(initGambarUrl);
+  const [gambarSize, setGambarSize] = useState<ImageSizeMode>(initGambarSize);
+  const [isInputtingImageUrl, setIsInputtingImageUrl] = useState(false);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Stimulus Audio State
+  const [audioUrl, setAudioUrl] = useState(initAudioUrl);
+  const [audioPlayLimit, setAudioPlayLimit] = useState(initAudioLimit);
+  const [isInputtingAudioUrl, setIsInputtingAudioUrl] = useState(false);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Options State: Pilihan Ganda & Benar/Salah
+  const [opsiList, setOpsiList] =
+    useState<Array<{ label: string; teks: string; isCorrect: boolean }>>(initOpsiList);
+
+  // Options State: Menjodohkan
+  const [menjodohkanPremis, setMenjodohkanPremis] =
+    useState<Array<{ id: number; teks: string }>>(initMenjodohkanPremis);
+  const [menjodohkanPilihan, setMenjodohkanPilihan] =
+    useState<Array<{ label: string; teks: string }>>(initMenjodohkanPilihan);
+  const [kunciPasanganMap, setKunciPasanganMap] =
+    useState<Record<number, string>>(initKunciPasanganMap);
+
+  const [kunciSingkat, setKunciSingkat] = useState(initKunciSingkat);
+  const [rubrikEsai, setRubrikEsai] = useState(initRubrikEsai);
+
+  const [isPending, startTransition] = useTransition();
+
+  // Sinkronisasi data butir soal ke dalam formulir (baik dari props SSR maupun fetching URL fallback)
+  const applyQuestionData = useCallback((q: BankSoalDTO) => {
+    let qPertanyaan = q.pertanyaan || "";
+    let qAudioUrl = "";
+    let qAudioLimit = 2;
+    const audioMatch = qPertanyaan.match(/\[audio:(https?:\/\/[^\s|\]]+)(?:\|limit:(\d+))?\]/i);
+    if (audioMatch) {
+      qAudioUrl = audioMatch[1];
+      qAudioLimit = audioMatch[2] ? parseInt(audioMatch[2], 10) : 2;
+      qPertanyaan = qPertanyaan.replace(/\[audio:[^\]]+\]/gi, "").trim();
+    } else {
+      const gUrl = q.gambar_url || "";
+      if (/\.(mp3|wav|ogg|m4a)(\?.*)?$/i.test(gUrl)) {
+        qAudioUrl = gUrl;
+      }
+    }
+
+    let qGambarUrl = "";
+    let qGambarSize: ImageSizeMode = "MD";
+    if (q.gambar_url && !/\.(mp3|wav|ogg|m4a)(\?.*)?$/i.test(q.gambar_url)) {
+      const [cleanImg, hash] = q.gambar_url.split("#");
+      qGambarUrl = cleanImg || "";
+      const sizeParam = hash?.match(/size=([a-zA-Z]+)/i)?.[1]?.toUpperCase();
+      if (sizeParam && ["SM", "MD", "LG", "FULL"].includes(sizeParam)) {
+        qGambarSize = sizeParam as ImageSizeMode;
+      }
+    }
+
+    const qRawOptions = q.opsi_jawaban || q.opsi;
+    const qRawKunci = q.kunci_jawaban;
+    const qCorrectKeys: string[] = Array.isArray(qRawKunci)
+      ? qRawKunci
+      : Array.isArray(qRawKunci?.pilihan_benar)
+        ? qRawKunci.pilihan_benar
+        : typeof qRawKunci?.pilihan_benar === "string"
+          ? [qRawKunci.pilihan_benar]
+          : typeof qRawKunci === "string"
+            ? [qRawKunci]
+            : [];
+
+    if (qRawOptions && Array.isArray(qRawOptions) && qRawOptions.length > 0) {
+      setOpsiList(
+        qRawOptions.map((op: any, idx: number) => {
+          const label = op.label || op.id || String.fromCharCode(65 + idx);
+          return {
+            label,
+            teks: op.teks || "",
+            isCorrect: qCorrectKeys.includes(label),
+          };
+        })
+      );
+    }
+
+    if (q.mata_pelajaran_id) setSelectedMapelId(q.mata_pelajaran_id);
+    if (q.kode) setKode(q.kode);
+    setJenisSoal((q.jenis_soal || q.tipe_soal || "PILIHAN_GANDA") as JenisSoalCbt);
+    setTingkatKesulitan((q.tingkat_kesulitan || "SEDANG") as TingkatKesulitanCbt);
+    setBobotDefault(q.bobot_default ?? 1);
+    const gambarSplit = qPertanyaan.split(/\[(?:gambar|image)\]/i);
+    if (gambarSplit.length > 1) {
+      setKontenPertanyaan(gambarSplit[0].trim());
+      setKontenPertanyaanBawah(gambarSplit.slice(1).join("\n\n[gambar]\n\n").trim());
+    } else if (qGambarUrl && qPertanyaan.includes("\n")) {
+      const lines = qPertanyaan
+        .split(/\n+/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (lines.length >= 2) {
+        setKontenPertanyaan(lines[0]);
+        setKontenPertanyaanBawah(lines.slice(1).join("\n\n"));
+      } else {
+        setKontenPertanyaan(qPertanyaan);
+        setKontenPertanyaanBawah("");
+      }
+    } else {
+      setKontenPertanyaan(qPertanyaan);
+      setKontenPertanyaanBawah("");
+    }
+    setGambarUrl(qGambarUrl);
+    setGambarSize(qGambarSize);
+    setAudioUrl(qAudioUrl);
+    setAudioPlayLimit(qAudioLimit);
+    setPembahasan(q.pembahasan || "");
+
+    if (q.tipe_soal === "MENJODOHKAN") {
+      if (qRawKunci?.premis && Array.isArray(qRawKunci.premis)) {
+        setMenjodohkanPremis(
+          qRawKunci.premis.map((p: any, i: number) => ({
+            id: Number(p.id) || i + 1,
+            teks: p.teks || "",
+          }))
+        );
+      }
+      if (qRawKunci?.pilihan && Array.isArray(qRawKunci.pilihan)) {
+        setMenjodohkanPilihan(
+          qRawKunci.pilihan.map((c: any, i: number) => ({
+            label: c.label || String.fromCharCode(65 + i),
+            teks: c.teks || "",
+          }))
+        );
+      }
+      if (qRawKunci?.kunci_pasangan && typeof qRawKunci.kunci_pasangan === "object") {
+        setKunciPasanganMap(qRawKunci.kunci_pasangan);
+      }
+    } else if (q.tipe_soal === "ISIAN_SINGKAT") {
+      const keys = Array.isArray(qRawKunci?.kata_kunci)
+        ? qRawKunci.kata_kunci.join(", ")
+        : Array.isArray(qRawKunci)
+          ? qRawKunci.join(", ")
+          : typeof qRawKunci === "string"
+            ? qRawKunci
+            : "";
+      setKunciSingkat(keys);
+    } else if (q.tipe_soal === "URAIAN_ESAI" || q.tipe_soal === "ESAI") {
+      setRubrikEsai(qRawKunci?.rubrik_penilaian || "");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!initialQuestion && urlEditId) {
+      // Fallback: Memuat data dari URL query ?editId=... jika tidak ter-pass dari Server Component
+      getQuestionDetailAction(urlEditId).then((res) => {
+        if (res.success && res.data) {
+          setCurrentQuestion(res.data);
+          applyQuestionData(res.data);
+        }
+      });
+    }
+  }, [initialQuestion, urlEditId, applyQuestionData]);
 
   // Rich Stimulus State
   const [isArabicActive, setIsArabicActive] = useState(false);
@@ -124,6 +384,8 @@ export function CreateQuestionFullView({
   } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaBawahRef = useRef<HTMLTextAreaElement>(null);
+  const lastFocusedFieldRef = useRef<"TOP" | "BOTTOM">("TOP");
 
   const showToast = (text: string, type: "success" | "error" | "info" = "info") => {
     setToastMessage({ text, type });
@@ -212,16 +474,19 @@ export function CreateQuestionFullView({
   };
 
   const handleInsertFormula = (latexFormula: string) => {
-    if (!textareaRef.current) {
-      setKontenPertanyaan((prev) => prev + (prev.endsWith(" ") ? "" : " ") + latexFormula);
+    const isBottom = lastFocusedFieldRef.current === "BOTTOM" && Boolean(gambarUrl.trim());
+    const target = isBottom ? textareaBawahRef.current : textareaRef.current;
+    const current = isBottom ? kontenPertanyaanBawah : kontenPertanyaan;
+    const setTargetContent = isBottom ? setKontenPertanyaanBawah : setKontenPertanyaan;
+
+    if (!target) {
+      setTargetContent((prev) => prev + (prev.endsWith(" ") ? "" : " ") + latexFormula);
       return;
     }
-    const target = textareaRef.current;
     const start = target.selectionStart;
     const end = target.selectionEnd;
-    const current = kontenPertanyaan;
     const updated = current.substring(0, start) + latexFormula + current.substring(end);
-    setKontenPertanyaan(updated);
+    setTargetContent(updated);
 
     setTimeout(() => {
       target.focus();
@@ -298,8 +563,8 @@ export function CreateQuestionFullView({
       showToast("Silakan pilih mata pelajaran terlebih dahulu.", "error");
       return;
     }
-    if (!kontenPertanyaan.trim()) {
-      showToast("Teks pertanyaan soal wajib diisi.", "error");
+    if (!kontenPertanyaan.trim() && !kontenPertanyaanBawah.trim()) {
+      showToast("Teks narasi atau pertanyaan soal wajib diisi.", "error");
       return;
     }
 
@@ -361,7 +626,7 @@ export function CreateQuestionFullView({
         kunciJawaban = {
           kata_kunci: kunciSingkat
             .split(",")
-            .map((k) => k.trim())
+            .map((k: string) => k.trim())
             .filter(Boolean),
           case_sensitive: false,
         };
@@ -372,7 +637,33 @@ export function CreateQuestionFullView({
         };
       }
 
-      let finalPertanyaan = kontenPertanyaan.trim();
+      let finalTeksAtas = kontenPertanyaan.trim();
+      let finalTeksBawah = kontenPertanyaanBawah.trim();
+
+      // Smart Auto-Split: Jika guru mengetik seluruh pengantar dan pertanyaan di kotak atas saat ada gambar
+      if (
+        gambarUrl.trim() &&
+        !finalTeksBawah &&
+        !finalTeksAtas.toLowerCase().includes("[gambar]") &&
+        finalTeksAtas.includes("\n")
+      ) {
+        const lines = finalTeksAtas
+          .split(/\n+/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        if (lines.length >= 2) {
+          finalTeksAtas = lines[0];
+          finalTeksBawah = lines.slice(1).join("\n\n");
+        }
+      }
+
+      let finalPertanyaan = finalTeksAtas;
+      if (gambarUrl.trim() && finalTeksBawah) {
+        finalPertanyaan = `${finalTeksAtas}\n\n[gambar]\n\n${finalTeksBawah}`;
+      } else if (finalTeksBawah) {
+        finalPertanyaan = finalTeksAtas ? `${finalTeksAtas}\n\n${finalTeksBawah}` : finalTeksBawah;
+      }
+
       if (audioUrl.trim()) {
         finalPertanyaan = `${finalPertanyaan}\n\n[audio:${audioUrl.trim()}|limit:${audioPlayLimit || 2}]`;
       }
@@ -396,42 +687,67 @@ export function CreateQuestionFullView({
         kunci_jawaban: kunciJawaban,
       };
 
-      const res = await createQuestionAction(payload);
-      if (res.success) {
-        showToast("Butir soal berhasil disimpan ke Bank Soal!", "success");
-        if (shouldContinue) {
-          setKontenPertanyaan("");
-          setKode("");
-          setGambarUrl("");
-          setAudioUrl("");
-          setPembahasan("");
-          setOpsiList([
-            { label: "A", teks: "", isCorrect: true },
-            { label: "B", teks: "", isCorrect: false },
-            { label: "C", teks: "", isCorrect: false },
-            { label: "D", teks: "", isCorrect: false },
-          ]);
-          setMenjodohkanPremis([
-            { id: 1, teks: "" },
-            { id: 2, teks: "" },
-            { id: 3, teks: "" },
-          ]);
-          setMenjodohkanPilihan([
-            { label: "A", teks: "" },
-            { label: "B", teks: "" },
-            { label: "C", teks: "" },
-            { label: "D", teks: "" },
-            { label: "E", teks: "" },
-          ]);
-          setKunciPasanganMap({ 1: "A", 2: "B", 3: "C" });
-        } else {
+      if (isEditMode && activeQuestion) {
+        const res = await createQuestionVersionAction(activeQuestion.id, {
+          pertanyaan: finalPertanyaan,
+          gambar_url: finalGambarUrl,
+          opsi: formatOpsi,
+          kunci_jawaban: kunciJawaban,
+          bobot: Number(bobotDefault) || 1,
+          tingkat_kesulitan: tingkatKesulitan,
+        });
+
+        if (res.success) {
+          showToast("Perubahan butir soal berhasil disimpan sebagai versi baru!", "success");
           setTimeout(() => {
             router.push("/cbt-ujian");
             router.refresh();
-          }, 600);
+          }, 800);
+        } else {
+          showToast(res.message || "Gagal menyimpan perubahan soal.", "error");
         }
       } else {
-        showToast(res.message || "Gagal menyimpan butir soal.", "error");
+        const res = await createQuestionAction(payload);
+        if (res.success) {
+          showToast("Butir soal berhasil disimpan ke Bank Soal!", "success");
+          if (shouldContinue) {
+            setKontenPertanyaan("");
+            setKontenPertanyaanBawah("");
+            setKode("");
+            setGambarUrl("");
+            setAudioUrl("");
+            setPembahasan("");
+            setOpsiList([
+              { label: "A", teks: "", isCorrect: true },
+              { label: "B", teks: "", isCorrect: false },
+              { label: "C", teks: "", isCorrect: false },
+              { label: "D", teks: "", isCorrect: false },
+            ]);
+            setMenjodohkanPremis([
+              { id: 1, teks: "" },
+              { id: 2, teks: "" },
+              { id: 3, teks: "" },
+            ]);
+            setMenjodohkanPilihan([
+              { label: "A", teks: "" },
+              { label: "B", teks: "" },
+              { label: "C", teks: "" },
+              { label: "D", teks: "" },
+              { label: "E", teks: "" },
+            ]);
+            setKunciPasanganMap({ 1: "A", 2: "B", 3: "C" });
+            if (typeof window !== "undefined") {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          } else {
+            setTimeout(() => {
+              router.push("/cbt-ujian");
+              router.refresh();
+            }, 600);
+          }
+        } else {
+          showToast(res.message || "Gagal menyimpan butir soal.", "error");
+        }
       }
     });
   };
@@ -474,18 +790,27 @@ export function CreateQuestionFullView({
             <span>Bank Soal</span>
             <span>/</span>
             <span className="text-blue-600 dark:text-blue-400 font-extrabold">
-              Buat Soal untuk Saya
+              {isEditMode
+                ? `Edit Butir Soal ${activeQuestion?.kode ? `(${activeQuestion.kode})` : ""}`
+                : "Buat Soal untuk Saya"}
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5 flex-wrap">
             <div className="size-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-              <Layers className="h-5 w-5" />
+              {isEditMode ? <Pencil className="h-5 w-5" /> : <Layers className="h-5 w-5" />}
             </div>
-            <span>Buat Soal untuk Saya</span>
+            <span>{isEditMode ? "Edit Butir Soal" : "Buat Soal untuk Saya"}</span>
+            {isEditMode && (
+              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
+                Akan menjadi v
+                {activeQuestion?.versi_aktif ? Number(activeQuestion.versi_aktif) + 1 : 2}
+              </span>
+            )}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-            Penyusunan butir soal evaluasi digital dengan stimulus multi-format (Formula KaTeX, Arab
-            RTL, Gambar, dan Audio Listening)
+            {isEditMode
+              ? "Perbarui narasi pertanyaan, stimulus multi-format, dan konfigurasi kunci jawaban butir soal ini."
+              : "Penyusunan butir soal evaluasi digital dengan stimulus multi-format (Formula KaTeX, Arab RTL, Gambar, dan Audio Listening)"}
           </p>
         </div>
 
@@ -498,15 +823,17 @@ export function CreateQuestionFullView({
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Kembali</span>
           </Link>
-          <button
-            type="button"
-            onClick={() => handleSave(true)}
-            disabled={isPending}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 text-xs font-extrabold transition-all shadow-xs cursor-pointer disabled:opacity-50"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>Simpan & Buat Lagi</span>
-          </button>
+          {!isEditMode && (
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 text-xs font-extrabold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Simpan & Buat Lagi</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleSave(false)}
@@ -514,10 +841,36 @@ export function CreateQuestionFullView({
             className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black shadow-md shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            <span>{isPending ? "Menyimpan..." : "Simpan Butir Soal"}</span>
+            <span>
+              {isPending
+                ? "Menyimpan..."
+                : isEditMode
+                  ? "Simpan Perubahan Soal"
+                  : "Simpan Butir Soal"}
+            </span>
           </button>
         </div>
       </div>
+
+      {/* Edit Mode Alert Banner */}
+      {isEditMode && (
+        <div className="p-4 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-3xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-3 shadow-2xs">
+          <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-bold flex items-center gap-2">
+              <span>Mode Edit Butir Soal Layar Penuh</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 font-bold">
+                v{initialQuestion?.versi_aktif ? Number(initialQuestion.versi_aktif) + 1 : 2}
+              </span>
+            </p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+              Sistem menjaga keamanan integritas nilai sekolah: Ujian terdahulu yang telah
+              berlangsung/selesai tidak akan terpengaruh. Perubahan yang Anda simpan otomatis
+              menjadi versi aktif untuk ujian mendatang.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           2. MAIN FORM BODY (ACADEMIC GLASS CONTAINER)
@@ -532,7 +885,8 @@ export function CreateQuestionFullView({
             <select
               value={selectedMapelId}
               onChange={(e) => setSelectedMapelId(e.target.value)}
-              className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition shadow-2xs cursor-pointer"
+              disabled={isEditMode}
+              className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition shadow-2xs cursor-pointer disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:opacity-75 disabled:cursor-not-allowed"
             >
               {mapelList.map((m) => (
                 <option
@@ -553,7 +907,8 @@ export function CreateQuestionFullView({
             <select
               value={jenisSoal}
               onChange={(e) => setJenisSoal(e.target.value as any)}
-              className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition shadow-2xs cursor-pointer"
+              disabled={isEditMode}
+              className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition shadow-2xs cursor-pointer disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:opacity-75 disabled:cursor-not-allowed"
             >
               <option value="PILIHAN_GANDA" className="dark:bg-slate-900">
                 Pilihan Ganda (Satu Jawaban Benar)
@@ -609,17 +964,29 @@ export function CreateQuestionFullView({
               value={kode}
               onChange={(e) => setKode(e.target.value)}
               placeholder="Misal: MAT-IX-001"
-              className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition shadow-2xs font-mono"
+              disabled={isEditMode}
+              className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition shadow-2xs font-mono disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
         </div>
 
         {/* Row 2: Teks Soal & Rich Toolbar */}
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                Teks Soal / Pertanyaan <span className="text-rose-500">*</span>
+                {gambarUrl.trim() ? (
+                  <span>
+                    1. Teks Pengantar / Stimulus Awal (Sebelum Gambar){" "}
+                    <span className="text-slate-400 font-normal text-[11px]">
+                      (Opsional jika gambar mandiri)
+                    </span>
+                  </span>
+                ) : (
+                  <span>
+                    Teks Soal / Pertanyaan <span className="text-rose-500">*</span>
+                  </span>
+                )}
               </label>
               <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-800">
                 Bisa Paste (Ctrl+V) Gambar Langsung
@@ -637,6 +1004,17 @@ export function CreateQuestionFullView({
               >
                 {isArabicActive ? "RTL Arab Aktif (يمين)" : "Teks Arab (RTL)"}
               </button>
+              {gambarUrl.trim() && (
+                <button
+                  type="button"
+                  onClick={() => handleInsertFormula("\n\n[gambar]\n\n")}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-all cursor-pointer"
+                  title="Sisipkan tag [gambar] di kursor agar gambar berada di tengah tulisan"
+                >
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  <span>Sisipkan [gambar] di Kursor</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowRichPreview(!showRichPreview)}
@@ -647,7 +1025,7 @@ export function CreateQuestionFullView({
                 ) : (
                   <Eye className="h-3.5 w-3.5" />
                 )}
-                <span>{showRichPreview ? "Tutup Preview" : "Preview Formula"}</span>
+                <span>{showRichPreview ? "Tutup Preview" : "Preview Tampilan Siswa"}</span>
               </button>
             </div>
           </div>
@@ -655,47 +1033,192 @@ export function CreateQuestionFullView({
           {/* KaTeX Math Toolbar */}
           <MathFormulaToolbar onInsertLatex={handleInsertFormula} />
 
-          {/* Textarea dengan High-Contrast Dark Mode & Paste Event Capture */}
+          {/* Textarea 1: Teks Pengantar / Soal Utama */}
           <textarea
             ref={textareaRef}
-            rows={5}
+            rows={gambarUrl.trim() ? 3 : 5}
             dir={isArabicActive ? "rtl" : "ltr"}
             value={kontenPertanyaan}
             onChange={(e) => setKontenPertanyaan(e.target.value)}
+            onFocus={() => {
+              lastFocusedFieldRef.current = "TOP";
+            }}
             onPaste={handleTextareaPaste}
             placeholder={
-              isArabicActive
-                ? "اكتب نص السؤال هنا..."
-                : "Tuliskan narasi pertanyaan atau stimulus soal di sini. Anda juga bisa menempelkan (Ctrl+V) screenshot gambar langsung ke sini, atau gunakan $formula$ untuk rumus matematika KaTeX."
+              gambarUrl.trim()
+                ? "Contoh: Perhatikan gambar berikut !"
+                : isArabicActive
+                  ? "اكتب نص السؤال هنا..."
+                  : "Tuliskan narasi pertanyaan atau stimulus soal di sini. Anda juga bisa menempelkan (Ctrl+V) screenshot gambar langsung ke sini, atau gunakan $formula$ untuk rumus matematika KaTeX."
             }
             className={`w-full text-sm px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 dark:focus:border-blue-500 shadow-2xs transition-colors ${
               isArabicActive ? "font-serif text-base leading-relaxed text-right" : ""
             }`}
           />
 
-          {/* Live Preview rendered */}
-          {showRichPreview && kontenPertanyaan && (
-            <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800 space-y-2">
-              <span className="text-[11px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-wider block">
-                Live Preview Tampilan Soal di Layar Siswa:
-              </span>
-              <MathRenderer
-                content={kontenPertanyaan}
-                className={
-                  isArabicActive
-                    ? "text-right font-serif text-lg leading-loose"
-                    : "text-slate-900 dark:text-white"
-                }
+          {/* Smart Split: Gambar Tersemat di Tengah & Textarea Pertanyaan Inti di Bawah Gambar */}
+          {gambarUrl.trim() && (
+            <div className="space-y-3 pt-1">
+              {/* Smart Assistance: Auto-split if user typed everything in box 1 */}
+              {!kontenPertanyaanBawah.trim() &&
+                kontenPertanyaan.includes("\n") &&
+                !kontenPertanyaan.toLowerCase().includes("[gambar]") && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-amber-50/90 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+                      <Lightbulb className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>
+                        <strong>Posisikan Gambar di Tengah:</strong> Terdeteksi teks pengantar dan
+                        pertanyaan berada di kotak atas.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lines = kontenPertanyaan
+                          .split(/\n+/)
+                          .map((l) => l.trim())
+                          .filter(Boolean);
+                        if (lines.length >= 2) {
+                          setKontenPertanyaan(lines[0]);
+                          setKontenPertanyaanBawah(lines.slice(1).join("\n\n"));
+                          showToast("Pertanyaan berhasil dipindahkan ke bawah gambar!", "success");
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-2xs transition cursor-pointer shrink-0"
+                    >
+                      Pindahkan Pertanyaan ke Bawah Gambar ⚡
+                    </button>
+                  </div>
+                )}
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5 text-blue-600" />
+                  <span>Gambar Stimulus Tersemat</span>
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  (Tarik salah satu sudut bulat biru untuk memperbesar / memperkecil)
+                </span>
+              </div>
+
+              <ResizableImageEditor
+                src={gambarUrl}
+                currentSizeMode={gambarSize}
+                onUpdate={(newSrcWithMetadata, newMode) => {
+                  setGambarUrl(newSrcWithMetadata);
+                  setGambarSize(newMode);
+                }}
+                onRemove={() => {
+                  if (kontenPertanyaanBawah.trim()) {
+                    setKontenPertanyaan((prev) =>
+                      prev
+                        ? `${prev}\n\n${kontenPertanyaanBawah}`.trim()
+                        : kontenPertanyaanBawah.trim()
+                    );
+                    setKontenPertanyaanBawah("");
+                  }
+                  setGambarUrl("");
+                }}
               />
+
+              {/* Textarea 2: Pokok Soal / Pertanyaan Inti (Setelah Gambar) */}
+              <div className="space-y-1.5 pt-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    2. Pokok Soal / Pertanyaan Inti (Setelah Gambar){" "}
+                    <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Mendukung rumus KaTeX $..$, teks Arab, & paste gambar
+                  </span>
+                </div>
+                <textarea
+                  ref={textareaBawahRef}
+                  rows={4}
+                  dir={isArabicActive ? "rtl" : "ltr"}
+                  value={kontenPertanyaanBawah}
+                  onChange={(e) => setKontenPertanyaanBawah(e.target.value)}
+                  onFocus={() => {
+                    lastFocusedFieldRef.current = "BOTTOM";
+                  }}
+                  onPaste={handleTextareaPaste}
+                  placeholder="Contoh: Berdasarkan gambar tersebut, contoh multimedia ditunjukkan karena ...."
+                  className={`w-full text-sm px-4 py-3 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/20 dark:bg-blue-950/20 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 dark:focus:border-blue-500 shadow-2xs transition-colors ${
+                    isArabicActive ? "font-serif text-base leading-relaxed text-right" : ""
+                  }`}
+                />
+              </div>
             </div>
           )}
+
+          {/* Live Preview rendered */}
+          {showRichPreview &&
+            (kontenPertanyaan || kontenPertanyaanBawah || gambarUrl.trim()) &&
+            (() => {
+              let prevTeksAtas = kontenPertanyaan;
+              let prevTeksBawah = kontenPertanyaanBawah;
+              if (
+                gambarUrl.trim() &&
+                !prevTeksBawah &&
+                !prevTeksAtas.toLowerCase().includes("[gambar]") &&
+                prevTeksAtas.includes("\n")
+              ) {
+                const lines = prevTeksAtas
+                  .split(/\n+/)
+                  .map((l) => l.trim())
+                  .filter(Boolean);
+                if (lines.length >= 2) {
+                  prevTeksAtas = lines[0];
+                  prevTeksBawah = lines.slice(1).join("\n\n");
+                }
+              } else if (prevTeksAtas.toLowerCase().includes("[gambar]")) {
+                const [t1, ...rest] = prevTeksAtas.split(/\[(?:gambar|image)\]/i);
+                prevTeksAtas = t1.trim();
+                prevTeksBawah = (
+                  rest.join("\n\n") + (prevTeksBawah ? "\n\n" + prevTeksBawah : "")
+                ).trim();
+              }
+
+              return (
+                <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800 space-y-3">
+                  <span className="text-[11px] font-black text-blue-700 dark:text-blue-300 uppercase tracking-wider block">
+                    Live Preview Tampilan Soal di Layar Siswa:
+                  </span>
+                  {prevTeksAtas && (
+                    <MathRenderer
+                      content={prevTeksAtas}
+                      className={
+                        isArabicActive
+                          ? "text-right font-serif text-lg leading-loose"
+                          : "text-slate-900 dark:text-white"
+                      }
+                    />
+                  )}
+                  {gambarUrl.trim() && (
+                    <div className="flex justify-center my-2">
+                      <ImageStimulus src={gambarUrl} alt="Ilustrasi Stimulus" />
+                    </div>
+                  )}
+                  {prevTeksBawah && (
+                    <MathRenderer
+                      content={prevTeksBawah}
+                      className={
+                        isArabicActive
+                          ? "text-right font-serif text-lg leading-loose"
+                          : "text-slate-900 dark:text-white"
+                      }
+                    />
+                  )}
+                </div>
+              );
+            })()}
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
             3. MEDIA STIMULUS (UPLOAD FILE GAMBAR & AUDIO LISTENING)
         ───────────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-          {/* A. GAMBAR STIMULUS DENGAN UPLOAD & UKURAN DINAMIS */}
+          {/* A. GAMBAR STIMULUS DENGAN UPLOAD BERKAS / URL */}
           <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -744,55 +1267,32 @@ export function CreateQuestionFullView({
               </div>
             )}
 
-            {/* Preview Gambar & Dynamic Size Controls */}
+            {/* Status Singkat Gambar Tersemat Tanpa Duplikasi Gambar */}
             {gambarUrl.trim() && (
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  {/* Pilihan Ukuran Gambar Dinamis */}
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Ukuran:</span>
-                    {(["SM", "MD", "LG", "FULL"] as ImageSizeMode[]).map((sz) => (
-                      <button
-                        type="button"
-                        key={sz}
-                        onClick={() => setGambarSize(sz)}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
-                          gambarSize === sz
-                            ? "bg-blue-600 text-white shadow-2xs"
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200"
-                        }`}
-                      >
-                        {sz === "SM" ? "25%" : sz === "MD" ? "50%" : sz === "LG" ? "75%" : "100%"}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setGambarUrl("")}
-                    className="text-[10px] text-rose-600 dark:text-rose-400 font-bold hover:underline cursor-pointer"
-                  >
-                    Hapus Gambar
-                  </button>
+              <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between text-xs font-bold text-blue-700 dark:text-blue-300 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2 truncate">
+                  <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="truncate">
+                    Gambar terpasang di form soal (dapat diubah ukurannya)
+                  </span>
                 </div>
-
-                <div
-                  className={`overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 mx-auto ${
-                    gambarSize === "SM"
-                      ? "max-w-[180px]"
-                      : gambarSize === "MD"
-                        ? "max-w-[340px]"
-                        : gambarSize === "LG"
-                          ? "max-w-[500px]"
-                          : "w-full"
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (kontenPertanyaanBawah.trim()) {
+                      setKontenPertanyaan((prev) =>
+                        prev
+                          ? `${prev}\n\n${kontenPertanyaanBawah}`.trim()
+                          : kontenPertanyaanBawah.trim()
+                      );
+                      setKontenPertanyaanBawah("");
+                    }
+                    setGambarUrl("");
+                  }}
+                  className="text-[11px] text-rose-600 dark:text-rose-400 hover:underline cursor-pointer shrink-0 font-bold ml-2"
                 >
-                  <img
-                    src={gambarUrl.trim().split("#")[0]}
-                    alt="Preview Stimulus"
-                    className="w-full h-auto object-contain max-h-64"
-                  />
-                </div>
+                  Hapus
+                </button>
               </div>
             )}
           </div>
@@ -899,7 +1399,7 @@ export function CreateQuestionFullView({
           {(jenisSoal === "PILIHAN_GANDA" || jenisSoal === "PILIHAN_GANDA_KOMPLEKS") && (
             <div className="space-y-3">
               {opsiList.map((op, idx) => (
-                <div key={op.label} className="flex items-center gap-3">
+                <div key={`${op.label || "opt"}-${idx}`} className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -1077,7 +1577,7 @@ export function CreateQuestionFullView({
 
                   <div className="space-y-2">
                     {menjodohkanPilihan.map((c, cIdx) => (
-                      <div key={c.label} className="flex items-center gap-2">
+                      <div key={`${c.label || "c"}-${cIdx}`} className="flex items-center gap-2">
                         <span className="size-7 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-xs font-black flex items-center justify-center shrink-0">
                           {c.label}
                         </span>
@@ -1209,7 +1709,15 @@ export function CreateQuestionFullView({
               min={0.1}
               step={0.5}
               value={bobotDefault}
-              onChange={(e) => setBobotDefault(Number(e.target.value) || 1)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setBobotDefault(val === "" ? "" : Number(val));
+              }}
+              onBlur={() => {
+                if (bobotDefault === "" || Number(bobotDefault) <= 0) {
+                  setBobotDefault(1);
+                }
+              }}
               className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 shadow-2xs"
             />
           </div>
@@ -1225,6 +1733,64 @@ export function CreateQuestionFullView({
               placeholder="Penjelasan ringkas cara penyelesaian soal ini..."
               className="w-full text-xs px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 shadow-2xs"
             />
+          </div>
+        </div>
+
+        {/* ─────────────────────────────────────────────────────────────
+            6. BOTTOM ACTION BAR (SIMPAN BUTIR SOAL & BUAT LAGI)
+        ───────────────────────────────────────────────────────────── */}
+        <div className="pt-6 border-t border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-50/70 dark:bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-xs">
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Target Soal:</span>
+            <span className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-blue-600 dark:text-blue-400 shadow-2xs">
+              {mapelList.find((m) => m.id === selectedMapelId)?.nama || "Pilih Mapel"}
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="font-mono text-slate-600 dark:text-slate-400 font-semibold">
+              {jenisSoal.replace(/_/g, " ")}
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="font-bold text-amber-600 dark:text-amber-400">
+              {bobotDefault} Poin
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            <Link
+              href="/cbt-ujian"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Kembali</span>
+            </Link>
+
+            {!isEditMode && (
+              <button
+                type="button"
+                onClick={() => handleSave(true)}
+                disabled={isPending}
+                className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 text-xs font-extrabold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Simpan & Buat Lagi</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => handleSave(false)}
+              disabled={isPending}
+              className="inline-flex items-center justify-center gap-1.5 px-5 sm:px-6 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black shadow-md shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              <span>
+                {isPending
+                  ? "Menyimpan..."
+                  : isEditMode
+                    ? "Simpan Perubahan Soal"
+                    : "Simpan Butir Soal"}
+              </span>
+            </button>
           </div>
         </div>
       </div>

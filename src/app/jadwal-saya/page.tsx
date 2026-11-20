@@ -12,7 +12,6 @@ import { staffCapabilityService } from "@/shared/infrastructure/authorization/st
 import { AcademicShell } from "@/shared/components/shell/academic-shell";
 import { scheduleService } from "@/modules/schedule/application/schedule-service";
 import { MyScheduleView } from "@/modules/schedule/presentation/my-schedule-view";
-import { ScheduleHeroBanner } from "@/modules/schedule/presentation/schedule-hero-banner";
 import { schoolProfileService } from "@/modules/school/application/school-profile-service";
 import { prisma } from "@/shared/infrastructure/database/prisma";
 
@@ -105,32 +104,28 @@ export default async function JadwalSayaPage() {
     }
   }
 
-  const uniqueSubjects = new Set(entries.map((e) => e.mata_pelajaran_nama)).size;
-  const uniqueRombels = new Set(entries.map((e) => e.rombel_nama)).size;
-
   return (
-    <AcademicShell user={user} userCapabilities={staffCapabilities}>
-      <div className="relative space-y-6">
+    <AcademicShell
+      user={user}
+      userCapabilities={staffCapabilities}
+      breadcrumbItems={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: isTeacher ? "Jadwal Mengajar" : "Jadwal Pelajaran" },
+      ]}
+    >
+      <div className="pt-2 sm:pt-4 w-full max-w-7xl mx-auto relative space-y-4 sm:space-y-5 pb-10">
         {/* Ambient Backlight Orbs for Academic Glass Refraction */}
         <div className="absolute -top-20 left-1/4 w-[520px] h-[520px] bg-gradient-to-br from-blue-500/15 via-sky-400/10 to-transparent rounded-full blur-[120px] pointer-events-none -z-10" />
         <div className="absolute top-1/3 -right-20 w-[480px] h-[480px] bg-gradient-to-bl from-indigo-500/15 via-purple-400/10 to-transparent rounded-full blur-[120px] pointer-events-none -z-10" />
         <div className="absolute bottom-10 -left-10 w-[480px] h-[480px] bg-gradient-to-tr from-emerald-400/10 via-teal-300/10 to-transparent rounded-full blur-[100px] pointer-events-none -z-10" />
 
-        {/* Modern Animated Hero Card */}
-        <ScheduleHeroBanner
-          isTeacher={isTeacher}
-          schoolName={schoolProfile.nama}
-          totalSessions={entries.length}
-          totalSubjects={uniqueSubjects}
-          totalRombels={uniqueRombels}
-        />
-
-        {/* My Schedule View Component */}
+        {/* My Schedule View Component (Unified Hero & Schedule Workspace) */}
         <MyScheduleView
           entries={entries}
           teacherName={teacherProfile?.nama_lengkap ?? user.nama_lengkap}
           isTeacher={isTeacher}
           initialScheduleRombelId={initialScheduleRombelId}
+          schoolName={schoolProfile.nama}
         />
       </div>
     </AcademicShell>

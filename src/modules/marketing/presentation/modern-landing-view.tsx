@@ -39,6 +39,8 @@ import {
   AnimatePresence,
   FadeIn,
   InteractiveCard,
+  SpotlightCard,
+  ParallaxTilt,
 } from "@/shared/components/motion/motion-elements";
 import { ProCheckoutButton } from "@/modules/billing/presentation/pro-checkout-button";
 import { logoutAction } from "@/app/actions/auth-actions";
@@ -749,8 +751,12 @@ export function ModernLandingView({ user }: ModernLandingViewProps) {
               </FadeIn>
             </div>
 
-            {/* Right Column: Astronaut Holding iPad Pro with ONE HAND + Looping Sway Motion + Translucent Glass Badges */}
-            <div className="lg:col-span-6 flex justify-center relative items-center">
+            {/* Right Column: Astronaut Holding iPad Pro with ONE HAND + Mouse Parallax 3D Tilt + Translucent Glass Badges */}
+            <ParallaxTilt
+              maxTilt={7}
+              perspective={1100}
+              className="lg:col-span-6 flex justify-center relative items-center"
+            >
               {/* Concentric Radar / Sonar Echo Ripples (Camply Video ATM) */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                 <div className="size-[340px] sm:size-[420px] rounded-full border border-blue-400/30 dark:border-blue-400/20 animate-pulse" />
@@ -834,7 +840,7 @@ export function ModernLandingView({ user }: ModernLandingViewProps) {
                   </span>
                 </div>
               </div>
-            </div>
+            </ParallaxTilt>
           </div>
         </div>
       </section>
@@ -927,78 +933,75 @@ export function ModernLandingView({ user }: ModernLandingViewProps) {
               </p>
             </RevealOnScroll>
 
-            {/* Right: 3 Feature Pillars with Custom 3D Clay Icons */}
-            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+            {/* Right: 3 Feature Pillars with Custom 3D Clay Icons & Spotlight Hover */}
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 items-stretch">
               {/* Feature 1: Administrasi & LMS */}
-              <RevealOnScroll
-                delay={100}
-                className="group text-left flex flex-col items-start p-2 rounded-2xl transition-all"
-              >
-                <div className="relative size-16 sm:size-20 mb-4 flex-shrink-0 transition-transform duration-300 group-hover:-translate-y-1.5">
-                  <Image
-                    src="/images/features/feature-lms-3d.png"
-                    alt="Administrasi Guru dan LMS Terpadu"
-                    width={80}
-                    height={80}
-                    unoptimized
-                    className="w-full h-full object-contain drop-shadow-md"
-                  />
-                </div>
-                <h3 className="text-base sm:text-lg font-bold font-century text-slate-900 dark:text-white">
-                  Administrasi & LMS
-                </h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-century leading-relaxed">
-                  Jurnal KBM harian, silabus otomatis, dan modul penugasan mandiri siswa
-                  tersinkronisasi tanpa kertas.
-                </p>
+              <RevealOnScroll delay={100} className="h-full">
+                <SpotlightCard className="group h-full text-left flex flex-col items-start p-5 sm:p-6 rounded-2xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-md transition-all">
+                  <div className="relative size-16 sm:size-20 mb-4 flex-shrink-0 transition-transform duration-300 group-hover:-translate-y-1.5">
+                    <Image
+                      src="/images/features/feature-lms-3d.png"
+                      alt="Administrasi Guru dan LMS Terpadu"
+                      width={80}
+                      height={80}
+                      unoptimized
+                      className="w-full h-full object-contain drop-shadow-md"
+                    />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold font-century text-slate-900 dark:text-white">
+                    Administrasi & LMS
+                  </h3>
+                  <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-century leading-relaxed">
+                    Jurnal KBM harian, silabus otomatis, dan modul penugasan mandiri siswa
+                    tersinkronisasi tanpa kertas.
+                  </p>
+                </SpotlightCard>
               </RevealOnScroll>
 
               {/* Feature 2: CBT Anti-Curang */}
-              <RevealOnScroll
-                delay={200}
-                className="group text-left flex flex-col items-start p-2 rounded-2xl transition-all"
-              >
-                <div className="relative size-16 sm:size-20 mb-4 flex-shrink-0 transition-transform duration-300 group-hover:-translate-y-1.5">
-                  <Image
-                    src="/images/features/feature-cbt-3d.png"
-                    alt="CBT Ujian Anti-Curang Safe Exam"
-                    width={80}
-                    height={80}
-                    unoptimized
-                    className="w-full h-full object-contain drop-shadow-md"
-                  />
-                </div>
-                <h3 className="text-base sm:text-lg font-bold font-century text-slate-900 dark:text-white">
-                  CBT Anti-Curang
-                </h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-century leading-relaxed">
-                  Ujian digital terkunci aman anti-buka tab baru dengan acak butir soal dan koreksi
-                  nilai instan.
-                </p>
+              <RevealOnScroll delay={200} className="h-full">
+                <SpotlightCard className="group h-full text-left flex flex-col items-start p-5 sm:p-6 rounded-2xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-md transition-all">
+                  <div className="relative size-16 sm:size-20 mb-4 flex-shrink-0 transition-transform duration-300 group-hover:-translate-y-1.5">
+                    <Image
+                      src="/images/features/feature-cbt-3d.png"
+                      alt="CBT Ujian Anti-Curang Safe Exam"
+                      width={80}
+                      height={80}
+                      unoptimized
+                      className="w-full h-full object-contain drop-shadow-md"
+                    />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold font-century text-slate-900 dark:text-white">
+                    CBT Anti-Curang
+                  </h3>
+                  <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-century leading-relaxed">
+                    Ujian digital terkunci aman anti-buka tab baru dengan acak butir soal dan
+                    koreksi nilai instan.
+                  </p>
+                </SpotlightCard>
               </RevealOnScroll>
 
               {/* Feature 3: Leger Rapor Merdeka */}
-              <RevealOnScroll
-                delay={300}
-                className="group text-left flex flex-col items-start p-2 rounded-2xl transition-all"
-              >
-                <div className="relative size-16 sm:size-20 mb-4 flex-shrink-0 transition-transform duration-300 group-hover:-translate-y-1.5">
-                  <Image
-                    src="/images/features/feature-leger-3d.png"
-                    alt="Buku Nilai dan Leger Kurikulum Merdeka"
-                    width={80}
-                    height={80}
-                    unoptimized
-                    className="w-full h-full object-contain drop-shadow-md"
-                  />
-                </div>
-                <h3 className="text-base sm:text-lg font-bold font-century text-slate-900 dark:text-white">
-                  Leger Rapor Merdeka
-                </h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-century leading-relaxed">
-                  Kalkulasi otomatis bobot TP formatif & sumatif sesuai juknis, siap cetak dan
-                  1-klik ekspor Excel.
-                </p>
+              <RevealOnScroll delay={300} className="h-full">
+                <SpotlightCard className="group h-full text-left flex flex-col items-start p-5 sm:p-6 rounded-2xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-md transition-all">
+                  <div className="relative size-16 sm:size-20 mb-4 flex-shrink-0 transition-transform duration-300 group-hover:-translate-y-1.5">
+                    <Image
+                      src="/images/features/feature-leger-3d.png"
+                      alt="Buku Nilai dan Leger Kurikulum Merdeka"
+                      width={80}
+                      height={80}
+                      unoptimized
+                      className="w-full h-full object-contain drop-shadow-md"
+                    />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold font-century text-slate-900 dark:text-white">
+                    Leger Rapor Merdeka
+                  </h3>
+                  <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-century leading-relaxed">
+                    Kalkulasi otomatis bobot TP formatif & sumatif sesuai juknis, siap cetak dan
+                    1-klik ekspor Excel.
+                  </p>
+                </SpotlightCard>
               </RevealOnScroll>
             </div>
           </div>
@@ -1551,194 +1554,204 @@ export function ModernLandingView({ user }: ModernLandingViewProps) {
 
           <div className="mt-14 grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch text-left">
             {/* Plan 1: 30-Day Free Trial */}
-            <RevealOnScroll
-              delay={100}
-              className="rounded-[32px] border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-sm"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Coba Gratis
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
-                    30 Hari Penuh
-                  </span>
+            <RevealOnScroll delay={100} className="h-full">
+              <SpotlightCard
+                spotlightColor="rgba(37, 99, 235, 0.10)"
+                className="h-full rounded-[32px] border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-sm transition-all hover:shadow-md"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Coba Gratis
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
+                      30 Hari Penuh
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-2">
+                    Guru Starter (Trial)
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Untuk guru mandiri yang ingin mencoba kecanggihan aplikasi di kelasnya.
+                  </p>
+
+                  <div className="mt-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-slate-900 dark:text-white">Rp 0</span>
+                    <span className="text-xs text-slate-500 font-medium">/ 30 hari pertama</span>
+                  </div>
+
+                  <ul className="mt-6 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <span>Maksimal 5 Rombel / Kelas Aktif</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <span>Photo-to-Class Vision AI (5x Scan)</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <span>Presensi & Jurnal Harian Lengkap</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <span>Buku Nilai & Ekspor ke Excel</span>
+                    </li>
+                  </ul>
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-2">
-                  Guru Starter (Trial)
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Untuk guru mandiri yang ingin mencoba kecanggihan aplikasi di kelasnya.
-                </p>
 
-                <div className="mt-6 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900 dark:text-white">Rp 0</span>
-                  <span className="text-xs text-slate-500 font-medium">/ 30 hari pertama</span>
+                <div className="mt-8">
+                  <Link
+                    href="/register"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-black dark:hover:bg-slate-700 text-white py-3.5 text-sm font-bold shadow-sm transition-all"
+                  >
+                    <span>Daftar Coba Gratis Sekarang</span>
+                  </Link>
                 </div>
-
-                <ul className="mt-6 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>Maksimal 5 Rombel / Kelas Aktif</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>Photo-to-Class Vision AI (5x Scan)</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>Presensi & Jurnal Harian Lengkap</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span>Buku Nilai & Ekspor ke Excel</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-8">
-                <Link
-                  href="/register"
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 dark:bg-slate-800 hover:bg-black dark:hover:bg-slate-700 text-white py-3.5 text-sm font-bold shadow-sm transition-all"
-                >
-                  <span>Daftar Coba Gratis Sekarang</span>
-                </Link>
-              </div>
+              </SpotlightCard>
             </RevealOnScroll>
 
             {/* Plan 2: Guru Pro Mandiri (Rp 15.000 / bln) */}
-            <RevealOnScroll
-              delay={200}
-              className="rounded-[32px] border-2 border-blue-600 dark:border-blue-500 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-xl relative scale-105"
-            >
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-white text-[11px] font-extrabold tracking-wide shadow-md">
-                PILIHAN PALING POPULER
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                    Mandiri Pendidik
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-xs font-bold">
-                    Paling Terjangkau
-                  </span>
-                </div>
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-2">
-                  Paket Guru Pro
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Untuk guru aktif yang ingin kemudahan penuh tanpa batasan kuota.
-                </p>
-
-                <div className="mt-6 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-blue-600 dark:text-blue-400">
-                    Rp 15.000
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium">/ bulan (ramah guru)</span>
+            <RevealOnScroll delay={200} className="h-full">
+              <SpotlightCard
+                spotlightColor="rgba(37, 99, 235, 0.16)"
+                className="h-full rounded-[32px] border-2 border-blue-600 dark:border-blue-500 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-xl relative scale-105 transition-all hover:shadow-2xl"
+              >
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-white text-[11px] font-extrabold tracking-wide shadow-md">
+                  PILIHAN PALING POPULER
                 </div>
 
-                <ul className="mt-6 space-y-3 text-xs sm:text-sm text-slate-700 dark:text-slate-200">
-                  <li className="flex items-start gap-2.5 font-bold text-blue-600 dark:text-blue-400">
-                    <Check className="size-4 flex-shrink-0 mt-0.5" />
-                    <span>Kelas & Jumlah Siswa Tanpa Batas</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <span>Vision AI Scan Absensi Tanpa Batas</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <span>CBT Ujian Online dengan Anti-Curang</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <span>Cetak Rapor Kemajuan Belajar Siswa</span>
-                  </li>
-                </ul>
-              </div>
+                <div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                      Mandiri Pendidik
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-xs font-bold">
+                      Paling Terjangkau
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-2">
+                    Paket Guru Pro
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Untuk guru aktif yang ingin kemudahan penuh tanpa batasan kuota.
+                  </p>
 
-              <div className="mt-8">
-                <ProCheckoutButton
-                  isLoggedIn={Boolean(user)}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 text-sm font-bold shadow-md shadow-blue-500/25 transition-all cursor-pointer"
-                >
-                  <span>Mulai dengan Guru Pro</span>
-                </ProCheckoutButton>
-              </div>
+                  <div className="mt-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-blue-600 dark:text-blue-400">
+                      Rp 15.000
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">/ bulan (ramah guru)</span>
+                  </div>
+
+                  <ul className="mt-6 space-y-3 text-xs sm:text-sm text-slate-700 dark:text-slate-200">
+                    <li className="flex items-start gap-2.5 font-bold text-blue-600 dark:text-blue-400">
+                      <Check className="size-4 flex-shrink-0 mt-0.5" />
+                      <span>Kelas & Jumlah Siswa Tanpa Batas</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <span>Vision AI Scan Absensi Tanpa Batas</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <span>CBT Ujian Online dengan Anti-Curang</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <span>Cetak Rapor Kemajuan Belajar Siswa</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="mt-8">
+                  <ProCheckoutButton
+                    isLoggedIn={Boolean(user)}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 text-sm font-bold shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+                  >
+                    <span>Mulai dengan Guru Pro</span>
+                  </ProCheckoutButton>
+                </div>
+              </SpotlightCard>
             </RevealOnScroll>
 
             {/* Plan 3: Lisensi Sekolah Terpadu (Akses Multi-Guru & Tata Usaha) */}
-            <RevealOnScroll
-              delay={300}
-              className="rounded-[32px] border border-indigo-200 dark:border-indigo-800/80 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-lg relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 bg-gradient-to-l from-indigo-500 to-blue-600 text-white text-[10px] font-bold px-4 py-1 rounded-bl-xl uppercase tracking-wider font-century">
-                Institusi Sekolah
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-century">
-                    Paket Institusi
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-xs font-bold font-century">
-                    Multi-Guru & Siswa
-                  </span>
+            <RevealOnScroll delay={300} className="h-full">
+              <SpotlightCard
+                spotlightColor="rgba(99, 102, 241, 0.16)"
+                className="h-full rounded-[32px] border border-indigo-200 dark:border-indigo-800/80 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-lg relative overflow-hidden transition-all hover:shadow-xl"
+              >
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-indigo-500 to-blue-600 text-white text-[10px] font-bold px-4 py-1 rounded-bl-xl uppercase tracking-wider font-century">
+                  Institusi Sekolah
                 </div>
-                <h3 className="text-2xl font-bold font-century text-slate-900 dark:text-white mt-2">
-                  Lisensi Sekolah Terpadu
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-century">
-                  Solusi penuh satu sekolah untuk Kepsek, Waka, TU, seluruh Guru, dan Orang Tua.
-                </p>
-
-                <div className="mt-6 flex flex-col gap-0.5">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl sm:text-4xl font-black text-indigo-600 dark:text-indigo-400 font-century">
-                      Akses Sekolah
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-century">
+                      Paket Institusi
                     </span>
-                    <span className="text-xs text-slate-500 font-medium font-century">/ tahun</span>
+                    <span className="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-xs font-bold font-century">
+                      Multi-Guru & Siswa
+                    </span>
                   </div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-century">
-                    Tersedia untuk jenjang SD, SMP, SMA/SMK, hingga Yayasan Terpadu
-                  </span>
+                  <h3 className="text-2xl font-bold font-century text-slate-900 dark:text-white mt-2">
+                    Lisensi Sekolah Terpadu
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-century">
+                    Solusi penuh satu sekolah untuk Kepsek, Waka, TU, seluruh Guru, dan Orang Tua.
+                  </p>
+
+                  <div className="mt-6 flex flex-col gap-0.5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl sm:text-4xl font-black text-indigo-600 dark:text-indigo-400 font-century">
+                        Akses Sekolah
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium font-century">
+                        / tahun
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-century">
+                      Tersedia untuk jenjang SD, SMP, SMA/SMK, hingga Yayasan Terpadu
+                    </span>
+                  </div>
+
+                  <ul className="mt-6 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-century">
+                    <li className="flex items-start gap-2.5 font-bold text-indigo-600 dark:text-indigo-400">
+                      <Zap className="size-4 flex-shrink-0 mt-0.5" />
+                      <span>Semua Guru Otomatis Jadi PRO Tanpa Bayar Mandiri</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                      <span>LMS Modul Ajar & CBT Ujian Massal Ribuan Siswa</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                      <span>Jadwal Pelajaran Otomatis Anti-Bentrok & Jurnal KBM</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                      <span>
+                        Rekap Terpadu: Ekspor Excel Leger, Rapor Kurikulum, & Arsip Digital
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                      <span>Dedicated Pendampingan & Pelatihan Guru Sampai Tuntas</span>
+                    </li>
+                  </ul>
                 </div>
 
-                <ul className="mt-6 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-century">
-                  <li className="flex items-start gap-2.5 font-bold text-indigo-600 dark:text-indigo-400">
-                    <Zap className="size-4 flex-shrink-0 mt-0.5" />
-                    <span>Semua Guru Otomatis Jadi PRO Tanpa Bayar Mandiri</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
-                    <span>LMS Modul Ajar & CBT Ujian Massal Ribuan Siswa</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
-                    <span>Jadwal Pelajaran Otomatis Anti-Bentrok & Jurnal KBM</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
-                    <span>Rekap Terpadu: Ekspor Excel Leger, Rapor Kurikulum, & Arsip Digital</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="size-4 text-indigo-600 flex-shrink-0 mt-0.5" />
-                    <span>Dedicated Pendampingan & Pelatihan Guru Sampai Tuntas</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-8">
-                <a
-                  href="https://wa.me/6281234567890?text=Halo%20Tim%20Ruang%20Pintar,%20sekolah%20kami%20tertarik%20konsultasi%20Lisensi%20Sekolah%20Terpadu%20untuk%20seluruh%20guru%20dan%20siswa."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 text-sm font-bold shadow-md shadow-indigo-600/20 transition-all font-century"
-                >
-                  <MessageCircle className="size-4" />
-                  <span>Konsultasi Lisensi Sekolah</span>
-                </a>
-              </div>
+                <div className="mt-8">
+                  <a
+                    href="https://wa.me/6281234567890?text=Halo%20Tim%20Ruang%20Pintar,%20sekolah%20kami%20tertarik%20konsultasi%20Lisensi%20Sekolah%20Terpadu%20untuk%20seluruh%20guru%20dan%20siswa."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 text-sm font-bold shadow-md shadow-indigo-600/20 transition-all font-century"
+                  >
+                    <MessageCircle className="size-4" />
+                    <span>Konsultasi Lisensi Sekolah</span>
+                  </a>
+                </div>
+              </SpotlightCard>
             </RevealOnScroll>
           </div>
         </div>

@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
+import { containsText } from "@/shared/infrastructure/database/query-filters";
 import { generateUlid } from "@/shared/lib/ulid";
 import {
   HeadmasterOverviewDTO,
@@ -560,7 +561,7 @@ export class ReportingRepository {
       where: {
         sekolah_id: schoolId,
         status: "AKTIF",
-        ...(programInfo.kode ? { nama: { contains: programInfo.kode } } : {}),
+        ...(programInfo.kode ? { nama: containsText(programInfo.kode) } : {}),
       },
       include: {
         penempatan_rombel: { where: { status: "AKTIF" } },
@@ -593,10 +594,10 @@ export class ReportingRepository {
       where: {
         sekolah_id: schoolId,
         OR: [
-          { nama: { contains: "Kejuruan" } },
-          { nama: { contains: "Otomotif" } },
-          { nama: { contains: "Praktik" } },
-          { kode: { contains: "PROG" } },
+          { nama: containsText("Kejuruan") },
+          { nama: containsText("Otomotif") },
+          { nama: containsText("Praktik") },
+          { kode: containsText("PROG") },
         ],
       },
       include: {

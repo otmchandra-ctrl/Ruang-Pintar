@@ -11,9 +11,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     ref
   ) => {
     const sizeStyles = {
-      sm: "h-9 px-3 text-xs rounded-lg",
-      default: "h-11 px-3.5 text-sm rounded-[10px]",
-      lg: "h-12 px-4 text-[15px] rounded-[10px]",
+      sm: "h-9 px-3 text-base sm:text-xs rounded-lg",
+      default: "h-11 px-3.5 text-base sm:text-sm rounded-[10px]",
+      lg: "h-12 px-4 text-base sm:text-[15px] rounded-[10px]",
     };
 
     const errorStyles = isError

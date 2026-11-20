@@ -104,28 +104,28 @@ export default async function KalenderAkademikPage() {
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200/80 text-xs font-semibold text-slate-700">
                   <CalendarDays className="h-3.5 w-3.5 text-[#2563EB]" />
                   <span>
-                    Total Agenda: <strong>{events.length}</strong>
+                    Total Agenda: <strong className="font-mono">{events.length}</strong>
                   </span>
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50/80 border border-rose-200/80 text-xs font-semibold text-rose-700">
                   <PartyPopper className="h-3.5 w-3.5 text-rose-600" />
                   <span>
-                    Libur & Cuti: <strong>{holidayCount}</strong>
+                    Libur & Cuti: <strong className="font-mono">{holidayCount}</strong>
                   </span>
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50/80 border border-purple-200/80 text-xs font-semibold text-purple-700">
                   <CalendarCheck className="h-3.5 w-3.5 text-purple-600" />
                   <span>
-                    Periode Ujian: <strong>{examCount}</strong>
+                    Periode Ujian: <strong className="font-mono">{examCount}</strong>
                   </span>
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50/80 border border-emerald-200/80 text-xs font-semibold text-emerald-700">
                   <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
                   <span>
-                    Kegiatan & MPLS: <strong>{eventCount}</strong>
+                    Kegiatan & MPLS: <strong className="font-mono">{eventCount}</strong>
                   </span>
                 </div>
               </div>

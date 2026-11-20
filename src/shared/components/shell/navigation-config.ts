@@ -48,7 +48,7 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         title: "Pengumuman",
         href: "/pengumuman",
         iconName: "Megaphone",
-        roles: ["SUPER_ADMIN", "SCHOOL_STAFF", "TEACHER", "STUDENT", "GUARDIAN"],
+        roles: ["SUPER_ADMIN", "SCHOOL_STAFF", "GUARDIAN"],
         requiredPermission: "communication.announcement.view",
         isPhaseDeferred: false,
       },
@@ -56,7 +56,7 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
   },
 
   // ==========================================
-  // GURU (TEACHER)
+  // GURU (TEACHER) - AKADEMIK & PENGAJARAN
   // ==========================================
   {
     id: "teacher-ops",
@@ -91,39 +91,30 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         isPhaseDeferred: false,
       },
       {
-        id: "teacher-schedule",
-        title: "Jadwal Mengajar",
-        href: "/jadwal-saya",
-        iconName: "Calendar",
+        id: "teacher-materials",
+        title: "Materi Pembelajaran",
+        href: "/materi",
+        iconName: "BookOpen",
         roles: ["TEACHER"],
-        requiredPermission: "schedule.class.view",
-        isPhaseDeferred: false,
-      },
-      {
-        id: "teacher-class-sessions",
-        title: "Log Sesi KBM",
-        href: "/sesi-pembelajaran",
-        iconName: "PlayCircle",
-        roles: ["TEACHER"],
-        requiredPermission: "schedule.class.view",
-        isPhaseDeferred: false,
-      },
-      {
-        id: "teacher-calendar",
-        title: "Kalender Akademik",
-        href: "/kalender-akademik",
-        iconName: "CalendarDays",
-        roles: ["TEACHER"],
-        requiredPermission: "academic.calendar.view",
+        requiredPermission: "learning.material.view",
         isPhaseDeferred: false,
       },
       {
         id: "teacher-classes",
-        title: "Rekap Presensi",
+        title: "Presensi & Jurnal",
         href: "/presensi-kelas",
-        iconName: "Users",
+        iconName: "UserCheck",
         roles: ["TEACHER"],
         requiredPermission: "attendance.session.record",
+        isPhaseDeferred: false,
+      },
+      {
+        id: "teacher-class-sessions",
+        title: "Pembelajaran & Tugas",
+        href: "/sesi-pembelajaran",
+        iconName: "PlayCircle",
+        roles: ["TEACHER"],
+        requiredPermission: "schedule.class.view",
         isPhaseDeferred: false,
       },
       {
@@ -137,13 +128,40 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
       },
       {
         id: "teacher-cbt",
-        title: "CBT Ujian Online",
+        title: "CBT & Bank Soal",
         href: "/cbt-ujian",
         iconName: "FileCheck",
         roles: ["TEACHER"],
         requiredPermission: "cbt.exam.manage",
         isPhaseDeferred: false,
       },
+    ],
+  },
+  // ==========================================
+  // GURU (TEACHER) - KOMUNIKASI
+  // ==========================================
+  {
+    id: "teacher-comm",
+    title: "Komunikasi",
+    items: [
+      {
+        id: "teacher-announcements",
+        title: "Pesan & Pengumuman",
+        href: "/pengumuman",
+        iconName: "Megaphone",
+        roles: ["TEACHER"],
+        requiredPermission: "communication.announcement.view",
+        isPhaseDeferred: false,
+      },
+    ],
+  },
+  // ==========================================
+  // GURU (TEACHER) - MENU KONTEKSTUAL
+  // ==========================================
+  {
+    id: "teacher-contextual",
+    title: "Menu Kontekstual",
+    items: [
       {
         id: "teacher-homeroom",
         title: "Wali Kelas",
@@ -166,9 +184,25 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         id: "teacher-ai-assistant",
         title: "Asisten AI Guru",
         href: "/asisten-ai",
-        iconName: "Sparkles",
+        iconName: "Bot",
         roles: ["TEACHER"],
-        badge: "AI 2.0",
+        isPhaseDeferred: false,
+      },
+    ],
+  },
+  // ==========================================
+  // GURU (TEACHER) - PENGATURAN
+  // ==========================================
+  {
+    id: "teacher-settings",
+    title: "Pengaturan & Profil",
+    items: [
+      {
+        id: "teacher-profile",
+        title: "Pengaturan & Profil",
+        href: "/profil",
+        iconName: "Settings",
+        roles: ["TEACHER"],
         isPhaseDeferred: false,
       },
     ],
@@ -191,12 +225,12 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         isPhaseDeferred: false,
       },
       {
-        id: "student-calendar",
-        title: "Kalender Akademik",
-        href: "/kalender-akademik",
-        iconName: "CalendarDays",
+        id: "student-learning",
+        title: "Materi & Tugas",
+        href: "/tugas-siswa",
+        iconName: "BookOpen",
         roles: ["STUDENT"],
-        requiredPermission: "academic.calendar.view",
+        requiredPermission: "learning.assignment.submit",
         isPhaseDeferred: false,
       },
       {
@@ -208,15 +242,12 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         requiredPermission: "cbt.attempt.start",
         isPhaseDeferred: false,
       },
-      {
-        id: "student-learning",
-        title: "Materi & Tugas",
-        href: "/tugas-siswa",
-        iconName: "BookOpen",
-        roles: ["STUDENT"],
-        requiredPermission: "learning.assignment.submit",
-        isPhaseDeferred: false,
-      },
+    ],
+  },
+  {
+    id: "student-info",
+    title: "Hasil & Informasi",
+    items: [
       {
         id: "student-grades",
         title: "Nilai & Rapor",
@@ -224,6 +255,24 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         iconName: "Award",
         roles: ["STUDENT"],
         requiredPermission: "assessment.report_card.view",
+        isPhaseDeferred: false,
+      },
+      {
+        id: "student-announcements",
+        title: "Pengumuman",
+        href: "/pengumuman",
+        iconName: "Megaphone",
+        roles: ["STUDENT"],
+        requiredPermission: "communication.announcement.view",
+        isPhaseDeferred: false,
+      },
+      {
+        id: "student-calendar",
+        title: "Kalender Akademik",
+        href: "/kalender-akademik",
+        iconName: "CalendarDays",
+        roles: ["STUDENT"],
+        requiredPermission: "academic.calendar.view",
         isPhaseDeferred: false,
       },
     ],
@@ -465,9 +514,8 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         id: "staff-ai-assistant",
         title: "Asisten AI Guru",
         href: "/asisten-ai",
-        iconName: "Sparkles",
+        iconName: "Bot",
         roles: ["SCHOOL_STAFF"],
-        badge: "AI 2.0",
         isPhaseDeferred: false,
       },
       {

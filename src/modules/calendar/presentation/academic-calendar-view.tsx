@@ -237,55 +237,79 @@ export function AcademicCalendarView({
         />
       )}
 
-      {/* KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 block">Total Agenda</span>
-            <span className="text-xl sm:text-2xl font-extrabold text-slate-800">
-              {events.length} Agenda
+      {/* KPI Metric Cards — Admin Dashboard Proportions & Font Mono */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[11px] uppercase font-bold tracking-wider text-slate-500 block">
+              Total Agenda
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900">
+                {events.length}
+              </span>
+              <span className="text-xs font-semibold font-mono text-slate-400">Agenda</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 block">
+              Tahun Ajaran 2026/2027
             </span>
           </div>
-          <div className="p-3 rounded-2xl bg-blue-50 text-[#2563EB]">
-            <CalendarIcon className="h-6 w-6" />
+          <div className="size-11 rounded-2xl bg-blue-50 text-[#2563EB] border border-blue-100/60 flex items-center justify-center shrink-0">
+            <CalendarIcon className="h-5 w-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 block">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[11px] uppercase font-bold tracking-wider text-slate-500 block">
               Hari Libur & Cuti
             </span>
-            <span className="text-xl sm:text-2xl font-extrabold text-rose-600">
-              {totalHolidays} Hari
-            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono text-rose-600">
+                {totalHolidays}
+              </span>
+              <span className="text-xs font-semibold font-mono text-rose-400">Hari</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 block">Libur KBM Resmi</span>
           </div>
-          <div className="p-3 rounded-2xl bg-rose-50 text-rose-600">
-            <Clock className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 block">Periode Ujian</span>
-            <span className="text-xl sm:text-2xl font-extrabold text-purple-600">
-              {totalExams} Periode
-            </span>
-          </div>
-          <div className="p-3 rounded-2xl bg-purple-50 text-purple-600">
-            <BookOpen className="h-6 w-6" />
+          <div className="size-11 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100/60 flex items-center justify-center shrink-0">
+            <Clock className="h-5 w-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white/90 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 block">Kegiatan & MPLS</span>
-            <span className="text-xl sm:text-2xl font-extrabold text-emerald-600">
-              {totalActivities} Event
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[11px] uppercase font-bold tracking-wider text-slate-500 block">
+              Periode Ujian
             </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono text-purple-600">
+                {totalExams}
+              </span>
+              <span className="text-xs font-semibold font-mono text-purple-400">Periode</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 block">Asesmen & CBT</span>
           </div>
-          <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600">
-            <Sparkles className="h-6 w-6" />
+          <div className="size-11 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100/60 flex items-center justify-center shrink-0">
+            <BookOpen className="h-5 w-5" />
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[11px] uppercase font-bold tracking-wider text-slate-500 block">
+              Kegiatan & MPLS
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono text-emerald-600">
+                {totalActivities}
+              </span>
+              <span className="text-xs font-semibold font-mono text-emerald-400">Event</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 block">Agenda Institusi</span>
+          </div>
+          <div className="size-11 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100/60 flex items-center justify-center shrink-0">
+            <Sparkles className="h-5 w-5" />
           </div>
         </div>
       </div>
@@ -511,15 +535,23 @@ export function AcademicCalendarView({
                     colSpan={canManage ? 6 : 5}
                     className="px-6 py-12 text-center text-slate-400 text-xs sm:text-sm"
                   >
-                    Tidak ada agenda kalender yang sesuai kriteria.
+                    <div className="flex flex-col items-center justify-center space-y-2.5">
+                      <div className="size-12 rounded-2xl bg-slate-100/80 border border-slate-200/80 flex items-center justify-center text-slate-400">
+                        <CalendarIcon className="size-6 text-slate-400" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-700">Tidak Ada Agenda Kalender</p>
+                      <p className="text-[11px] font-mono text-slate-400">
+                        Belum ada kegiatan akademik yang sesuai dengan filter pencarian ini.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 paginatedEvents.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2 font-semibold text-slate-800">
-                        <CalendarIcon className="h-4 w-4 text-[#2563EB]" />
+                      <div className="flex items-center gap-2 font-mono text-xs font-bold text-slate-800">
+                        <CalendarIcon className="h-4 w-4 text-[#2563EB] shrink-0" />
                         <span>
                           {new Date(e.tanggal_mulai).toLocaleDateString("id-ID", {
                             day: "numeric",
@@ -608,7 +640,7 @@ export function AcademicCalendarView({
         </div>
 
         {/* Pagination Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 text-xs font-mono text-slate-500">
           <div className="flex items-center gap-2">
             <span>Menampilkan</span>
             <select
@@ -617,7 +649,7 @@ export function AcademicCalendarView({
                 setRowsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none"
+              className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-700 focus:outline-hidden"
             >
               <option value={10}>10 Baris</option>
               <option value={20}>20 Baris</option>
@@ -635,7 +667,7 @@ export function AcademicCalendarView({
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="font-semibold text-slate-700">
+            <span className="font-bold text-slate-800">
               {currentPage} / {totalPages}
             </span>
             <button

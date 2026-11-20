@@ -34,6 +34,8 @@ export interface StudentTodayScheduleItem {
   ruangan: string | null;
   status: "SELESAI" | "AKTIF" | "MENDATANG";
   penugasanMengajarId: string;
+  totalJp?: number;
+  slotRangeLabel?: string;
 }
 
 export interface StudentAssignmentItem {

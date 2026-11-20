@@ -7,6 +7,7 @@
 
 import React, { useState, useMemo, useEffect, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -18,7 +19,8 @@ import {
   Clock,
   Users,
   BookOpen,
-  ArrowRight,
+  ArrowUpRight,
+  DoorOpen,
   Pencil,
   Trash2,
   X,
@@ -30,17 +32,17 @@ import {
   Check,
   AlertCircle,
   MoreVertical,
-  PlayCircle,
-  FileSpreadsheet,
   Layers,
 } from "lucide-react";
-import { motion, AnimatePresence } from "@/shared/components/motion/motion-elements";
+import { motion } from "@/shared/components/motion/motion-elements";
 import { TeacherClassCardDTO } from "../domain/learning-types";
 import { ManualCreateClassModal } from "./manual-create-class-modal";
 import { QuickSetScheduleModal } from "./quick-set-schedule-modal";
 import { ManageCurriculumModal } from "./manage-curriculum-modal";
 import { Toast, ToastType } from "@/shared/components/ui/toast";
 import { deleteRombelAction, updateRombelAction } from "@/app/actions/academic-actions";
+import { TeacherHeroActions } from "@/shared/components/dashboard/cockpit/teacher-hero-actions";
+import { TeacherTrialPill } from "@/shared/components/dashboard/cockpit/teacher-trial-pill";
 
 export interface TeacherSimpleDTO {
   id: string;
@@ -130,36 +132,11 @@ export function TeacherClassesView({
     return Array.from(set).sort();
   }, [classes]);
 
-  // Metrik Siswa Binaan Unik (Domain Invariant: 1 siswa terdaftar di 1 rombel dihitung 1 kali)
-  const distinctSiswaCount = useMemo(() => {
-    const rombelStudentsMap = new Map<string, number>();
-    classes.forEach((c) => {
-      const current = rombelStudentsMap.get(c.rombel_id) || 0;
-      if (c.total_siswa > current) {
-        rombelStudentsMap.set(c.rombel_id, c.total_siswa);
-      }
-    });
-    return Array.from(rombelStudentsMap.values()).reduce((sum, count) => sum + count, 0);
-  }, [classes]);
-
-  // Metrik Tambahan untuk 4 Kartu Informasi Atas
   const uniqueRombelsCount = useMemo(() => {
     return new Set(classes.map((c) => c.rombel_id)).size;
   }, [classes]);
 
-  const uniqueMapelsCount = useMemo(() => {
-    return new Set(classes.map((c) => c.mata_pelajaran_id)).size;
-  }, [classes]);
-
   const totalPenugasanCount = classes.length;
-
-  const totalJP = useMemo(() => {
-    return classes.reduce((sum, c) => sum + c.jumlah_jam_minggu, 0);
-  }, [classes]);
-
-  const totalBAB = useMemo(() => {
-    return classes.reduce((sum, c) => sum + c.total_bab, 0);
-  }, [classes]);
 
   // Filtering data reaktif
   const filtered = useMemo(() => {
@@ -244,7 +221,12 @@ export function TeacherClassesView({
   }
 
   return (
-    <div className="space-y-4 sm:space-y-5 pb-16">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-4 sm:space-y-5 pb-16 w-full"
+    >
       {/* Modal Dialogs */}
       {toast && (
         <Toast
@@ -279,178 +261,6 @@ export function TeacherClassesView({
         />
       )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          1. MINIMALIST PAGE HEADER (Linear / Stripe Standard)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 pb-1 border-b border-slate-200/80 dark:border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {isAdmin ? "Supervisi Kelas Sekolah" : "Kelas Saya"}
-            </h1>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 text-[#2563EB] dark:text-blue-400 font-mono text-[11px] font-bold">
-              Semester Aktif
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {isAdmin
-              ? `Supervisi seluruh rombel dan kurikulum (${classes.length} kelas aktif).`
-              : `${classes.length} kelas diampu • Pantau pembelajaran, absensi, dan materi ajar.`}
-          </p>
-        </div>
-
-        {/* Action Buttons di Sudut Kanan Header */}
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
-          {isSubscribed ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsManageCurriculumOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200/80 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-950/40 hover:bg-blue-100/70 dark:hover:bg-blue-900/60 text-[#2563EB] dark:text-blue-400 font-mono text-xs font-bold shadow-2xs transition-all cursor-pointer hover:border-blue-300 active:scale-95"
-                title="Pusat Kurikulum: Kelola BAB dan Terbitkan Materi ke Seluruh Kelas Paralel"
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                <span>Kelola BAB & Materi</span>
-              </button>
-              <Link
-                href="/penugasan"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono text-xs font-bold shadow-2xs transition-all cursor-pointer"
-              >
-                <BookOpen className="h-3.5 w-3.5 text-blue-600" />
-                <span>+ Buat Penugasan</span>
-              </Link>
-              <Link
-                href="/sesi-pembelajaran"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 active:bg-blue-800 text-white font-mono text-xs font-bold shadow-xs shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
-              >
-                <PlayCircle className="h-3.5 w-3.5" />
-                <span>+ Buka Sesi KBM</span>
-              </Link>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleOpenManualClass}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-700 active:bg-blue-800 text-white font-mono text-xs font-bold shadow-xs shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>+ Tambah Kelas Manual</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenAiPhoto}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono text-xs font-bold shadow-2xs transition-all cursor-pointer"
-              >
-                <Camera className="h-3.5 w-3.5 text-blue-600" />
-                <span>+ Foto Absen AI</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          2. TOP 4 METRIC CARDS (Rombel Diajar, Beban KBM, Siswa Binaan, Lingkup Materi)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-        {/* Metric 1: Rombel Diajar */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-white/80 dark:bg-slate-900/75 backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_0_25px_-5px_rgba(37,99,235,0.16)] hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500/40 hover:-translate-y-0.5 transition-all duration-300 group cursor-default">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors truncate">
-              Rombel Diajar
-            </span>
-            <div className="p-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-2xs shrink-0">
-              <Layers className="h-4 w-4 group-hover:scale-110 transition-transform" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white group-hover:text-[#2563EB] transition-colors">
-              {uniqueRombelsCount}
-            </span>
-            <span className="text-xs font-bold font-mono text-slate-500 dark:text-slate-400">
-              Rombel
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 block mt-1 truncate">
-            {totalPenugasanCount} Penugasan KBM Aktif
-          </span>
-        </div>
-
-        {/* Metric 2: Beban KBM */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-white/80 dark:bg-slate-900/75 backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_0_25px_-5px_rgba(37,99,235,0.16)] hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:-translate-y-0.5 transition-all duration-300 group cursor-default">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors truncate">
-              Beban KBM
-            </span>
-            <div className="p-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-2xs shrink-0">
-              <Clock className="h-4 w-4 group-hover:scale-110 transition-transform" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 transition-colors">
-              {totalJP}
-            </span>
-            <span className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400">
-              JP / Minggu
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 block mt-1 truncate">
-            Beban Tatap Muka Terjadwal
-          </span>
-        </div>
-
-        {/* Metric 3: Siswa Binaan */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-white/80 dark:bg-slate-900/75 backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_0_25px_-5px_rgba(37,99,235,0.16)] hover:shadow-md hover:border-purple-300 dark:hover:border-purple-500/40 hover:-translate-y-0.5 transition-all duration-300 group cursor-default">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors truncate">
-              Siswa Binaan
-            </span>
-            <div className="p-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300 shadow-2xs shrink-0">
-              <Users className="h-4 w-4 group-hover:scale-110 transition-transform" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-xl sm:text-2xl font-black font-mono text-purple-600 dark:text-purple-400 group-hover:text-purple-700 transition-colors">
-              {distinctSiswaCount}
-            </span>
-            <span className="text-xs font-bold font-mono text-purple-600 dark:text-purple-400">
-              Siswa
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 block mt-1 truncate">
-            Peserta Didik Aktif Terdaftar
-          </span>
-        </div>
-
-        {/* Metric 4: Lingkup Materi */}
-        <div
-          onClick={() => setIsManageCurriculumOpen(true)}
-          title="Klik untuk Kelola BAB & Materi ke Seluruh Kelas"
-          className="p-3.5 sm:p-4 rounded-2xl bg-white/80 dark:bg-slate-900/75 backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_0_25px_-5px_rgba(37,99,235,0.16)] hover:shadow-md hover:border-amber-400 dark:hover:border-amber-500 hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors truncate">
-              Lingkup Materi
-            </span>
-            <div className="p-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white transition-all duration-300 shadow-2xs shrink-0">
-              <GraduationCap className="h-4 w-4 group-hover:scale-110 transition-transform" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400 group-hover:text-amber-700 transition-colors">
-              {totalBAB}
-            </span>
-            <span className="text-xs font-bold font-mono text-amber-600 dark:text-amber-400">
-              BAB Materi
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 block mt-1 truncate">
-            Modul & Tujuan Pembelajaran
-          </span>
-        </div>
-      </div>
-
       {/* Alert Banner Jam Mengajar jika ada yang belum diatur */}
       {unscheduledClassesTotal > 0 && (
         <div className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl border border-amber-200/80 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs">
@@ -474,128 +284,116 @@ export function TeacherClassesView({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          2. UNIFIED WORKSPACE TOOLBAR (Satu Baris Tunggal ala Linear/Stripe)
+          2. WORKSPACE TOOLBAR
+          Search Bar (Proper input), Semua, Hari Ini, Icon Filter, Icon Grid, Icon Tabel
+          Card pembungkus transparan tanpa warna latar
       ───────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        {/* Sisi Kiri: Search Input + Tab Status Kontekstual */}
-        <div className="flex flex-wrap items-center gap-2.5 flex-1">
-          {/* A. Search Box Terpadu */}
-          <div className="relative w-full sm:w-64 md:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder={
-                isAdmin ? "Cari rombel, mapel, kode, guru..." : "Cari rombel atau mata pelajaran..."
-              }
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-8 pr-7 py-2 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] transition-all shadow-2xs"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                title="Hapus pencarian"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* B. Tab Filter Kontekstual dengan Sliding Pill Indicator */}
-          <div className="flex items-center p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/60 text-xs font-semibold overflow-x-auto scrollbar-none">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3 w-full">
+        {/* A. Search Bar (Tampilan Search Bar yang Jelas, Bersih & Nyata) */}
+        <div className="relative flex-1 flex items-center min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+          <input
+            type="text"
+            placeholder={
+              isAdmin ? "Cari rombel, mapel, guru..." : "Cari rombel atau mata pelajaran..."
+            }
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full h-10 pl-9 pr-8 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xs text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] transition-all"
+          />
+          {search && (
             <button
               type="button"
-              onClick={() => {
-                setStatusTab("ALL");
-                setCurrentPage(1);
-              }}
-              className={`relative px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
-                statusTab === "ALL"
-                  ? "text-[#2563EB] dark:text-blue-400 font-bold"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Hapus pencarian"
             >
-              {statusTab === "ALL" && (
-                <motion.div
-                  layoutId="activeFilterPill"
-                  className="absolute inset-0 bg-white dark:bg-slate-800 rounded-lg shadow-2xs"
-                  transition={{ type: "spring", stiffness: 450, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10">Semua ({classes.length})</span>
+              <X className="h-3.5 w-3.5" />
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setStatusTab("TODAY");
-                setCurrentPage(1);
-              }}
-              className={`relative px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
-                statusTab === "TODAY"
-                  ? "text-[#2563EB] dark:text-blue-400 font-bold"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              {statusTab === "TODAY" && (
-                <motion.div
-                  layoutId="activeFilterPill"
-                  className="absolute inset-0 bg-white dark:bg-slate-800 rounded-lg shadow-2xs"
-                  transition={{ type: "spring", stiffness: 450, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-emerald-500" />
-                <span>Hari Ini ({todayClassesTotal})</span>
-              </span>
-            </button>
-
-            {unscheduledClassesTotal > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusTab("UNSCHEDULED");
-                  setCurrentPage(1);
-                }}
-                className={`relative px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
-                  statusTab === "UNSCHEDULED"
-                    ? "text-amber-700 dark:text-amber-400 font-bold"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                }`}
-              >
-                {statusTab === "UNSCHEDULED" && (
-                  <motion.div
-                    layoutId="activeFilterPill"
-                    className="absolute inset-0 bg-white dark:bg-slate-800 rounded-lg shadow-2xs"
-                    transition={{ type: "spring", stiffness: 450, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                  <AlertCircle className="h-3 w-3" />
-                  <span>Belum Diatur ({unscheduledClassesTotal})</span>
-                </span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Sisi Kanan: Dropdown Filter Tingkat + Filter Guru (Admin) + Toggle Grid/Tabel */}
-        <div className="flex items-center gap-2 self-start lg:self-auto shrink-0 flex-wrap">
-          {/* Filter Tingkat */}
-          {uniqueTingkats.length > 1 && (
-            <div className="relative">
+        {/* B. Controls Row: Semua | Hari Ini | Icon Filter | Icon Grid | Icon Tabel (Tanpa Warna Card) */}
+        <div className="flex items-center justify-between md:justify-end gap-1 sm:gap-1.5 shrink-0">
+          {/* Tab: Semua (Tulisan Diperkecil) */}
+          <button
+            type="button"
+            onClick={() => {
+              setStatusTab("ALL");
+              setCurrentPage(1);
+            }}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-sans transition-colors cursor-pointer flex items-center gap-1.5 ${
+              statusTab === "ALL"
+                ? "text-slate-950 dark:text-white font-bold bg-slate-200/70 dark:bg-slate-800 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 font-medium"
+            }`}
+          >
+            <span>Semua</span>
+            <span className="font-mono text-[10px] opacity-70">({classes.length})</span>
+          </button>
+
+          {/* Tab: Hari Ini (Tulisan Diperkecil) */}
+          <button
+            type="button"
+            onClick={() => {
+              setStatusTab("TODAY");
+              setCurrentPage(1);
+            }}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-sans transition-colors cursor-pointer flex items-center gap-1.5 ${
+              statusTab === "TODAY"
+                ? "text-slate-950 dark:text-white font-bold bg-slate-200/70 dark:bg-slate-800 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 font-medium"
+            }`}
+          >
+            <span>Hari Ini</span>
+            <span className="font-mono text-[10px] opacity-70">({todayClassesTotal})</span>
+          </button>
+
+          {/* Tab: Belum Diatur (jika ada rombel belum diatur jamnya) */}
+          {unscheduledClassesTotal > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusTab("UNSCHEDULED");
+                setCurrentPage(1);
+              }}
+              className={`px-2 py-1.5 rounded-lg text-xs font-sans transition-colors cursor-pointer flex items-center gap-1 text-amber-600 dark:text-amber-400 ${
+                statusTab === "UNSCHEDULED"
+                  ? "bg-amber-100/80 dark:bg-amber-950/60 font-bold"
+                  : "hover:bg-amber-50 dark:hover:bg-amber-950/30 font-medium"
+              }`}
+              title="Rombel belum diatur jam"
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-mono text-[10px]">({unscheduledClassesTotal})</span>
+            </button>
+          )}
+
+          {/* Icon Filter (Tingkat - Hapus tulisan "Semua Tingkat", Hanya Icon) */}
+          {uniqueTingkats.length > 1 ? (
+            <div
+              className={`relative p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
+                selectedTingkat !== "ALL"
+                  ? "bg-slate-200/70 dark:bg-slate-800 text-slate-950 dark:text-white font-bold"
+                  : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
+              }`}
+              title="Filter Tingkat"
+            >
+              <Filter className="h-4 w-4 shrink-0 pointer-events-none" />
+              {selectedTingkat !== "ALL" && (
+                <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 pointer-events-none" />
+              )}
               <select
                 value={selectedTingkat}
                 onChange={(e) => {
                   setSelectedTingkat(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-2.5 py-1.5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs cursor-pointer"
+                aria-label="Filter Tingkat"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
               >
                 <option value="ALL">Semua Tingkat</option>
                 {uniqueTingkats.map((tk) => (
@@ -605,18 +403,39 @@ export function TeacherClassesView({
                 ))}
               </select>
             </div>
+          ) : (
+            <button
+              type="button"
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors"
+              title="Filter"
+              aria-label="Filter"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
           )}
 
-          {/* Filter Guru (Khusus Supervisi Admin) */}
+          {/* Khusus Admin: Filter Guru (Hanya Icon Users) */}
           {isAdmin && (
-            <div className="relative">
+            <div
+              className={`relative p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
+                selectedGuruId !== "ALL"
+                  ? "bg-slate-200/70 dark:bg-slate-800 text-slate-950 dark:text-white font-bold"
+                  : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
+              }`}
+              title="Filter Guru"
+            >
+              <Users className="h-4 w-4 shrink-0 pointer-events-none" />
+              {selectedGuruId !== "ALL" && (
+                <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 pointer-events-none" />
+              )}
               <select
                 value={selectedGuruId}
                 onChange={(e) => {
                   setSelectedGuruId(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-2.5 py-1.5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs cursor-pointer max-w-[180px] truncate"
+                aria-label="Filter Guru"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
               >
                 <option value="ALL">Semua Guru ({teachersList.length})</option>
                 {teachersList.map((t) => (
@@ -630,7 +449,7 @@ export function TeacherClassesView({
             </div>
           )}
 
-          {/* Reset Filters jika ada filter aktif */}
+          {/* Tombol Reset jika ada filter aktif */}
           {(search ||
             statusTab !== "ALL" ||
             selectedTingkat !== "ALL" ||
@@ -638,43 +457,43 @@ export function TeacherClassesView({
             <button
               type="button"
               onClick={handleResetFilters}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors shadow-2xs cursor-pointer"
-              title="Reset semua filter"
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Reset filter"
+              aria-label="Reset filter"
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
           )}
 
-          {/* View Mode Toggle: Grid ⊞ vs Table ☰ */}
-          <div className="flex items-center p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/60">
-            <button
-              type="button"
-              onClick={() => setViewMode("GRID")}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                viewMode === "GRID"
-                  ? "bg-white dark:bg-slate-800 text-[#2563EB] dark:text-blue-400 shadow-2xs"
-                  : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
-              }`}
-              title="Tampilan Kartu Grid"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Grid</span>
-            </button>
+          {/* Icon Grid */}
+          <button
+            type="button"
+            onClick={() => setViewMode("GRID")}
+            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+              viewMode === "GRID"
+                ? "text-slate-950 dark:text-white bg-slate-200/70 dark:bg-slate-800 shadow-2xs"
+                : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
+            }`}
+            title="Tampilan Grid"
+            aria-label="Tampilan Grid"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setViewMode("TABLE")}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                viewMode === "TABLE"
-                  ? "bg-white dark:bg-slate-800 text-[#2563EB] dark:text-blue-400 shadow-2xs"
-                  : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
-              }`}
-              title="Tampilan Tabel Ringkas"
-            >
-              <Table2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Tabel</span>
-            </button>
-          </div>
+          {/* Icon Tabel */}
+          <button
+            type="button"
+            onClick={() => setViewMode("TABLE")}
+            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+              viewMode === "TABLE"
+                ? "text-slate-950 dark:text-white bg-slate-200/70 dark:bg-slate-800 shadow-2xs"
+                : "text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
+            }`}
+            title="Tampilan Tabel"
+            aria-label="Tampilan Tabel"
+          >
+            <Table2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -683,7 +502,7 @@ export function TeacherClassesView({
       ───────────────────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
         /* Empty State */
-        <div className="p-8 sm:p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3">
+        <div className="p-8 sm:p-12 text-center rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3 font-sans">
           <div className="h-11 w-11 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center mx-auto">
             <Search className="h-5 w-5" />
           </div>
@@ -702,7 +521,7 @@ export function TeacherClassesView({
           <button
             type="button"
             onClick={handleResetFilters}
-            className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
           >
             <RotateCcw className="h-3 w-3" />
             <span>Tampilkan Semua Kelas</span>
@@ -710,44 +529,60 @@ export function TeacherClassesView({
         </div>
       ) : viewMode === "GRID" ? (
         /* A. FLAT ENTERPRISE CARD GRID */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {pagedClasses.map((c) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 font-sans">
+          {pagedClasses.map((c, idx) => {
             const isUnscheduled = !c.jadwal_ringkas || c.jumlah_jam_minggu === 0;
             const hasScheduleToday = !isUnscheduled && Boolean(c.jadwal_hari_ini);
 
             return (
               <motion.div
                 key={c.id}
-                whileHover={{ y: -2 }}
-                transition={{ type: "spring", stiffness: 450, damping: 30 }}
-                className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all p-4 sm:p-5 flex flex-col justify-between gap-3.5 group relative"
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true, amount: 0.12, margin: "0px 0px -40px 0px" }}
+                transition={{
+                  duration: 0.4,
+                  ease: [0.16, 1, 0.3, 1],
+                  delay: Math.min((idx % 3) * 0.06, 0.18),
+                }}
+                whileHover={{
+                  scale: 1.018,
+                  y: -4,
+                  transition: { duration: 0.18, ease: "easeOut" },
+                }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => router.push(`/kelas-saya/${c.id}`)}
+                className="rounded-[26px] border border-slate-200/90 dark:border-slate-800 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md shadow-2xs hover:shadow-xl hover:border-blue-400/60 dark:hover:border-blue-500/50 hover:ring-1 hover:ring-blue-300/30 transition-all p-5 flex flex-col justify-between gap-4 group relative will-change-transform cursor-pointer"
               >
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   {/* Row 1: Nama Rombel Ukuran Besar, Tingkat, Kode Mapel & Titik 3 Control (Owner Only) */}
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Nama Rombel Ukuran Besar */}
-                        <h3 className="text-xl sm:text-2xl font-black font-mono tracking-tight text-slate-900 dark:text-white group-hover:text-[#2563EB] dark:group-hover:text-blue-400 transition-colors">
+                        <h3 className="text-xl sm:text-2xl font-bold font-sans tracking-tight text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {c.rombel_nama}
                         </h3>
                         {c.tingkat_nama && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                          <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-sans font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50">
                             {c.tingkat_nama}
                           </span>
                         )}
                       </div>
                       <p
-                        className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 mt-1 truncate"
+                        className="text-xs sm:text-sm font-semibold font-sans text-slate-600 dark:text-slate-300 mt-1 truncate"
                         title={c.mata_pelajaran_nama}
                       >
                         {c.mata_pelajaran_nama}
                       </p>
                     </div>
 
-                    {/* Sisi Kanan Atas: Kode Mapel Badge & Titik 3 Control */}
-                    <div className="shrink-0 flex items-center gap-1.5">
-                      <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/50">
+                    {/* Sisi Kanan Atas: Kode Mapel Clean & Titik 3 Control */}
+                    <div
+                      className="shrink-0 flex items-center gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/60 shadow-2xs">
                         {c.mata_pelajaran_kode}
                       </span>
 
@@ -762,7 +597,7 @@ export function TeacherClassesView({
                                 openActionMenuRombelId === c.rombel_id ? null : c.rombel_id
                               );
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            className="h-8.5 w-8.5 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             title="Menu Kelas"
                             aria-label="Menu Kelas"
                           >
@@ -771,7 +606,7 @@ export function TeacherClassesView({
 
                           {/* Dropdown Menu Popover Titik 3 */}
                           <div
-                            className={`absolute right-0 top-full mt-1 w-44 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl py-1 z-30 transition-all ${
+                            className={`absolute right-0 top-full mt-1 w-48 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl py-1 z-30 transition-all ${
                               openActionMenuRombelId === c.rombel_id
                                 ? "opacity-100 scale-100 pointer-events-auto"
                                 : "opacity-0 scale-95 pointer-events-none"
@@ -779,26 +614,28 @@ export function TeacherClassesView({
                           >
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setOpenActionMenuRombelId(null);
                                 setClassActionTarget({ id: c.rombel_id, nama: c.rombel_nama });
                                 setClassActionMode("rename");
                                 setClassActionError(null);
                               }}
-                              className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer transition-colors"
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2.5 cursor-pointer transition-colors"
                             >
                               <Pencil className="h-3.5 w-3.5 text-slate-500" />
                               <span>Ubah Nama Kelas</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setOpenActionMenuRombelId(null);
                                 setClassActionTarget({ id: c.rombel_id, nama: c.rombel_nama });
                                 setClassActionMode("delete");
                                 setClassActionError(null);
                               }}
-                              className="w-full px-3 py-2 text-left text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 cursor-pointer transition-colors"
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2.5 cursor-pointer transition-colors"
                             >
                               <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                               <span>Hapus Kelas</span>
@@ -810,54 +647,76 @@ export function TeacherClassesView({
                   </div>
 
                   {/* Row 2: Jadwal & Status Operasional KBM */}
-                  <div className="pt-0.5">
+                  <div>
                     {isUnscheduled ? (
-                      <div className="flex items-center justify-between text-xs bg-amber-50/80 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-3 py-1.5 rounded-xl border border-amber-200/60 dark:border-amber-900/50 font-mono">
-                        <span className="flex items-center gap-1.5 text-xs font-semibold">
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center justify-between text-xs py-2 px-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60 text-amber-800 dark:text-amber-300 font-sans shadow-2xs"
+                      >
+                        <span className="flex items-center gap-1.5 font-sans font-medium">
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                           <span>Jam Belum Diatur</span>
                         </span>
                         <button
                           type="button"
                           onClick={() => setScheduleModalTarget(c)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold cursor-pointer transition-colors shadow-2xs"
+                          className="text-amber-700 dark:text-amber-300 hover:text-amber-800 font-semibold underline text-xs cursor-pointer"
                         >
                           + Atur Jam
                         </button>
                       </div>
                     ) : hasScheduleToday ? (
-                      <div className="flex items-center gap-2 text-xs text-[#2563EB] dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/50 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-900/50 font-mono">
-                        <span className="size-2 rounded-full bg-[#2563EB] animate-pulse" />
-                        <span className="font-bold">Hari Ini: {c.jadwal_hari_ini}</span>
+                      <div className="flex items-center gap-2 text-xs py-2 px-3 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 font-sans shadow-2xs">
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span className="font-semibold">Hari Ini:</span>
+                        <span className="font-mono font-bold tracking-tight">
+                          {c.jadwal_hari_ini}
+                        </span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-800/40 px-3 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
+                      <div className="flex items-center gap-2 text-xs py-2 px-3 rounded-xl bg-slate-50/90 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 font-sans">
                         <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{c.jadwal_ringkas}</span>
+                        <span className="font-mono text-xs truncate">{c.jadwal_ringkas}</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Row 3: Avatar Stack Siswa (Kiri) & Beban JP (Kanan) */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                  {/* Row 3: Academic Learning Activity (Kurikulum & Pertemuan KBM) */}
+                  <div className="grid grid-cols-2 gap-2 py-2 px-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-[11px] font-sans">
+                    <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 truncate">
+                      <BookOpen className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <span className="truncate">
+                        {c.total_bab} BAB • {c.total_materi} Materi
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 truncate">
+                      <Layers className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                      <span className="truncate">{c.total_jurnal} Pertemuan</span>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Student Roster & Load */}
+                  <div className="flex items-center justify-between pt-1 font-sans">
                     <div className="flex items-center gap-2">
-                      {/* Avatar Stack Siswa (3-5 Lingkaran Bertumpuk) */}
+                      {/* Avatar Stack Siswa (3 Lingkaran Bertumpuk) */}
                       <div className="flex items-center -space-x-1.5 overflow-hidden">
                         {c.total_siswa > 0 ? (
-                          Array.from({ length: Math.min(3, c.total_siswa) }).map((_, idx) => {
+                          Array.from({ length: Math.min(3, c.total_siswa) }).map((_, i) => {
                             const colors = [
                               "bg-blue-500 text-white",
-                              "bg-emerald-500 text-white",
-                              "bg-purple-500 text-white",
-                              "bg-amber-500 text-white",
+                              "bg-indigo-500 text-white",
+                              "bg-slate-600 text-white",
                             ];
                             return (
                               <div
-                                key={idx}
-                                className={`inline-flex items-center justify-center size-5.5 sm:size-6 rounded-full ring-2 ring-white dark:ring-slate-900 text-[9px] font-bold ${colors[idx % colors.length]}`}
-                                title={`Siswa ${idx + 1}`}
+                                key={i}
+                                className={`inline-flex items-center justify-center size-5.5 sm:size-6 rounded-full ring-2 ring-white dark:ring-slate-900 text-[9px] font-bold ${colors[i % colors.length]}`}
+                                title={`Siswa ${i + 1}`}
                               >
-                                {String.fromCharCode(65 + (idx % 26))}
+                                {String.fromCharCode(65 + (i % 26))}
                               </div>
                             );
                           })
@@ -877,50 +736,57 @@ export function TeacherClassesView({
                       </span>
                     </div>
 
-                    {/* Beban JP Mengajar */}
-                    <span className="font-bold font-mono text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/40">
+                    {/* Beban JP Mengajar (Clean Mono Text) */}
+                    <span className="font-bold font-mono text-xs text-slate-700 dark:text-slate-300">
                       {c.jumlah_jam_minggu} JP
                     </span>
                   </div>
-
-                  {/* Wali Kelas jika ada */}
-                  {c.wali_kelas_nama && (
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      Wali:{" "}
-                      <strong className="font-semibold text-slate-700 dark:text-slate-300">
-                        {c.wali_kelas_nama}
-                      </strong>
-                    </div>
-                  )}
-
-                  {/* Guru Pengampu (jika mode supervisi admin) */}
-                  {isAdmin && (
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      Guru:{" "}
-                      <strong className="font-semibold text-slate-700 dark:text-slate-300">
-                        {c.guru_nama}
-                      </strong>
-                    </div>
-                  )}
                 </div>
 
-                {/* Row 4: Action Footer (Hanya Presensi & Kelola Kelas) */}
-                <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100 dark:border-slate-800">
-                  <Link
-                    href={`/kelas-saya/${c.id}?tab=PRESENSI`}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
-                    title="Buka form presensi kelas"
-                  >
-                    <Users className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Presensi</span>
-                  </Link>
+                {/* Row 5: Action Footer (Masuk Kelas) - Compact, Minimalis & Elegan */}
+                <div
+                  className="pt-3 border-t border-slate-100 dark:border-slate-800/80 font-sans flex items-center justify-between gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Sisi Kiri: Wali Kelas atau Info Ruang Belajar */}
+                  <div className="min-w-0 flex-1">
+                    {c.wali_kelas_nama ? (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-sans">
+                        Wali:{" "}
+                        <strong className="font-semibold text-slate-700 dark:text-slate-300">
+                          {c.wali_kelas_nama}
+                        </strong>
+                      </div>
+                    ) : isAdmin && c.guru_nama ? (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-sans">
+                        Guru:{" "}
+                        <strong className="font-semibold text-slate-700 dark:text-slate-300">
+                          {c.guru_nama}
+                        </strong>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500/60" />
+                        <span>Ruang Belajar</span>
+                      </div>
+                    )}
+                  </div>
 
+                  {/* Sisi Kanan: Tombol Compact "Masuk Kelas" (Lingkaran Biru & Morphing Icon Pintu) */}
                   <Link
                     href={`/kelas-saya/${c.id}`}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold transition-all shadow-2xs shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="group/btn inline-flex items-center gap-2 pl-3.5 pr-1.5 py-1.5 rounded-full border border-slate-200/90 dark:border-slate-700/80 bg-slate-50/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 text-xs font-semibold font-sans shadow-2xs transition-all duration-300 group-hover/btn:border-blue-400/70 group-hover/btn:bg-blue-50/60 dark:group-hover/btn:bg-blue-950/40 group-hover/btn:shadow-md group-hover/btn:shadow-blue-500/20 active:scale-95 cursor-pointer shrink-0"
                   >
-                    <span>Kelola Kelas</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    <span className="transition-colors duration-300 group-hover/btn:text-blue-600 dark:group-hover/btn:text-blue-400">
+                      Masuk Kelas
+                    </span>
+
+                    {/* Lingkaran Biru: Berubah jadi Icon Pintu Terbuka saat Mouse Mendekat */}
+                    <span className="relative flex items-center justify-center size-6 rounded-full bg-blue-100/90 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/60 transition-all duration-300 ease-out group-hover/btn:bg-gradient-to-tr group-hover/btn:from-blue-600 group-hover/btn:via-blue-500 group-hover/btn:to-cyan-400 group-hover/btn:text-white group-hover/btn:border-transparent group-hover/btn:shadow-md group-hover/btn:shadow-blue-500/35 group-hover/btn:scale-110">
+                      <ArrowUpRight className="h-3.5 w-3.5 transition-all duration-300 ease-out group-hover/btn:opacity-0 group-hover/btn:scale-50 group-hover/btn:rotate-45" />
+                      <DoorOpen className="h-3.5 w-3.5 absolute transition-all duration-300 ease-out opacity-0 scale-50 group-hover/btn:opacity-100 group-hover/btn:scale-100" />
+                    </span>
                   </Link>
                 </div>
               </motion.div>
@@ -929,10 +795,10 @@ export function TeacherClassesView({
         </div>
       ) : (
         /* B. COMPACT DATA TABLE VIEW */
-        <div className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+        <div className="overflow-hidden rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs font-sans">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px] font-mono">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase text-[11px] font-sans tracking-wider">
                 <tr>
                   <th className="py-2.5 px-4 w-12 text-center">No</th>
                   <th className="py-2.5 px-4">Rombel</th>
@@ -971,22 +837,25 @@ export function TeacherClassesView({
                     </td>
                     <td className="py-3 px-4 font-mono text-xs">
                       {c.jadwal_hari_ini ? (
-                        <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-bold">
-                          Hari Ini: {c.jadwal_hari_ini}
+                        <span className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+                          <span>Hari Ini: {c.jadwal_hari_ini}</span>
                         </span>
                       ) : c.jadwal_ringkas ? (
-                        <span>{c.jadwal_ringkas}</span>
+                        <span className="text-slate-600 dark:text-slate-400">
+                          {c.jadwal_ringkas}
+                        </span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => setScheduleModalTarget(c)}
-                          className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 text-[10px] font-bold cursor-pointer"
+                          className="text-amber-600 dark:text-amber-400 hover:text-amber-700 font-bold underline cursor-pointer"
                         >
                           + Atur Jam
                         </button>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                    <td className="py-3 px-4 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                       {c.jumlah_jam_minggu} JP
                     </td>
                     <td className="py-3 px-4 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
@@ -998,18 +867,21 @@ export function TeacherClassesView({
                       </td>
                     )}
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Link
-                          href={`/kelas-saya/${c.id}?tab=PRESENSI`}
-                          className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-[11px] font-bold text-slate-700 dark:text-slate-200"
-                        >
-                          Presensi
-                        </Link>
+                      <div className="flex items-center justify-end">
                         <Link
                           href={`/kelas-saya/${c.id}`}
-                          className="px-3 py-1 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white text-[11px] font-bold"
+                          onClick={(e) => e.stopPropagation()}
+                          className="group/btn inline-flex items-center gap-2 pl-3 pr-1 py-1 rounded-full border border-slate-200/90 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-semibold font-sans shadow-2xs transition-all duration-300 hover:border-blue-400/70 hover:bg-blue-50/60 dark:hover:bg-blue-950/40 hover:shadow-md hover:shadow-blue-500/20 active:scale-95 cursor-pointer"
                         >
-                          Kelola Kelas
+                          <span className="transition-colors duration-300 group-hover/btn:text-blue-600 dark:group-hover/btn:text-blue-400">
+                            Masuk Kelas
+                          </span>
+
+                          {/* Lingkaran Biru dengan Transform Icon Pintu */}
+                          <span className="relative flex items-center justify-center size-5.5 rounded-full bg-blue-100/90 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/60 transition-all duration-300 ease-out group-hover/btn:bg-gradient-to-tr group-hover/btn:from-blue-600 group-hover/btn:via-blue-500 group-hover/btn:to-cyan-400 group-hover/btn:text-white group-hover/btn:border-transparent group-hover/btn:shadow-md group-hover/btn:shadow-blue-500/35 group-hover/btn:scale-110">
+                            <ArrowUpRight className="h-3 w-3 transition-all duration-300 ease-out group-hover/btn:opacity-0 group-hover/btn:scale-50 group-hover/btn:rotate-45" />
+                            <DoorOpen className="h-3 w-3 absolute transition-all duration-300 ease-out opacity-0 scale-50 group-hover/btn:opacity-100 group-hover/btn:scale-100" />
+                          </span>
                         </Link>
                       </div>
                     </td>
@@ -1022,11 +894,11 @@ export function TeacherClassesView({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          4. PAGINATION BAR (Minimalist Bottom Controls)
+          4. PAGINATION BAR (Minimalist Bottom Controls - Responsive)
       ───────────────────────────────────────────────────────────── */}
       {filtered.length > pageSize && (
-        <div className="flex items-center justify-between pt-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200/80 dark:border-slate-800">
-          <span>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200/80 dark:border-slate-800">
+          <span className="text-center sm:text-left">
             Menampilkan{" "}
             <strong className="text-slate-800 dark:text-white font-mono">{startIndex + 1}</strong> -{" "}
             <strong className="text-slate-800 dark:text-white font-mono">
@@ -1037,24 +909,24 @@ export function TeacherClassesView({
             kelas
           </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               disabled={safeCurrentPage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs"
+              className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs active:scale-95 transition-all"
               title="Halaman Sebelumnya"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="font-mono font-bold px-2 text-slate-800 dark:text-slate-200">
+            <span className="font-mono font-bold px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
               {safeCurrentPage} / {totalPages}
             </span>
             <button
               type="button"
               disabled={safeCurrentPage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs"
+              className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs active:scale-95 transition-all"
               title="Halaman Berikutnya"
             >
               <ChevronRight className="h-4 w-4" />
@@ -1182,6 +1054,6 @@ export function TeacherClassesView({
           </section>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

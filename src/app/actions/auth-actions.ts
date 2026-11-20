@@ -105,7 +105,7 @@ export async function logoutAction(): Promise<void> {
     maxAge: expiredOptions.maxAge,
   });
 
-  redirect("/login");
+  redirect("/");
 }
 
 /**
@@ -123,11 +123,12 @@ export async function changePasswordAction(
     };
   }
 
+  const isMandatory = Boolean(user.harus_ganti_password);
   const oldPassword = formData.get("oldPassword")?.toString() ?? "";
   const newPassword = formData.get("newPassword")?.toString() ?? "";
   const confirmPassword = formData.get("confirmPassword")?.toString() ?? "";
 
-  if (!oldPassword || !newPassword || !confirmPassword) {
+  if ((!isMandatory && !oldPassword) || !newPassword || !confirmPassword) {
     return {
       success: false,
       error: "Semua kolom kata sandi wajib diisi.",
@@ -150,7 +151,8 @@ export async function changePasswordAction(
     oldPassword,
     newPassword,
     ipAddress,
-    userAgent
+    userAgent,
+    { requireOldPassword: !isMandatory }
   );
 
   if (!result.success) {

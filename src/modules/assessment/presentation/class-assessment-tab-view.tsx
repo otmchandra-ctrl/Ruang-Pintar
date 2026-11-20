@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import {
   GraduationCap,
   Plus,
@@ -130,8 +131,12 @@ export function ClassAssessmentTabView({
             <Target className="h-4 w-4 text-[#2563EB] dark:text-blue-400" />
             Total Asesmen
           </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{totalAsesmen}</div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Seluruh kegiatan nilai</p>
+          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+            {totalAsesmen}
+          </div>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+            Seluruh kegiatan nilai
+          </p>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 p-4 shadow-xs">
@@ -139,8 +144,12 @@ export function ClassAssessmentTabView({
             <GraduationCap className="h-4 w-4 text-blue-500 dark:text-blue-400" />
             Formatif (TP)
           </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{totalFormatif}</div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Penilaian tujuan belajar</p>
+          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+            {totalFormatif}
+          </div>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+            Penilaian tujuan belajar
+          </p>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 p-4 shadow-xs">
@@ -148,8 +157,12 @@ export function ClassAssessmentTabView({
             <Layers className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
             Sumatif (BAB/SAS)
           </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{totalSumatif}</div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Evaluasi lingkup materi</p>
+          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+            {totalSumatif}
+          </div>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+            Evaluasi lingkup materi
+          </p>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 p-4 shadow-xs">
@@ -157,8 +170,12 @@ export function ClassAssessmentTabView({
             <TrendingUp className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
             Rata-rata Kelas
           </div>
-          <div className="mt-2 text-2xl font-bold text-[#2563EB] dark:text-blue-400">{rataRataKelas}</div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Rerata seluruh nilai</p>
+          <div className="mt-2 text-2xl font-bold text-[#2563EB] dark:text-blue-400">
+            {rataRataKelas}
+          </div>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+            Rerata seluruh nilai
+          </p>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 p-4 shadow-xs col-span-2 sm:col-span-1">
@@ -261,7 +278,9 @@ export function ClassAssessmentTabView({
           {filteredAssessments.length === 0 ? (
             <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900/75 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3">
               <Target className="h-10 w-10 text-slate-300 dark:text-slate-600 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white">Belum Ada Asesmen Pembelajaran</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white">
+                Belum Ada Asesmen Pembelajaran
+              </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
                 Mulai buat asesmen formatif berdasarkan Tujuan Pembelajaran (TP) atau asesmen
                 sumatif lingkup materi BAB untuk mengambil nilai siswa.
@@ -324,7 +343,9 @@ export function ClassAssessmentTabView({
                       </div>
 
                       {/* Judul & TP Context */}
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-white line-clamp-1">{a.judul}</h4>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-white line-clamp-1">
+                        {a.judul}
+                      </h4>
                       {a.tp_kode ? (
                         <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-0.5">
                           {a.tp_kode} • {a.tp_deskripsi || ""}
@@ -338,10 +359,14 @@ export function ClassAssessmentTabView({
                       {/* Detail Metrics */}
                       <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-2 text-center text-xs">
                         <div className="p-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Status Siswa</span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+                            Status Siswa
+                          </span>
                           <span
                             className={`font-bold ${
-                              isComplete ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
+                              isComplete
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-amber-700 dark:text-amber-400"
                             }`}
                           >
                             {a.total_siswa_dinilai}/{a.total_siswa_rombel}
@@ -349,12 +374,18 @@ export function ClassAssessmentTabView({
                         </div>
 
                         <div className="p-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">KKTP</span>
-                          <span className="font-bold text-slate-700 dark:text-slate-300">{a.kkm_kktp}</span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+                            KKTP
+                          </span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            {a.kkm_kktp}
+                          </span>
                         </div>
 
                         <div className="p-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Rata-rata</span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+                            Rata-rata
+                          </span>
                           <span className="font-bold text-[#2563EB] dark:text-blue-400">
                             {a.rata_rata_nilai !== null ? a.rata_rata_nilai : "-"}
                           </span>
@@ -491,69 +522,80 @@ export function ClassAssessmentTabView({
       )}
 
       {/* Modal Konfirmasi Hapus Asesmen (Academic Glass UI) */}
-      {deleteTarget && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-assessment-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
-        >
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-rose-100 p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-200">
-            <div className="flex items-start gap-4">
-              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 shrink-0">
-                <AlertTriangle className="h-6 w-6" />
+      {deleteTarget &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-assessment-title"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isPending) setDeleteTarget(null);
+            }}
+          >
+            <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-rose-100 dark:border-rose-950 p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-200">
+              <div className="flex items-start gap-4">
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900 text-rose-600 dark:text-rose-400 shrink-0">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+                <div className="space-y-1 text-left flex-1">
+                  <h3
+                    id="delete-assessment-title"
+                    className="text-base font-bold text-slate-900 dark:text-slate-100"
+                  >
+                    Hapus Definisi Asesmen
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Tindakan ini tidak dapat dibatalkan. Seluruh rekaman nilai siswa pada lembar
+                    asesmen ini akan dihapus secara permanen dari buku nilai.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1 text-left flex-1">
-                <h3 id="delete-assessment-title" className="text-base font-bold text-slate-900">
-                  Hapus Definisi Asesmen
-                </h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Tindakan ini tidak dapat dibatalkan. Seluruh rekaman nilai siswa pada lembar
-                  asesmen ini akan dihapus secara permanen dari buku nilai.
-                </p>
-              </div>
-            </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
-              <div className="text-xs font-semibold text-slate-800 line-clamp-2">
-                {deleteTarget.judul}
-              </div>
-              {deleteTarget.detail && (
-                <div className="text-[11px] font-medium text-slate-500">{deleteTarget.detail}</div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={handleConfirmDelete}
-                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
-              >
-                {isPending ? (
-                  <>
-                    <span className="inline-block h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Menghapus...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Ya, Hapus Permanen</span>
-                  </>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-1">
+                <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">
+                  {deleteTarget.judul}
+                </div>
+                {deleteTarget.detail && (
+                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    {deleteTarget.detail}
+                  </div>
                 )}
-              </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => setDeleteTarget(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isPending ? (
+                    <>
+                      <span className="inline-block h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Menghapus...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Ya, Hapus Permanen</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
+import { containsText } from "@/shared/infrastructure/database/query-filters";
 import { generateUlid } from "@/shared/lib/ulid";
 import {
   AnnouncementCategory,
@@ -179,8 +180,8 @@ export class CommunicationRepository {
 
     if (filter?.pencarian && filter.pencarian.trim().length > 0) {
       where.OR = [
-        { judul: { contains: filter.pencarian.trim() } },
-        { konten: { contains: filter.pencarian.trim() } },
+        { judul: containsText(filter.pencarian.trim()) },
+        { konten: containsText(filter.pencarian.trim()) },
       ];
     }
 
@@ -271,8 +272,8 @@ export class CommunicationRepository {
       where.AND = [
         {
           OR: [
-            { judul: { contains: filter.pencarian.trim() } },
-            { konten: { contains: filter.pencarian.trim() } },
+            { judul: containsText(filter.pencarian.trim()) },
+            { konten: containsText(filter.pencarian.trim()) },
           ],
         },
       ];

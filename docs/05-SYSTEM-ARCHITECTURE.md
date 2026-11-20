@@ -61,17 +61,17 @@ Keputusan berikut menjadi baseline Ruang Pintar.
 | UI framework | **React melalui Next.js** |
 | Styling | **Tailwind CSS 4.x** |
 | UI primitives | **shadcn/ui dengan Base UI sebagai baseline project baru** |
-| Database | **SQLite** |
+| Database | **SQLite for local development; Supabase PostgreSQL for Vercel production** |
 | Database development | **SQLite** |
 | Database testing | **SQLite** |
-| Database production | **SQLite** |
+| Database production | **Supabase PostgreSQL** |
 | Deployment tenancy | **Single-school-per-deployment** |
 | Identifier domain | **ULID 26 karakter** |
 | Queue | **Queue-ready sejak arsitektur awal; implementasi bertahap** |
 | File storage awal | **Private local storage** |
 | File storage evolusi | **S3-compatible ready melalui abstraction** |
 | Deployment baseline | **Single application deployment** |
-| Serverless/Edge baseline | **Tidak digunakan untuk deployment utama berbasis local SQLite** |
+| Serverless/Edge baseline | **Vercel Node.js Functions with managed PostgreSQL; local SQLite is not used in production** |
 | Source of truth | **Database/domain resmi, bukan cache/report/notification/AI** |
 
 ---
@@ -332,7 +332,7 @@ Baseline:
 - server-side data access untuk data privat;
 - server-side mutation untuk operasi domain;
 - Route Handlers untuk endpoint HTTP yang memang diperlukan;
-- Node.js runtime untuk operasi yang membutuhkan local SQLite dan filesystem persisten.
+- Node.js runtime untuk operasi Prisma dan layanan storage persisten.
 
 ---
 
@@ -519,7 +519,7 @@ Baseline deployment:
 =
 1 School
 =
-1 Primary SQLite Database
+1 Primary Supabase PostgreSQL Database
 ```
 
 Contoh:
@@ -585,15 +585,15 @@ Jika di masa depan diperlukan SaaS multi-school, keputusan tersebut membutuhkan 
 Database resmi:
 
 ```text
-SQLite
+SQLite untuk development/testing; Supabase PostgreSQL untuk production.
 ```
 
 Digunakan pada:
 
 ```text
-Development
-Testing
-Production
+Development: SQLite
+Testing: SQLite
+Production: Supabase PostgreSQL
 ```
 
 Tujuan:
@@ -607,38 +607,37 @@ Tujuan:
 
 ---
 
-# 21. SQLite Production Rules
+# 21. Production Database Rules
 
-Production SQLite harus berada pada filesystem persisten.
+Production PostgreSQL dikelola Supabase dan diakses dari Vercel melalui connection pooler. SQLite tetap digunakan lokal dan sebagai sumber migrasi.
 
 Dilarang mengandalkan:
 
-- ephemeral filesystem;
-- stateless serverless instance;
-- local file yang hilang saat redeploy.
+- SQLite file pada ephemeral filesystem Vercel;
+- local file yang hilang saat redeploy;
+- koneksi database langsung tanpa pooler pada function serverless.
 
 Production harus memastikan:
 
-- file database persisten;
-- permission filesystem aman;
-- backup berjalan;
-- restore diuji;
-- kapasitas disk dipantau;
-- concurrency pattern sesuai kemampuan SQLite.
+- connection pool sesuai runtime serverless;
+- backup dan recovery policy Supabase aktif dan dipahami;
+- migrasi PostgreSQL diterapkan terpisah dari riwayat SQLite;
+- secret koneksi tidak masuk client bundle atau Git;
+- object storage persisten untuk unggahan file.
 
 ---
 
-# 22. SQLite Concurrency
+# 22. Database Concurrency
 
-SQLite cocok untuk banyak pembacaan dan workload sekolah yang wajar, tetapi memiliki karakteristik write concurrency yang harus dihormati.
+Development dan testing menggunakan SQLite; production menggunakan PostgreSQL yang mendukung penulisan konkuren. Hasil benchmark SQLite tidak otomatis membuktikan kapasitas PostgreSQL/Vercel.
 
 Arsitektur harus:
 
 - menjaga transaction singkat;
 - menghindari long-running write transaction;
 - menghindari pekerjaan eksternal di dalam transaction;
-- menggunakan mode/journal configuration yang sesuai untuk production;
-- mengukur contention sebelum melakukan optimasi kompleks.
+- menggunakan pooler yang sesuai untuk production;
+- melakukan load test terhadap PostgreSQL sebelum menetapkan kapasitas.
 
 Scale issue tidak boleh diselesaikan dengan tebakan.
 
@@ -1826,7 +1825,7 @@ SQLite dengan konfigurasi interim production-grade saat ini menggunakan:
 - `PRAGMA busy_timeout = 5000;` (Toleransi antrean lock tulis hingga 5.000 ms sebelum melempar `SQLITE_BUSY`).
 - `PRAGMA synchronous = NORMAL;` (Dipilih menggantikan `FULL`. Dalam mode WAL, `NORMAL` menjamin integritas 100% aman terhadap crash aplikasi/Next.js tanpa risiko korupsi berkas database, mengeliminasi bottleneck `fsync` per-commit ke disk, dan membuka kapasitas write throughput lebih tinggi guna menjaga target P99 write latency < 200 ms).
 
-Perubahan database ke PostgreSQL (ADR-001) tidak dilakukan atas dasar tren atau preferensi subjektif ("Postgres lebih enterprise"), melainkan wajib berdasar bukti metrik kuantitatif dan karakteristik beban kerja (khususnya menjelang modul M14 CBT / Ujian Berbasis Komputer).
+Catatan historis: pemilik proyek pada 15 November 2026 secara eksplisit memilih migrasi production ke Supabase PostgreSQL untuk deployment Vercel. Instruksi manusia ini menggantikan trigger metrik pada bagian ini sebagai keputusan target; ambang batas tetap berguna untuk mengevaluasi database sekolah yang tetap memakai SQLite.
 
 ---
 
@@ -2144,7 +2143,7 @@ Sebelum `APPROVED / LOCKED`, pastikan:
 - [ ] Next.js digunakan sebagai full-stack application;
 - [ ] Node.js runtime menjadi baseline server;
 - [ ] Tailwind CSS + shadcn/ui + Base UI sesuai;
-- [ ] SQLite digunakan di development, test, dan production;
+- [ ] SQLite digunakan di development/test dan Supabase PostgreSQL di production Vercel;
 - [ ] single-school-per-deployment sesuai;
 - [ ] ULID menjadi identifier domain;
 - [ ] queue-ready tetapi implementasi bertahap;
@@ -2152,7 +2151,7 @@ Sebelum `APPROVED / LOCKED`, pastikan:
 - [ ] private local storage menjadi baseline;
 - [ ] S3-ready abstraction disiapkan;
 - [ ] single-app deployment sesuai;
-- [ ] serverless stateless bukan baseline;
+- [ ] Vercel Node.js Functions menjadi baseline production setelah cutover;
 - [ ] backup dan restore wajib;
 - [ ] authentication provider belum perlu dikunci;
 - [ ] ORM belum perlu dikunci;

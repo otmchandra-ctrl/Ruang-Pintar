@@ -20,6 +20,13 @@ import {
   UpdateTujuanPembelajaranInput,
   AdministrasiPembelajaranDTO,
   DefinisiTugasDTO,
+  CapaianPembelajaranDTO,
+  CreateCapaianPembelajaranInput,
+  UpdateCapaianPembelajaranInput,
+  KriteriaKetercapaianTpDTO,
+  UpsertKktpInput,
+  CurriculumLineageNodeDTO,
+  ClassActivityItemDTO,
 } from "../domain/learning-types";
 import {
   CreateAdministrasiSchema,
@@ -31,6 +38,9 @@ import {
   UpdateLingkupMateriSchema,
   UpdateMateriSchema,
   UpdateTujuanPembelajaranSchema,
+  CreateCapaianPembelajaranSchema,
+  UpdateCapaianPembelajaranSchema,
+  UpsertKriteriaKetercapaianTpSchema,
 } from "../domain/learning-validation";
 import { LearningRepository, learningRepository } from "../infrastructure/learning-repository";
 import {
@@ -387,6 +397,142 @@ export class LearningService {
       id_sumber: id,
       aksi: "DELETE_ADMINISTRASI",
     });
+  }
+
+  // ==========================================
+  // CAPAIAN PEMBELAJARAN (CP)
+  // ==========================================
+
+  async listCapaianPembelajaran(
+    sekolahId: string,
+    filter?: { mataPelajaranId?: string; faseId?: string; status?: string }
+  ): Promise<CapaianPembelajaranDTO[]> {
+    return this.repository.listCapaianPembelajaran(sekolahId, filter);
+  }
+
+  async getCapaianPembelajaranById(
+    sekolahId: string,
+    id: string
+  ): Promise<CapaianPembelajaranDTO | null> {
+    return this.repository.getCapaianPembelajaranById(sekolahId, id);
+  }
+
+  async createCapaianPembelajaran(
+    actorId: string,
+    actorRole: string,
+    input: CreateCapaianPembelajaranInput
+  ): Promise<CapaianPembelajaranDTO> {
+    const validated = CreateCapaianPembelajaranSchema.parse(input);
+    const created = await this.repository.createCapaianPembelajaran(validated);
+
+    await recordAuditEvent({
+      sekolah_id: validated.sekolah_id,
+      aktor_id: actorId,
+      aktor_role: actorRole,
+      tipe_sumber: "CAPAIAN_PEMBELAJARAN",
+      id_sumber: created.id,
+      aksi: "CREATE_CAPAIAN_PEMBELAJARAN",
+      payload_sesudah: created as unknown as Record<string, unknown>,
+    });
+
+    return created;
+  }
+
+  async updateCapaianPembelajaran(
+    actorId: string,
+    actorRole: string,
+    id: string,
+    sekolahId: string,
+    input: UpdateCapaianPembelajaranInput
+  ): Promise<CapaianPembelajaranDTO> {
+    const validated = UpdateCapaianPembelajaranSchema.parse(input);
+    const updated = await this.repository.updateCapaianPembelajaran(sekolahId, id, validated);
+
+    await recordAuditEvent({
+      sekolah_id: sekolahId,
+      aktor_id: actorId,
+      aktor_role: actorRole,
+      tipe_sumber: "CAPAIAN_PEMBELAJARAN",
+      id_sumber: id,
+      aksi: "UPDATE_CAPAIAN_PEMBELAJARAN",
+      payload_sesudah: updated as unknown as Record<string, unknown>,
+    });
+
+    return updated;
+  }
+
+  async deleteCapaianPembelajaran(
+    actorId: string,
+    actorRole: string,
+    id: string,
+    sekolahId: string
+  ): Promise<void> {
+    await this.repository.deleteCapaianPembelajaran(sekolahId, id);
+
+    await recordAuditEvent({
+      sekolah_id: sekolahId,
+      aktor_id: actorId,
+      aktor_role: actorRole,
+      tipe_sumber: "CAPAIAN_PEMBELAJARAN",
+      id_sumber: id,
+      aksi: "DELETE_CAPAIAN_PEMBELAJARAN",
+    });
+  }
+
+  // ==========================================
+  // KRITERIA KETERCAPAIAN TP (KKTP)
+  // ==========================================
+
+  async getKktpByTpId(
+    sekolahId: string,
+    tujuanPembelajaranId: string
+  ): Promise<KriteriaKetercapaianTpDTO | null> {
+    return this.repository.getKktpByTpId(sekolahId, tujuanPembelajaranId);
+  }
+
+  async upsertKktp(
+    actorId: string,
+    actorRole: string,
+    input: UpsertKktpInput
+  ): Promise<KriteriaKetercapaianTpDTO> {
+    const validated = UpsertKriteriaKetercapaianTpSchema.parse(input);
+    const saved = await this.repository.upsertKktp(validated as UpsertKktpInput);
+
+    await recordAuditEvent({
+      sekolah_id: validated.sekolah_id,
+      aktor_id: actorId,
+      aktor_role: actorRole,
+      tipe_sumber: "KRITERIA_KETERCAPAIAN_TP",
+      id_sumber: saved.id,
+      aksi: "UPSERT_KKTP",
+      payload_sesudah: saved as unknown as Record<string, unknown>,
+    });
+
+    return saved;
+  }
+
+  // ==========================================
+  // CURRICULUM LINEAGE
+  // ==========================================
+
+  async getCurriculumLineage(
+    sekolahId: string,
+    mataPelajaranId: string,
+    penugasanMengajarId?: string
+  ): Promise<CurriculumLineageNodeDTO[]> {
+    return this.repository.getCurriculumLineage(sekolahId, mataPelajaranId, penugasanMengajarId);
+  }
+
+  // ==========================================
+  // CLASS ACTIVITY FEED (RINGKASAN AKTUAL)
+  // ==========================================
+
+  async getClassActivityFeed(
+    penugasanId: string,
+    sekolahId: string,
+    limit: number = 8
+  ): Promise<ClassActivityItemDTO[]> {
+    return this.repository.getClassActivityFeed(penugasanId, sekolahId, limit);
   }
 }
 

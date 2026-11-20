@@ -210,14 +210,14 @@ export class ReportCardRepository {
       }
     }
 
-    // Ambil nilai-nilai terpublikasi untuk siswa ini
+    // Ambil nilai-nilai terpublikasi untuk siswa ini (mendukung status 'PUBLISHED' dan 'TERBIT')
     const publishedGrades = await prisma.nilaiSiswa.findMany({
       where: {
         penempatan_rombel_id: placement.id,
-        status: "TERBIT",
+        status: { in: ["TERBIT", "PUBLISHED"] },
         asesmen: {
           sekolah_id: sekolahId,
-          status: "DITERBITKAN",
+          status: { in: ["DITERBITKAN", "PUBLISHED"] },
         },
       },
       include: {

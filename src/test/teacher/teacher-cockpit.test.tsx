@@ -6,6 +6,7 @@ import { PerformanceBarChart } from "@/shared/components/dashboard/cockpit/perfo
 import { AttentionQueueCard } from "@/shared/components/dashboard/cockpit/attention-queue-card";
 import { TeachingTimelineRail } from "@/shared/components/dashboard/cockpit/teaching-timeline-rail";
 import { TeacherHeroActions } from "@/shared/components/dashboard/cockpit/teacher-hero-actions";
+import { TeacherAttendanceCard } from "@/shared/components/dashboard/cockpit/teacher-attendance-card";
 import { MergedScheduleBlock } from "@/modules/schedule/domain/schedule-merger";
 
 describe("Teacher Teaching Cockpit Components (Academic Glass UI)", () => {
@@ -110,5 +111,45 @@ describe("Teacher Teaching Cockpit Components (Academic Glass UI)", () => {
     expect(screen.getByText("Matematika Diskrit")).toBeInTheDocument();
     expect(screen.getByText("Kelas 10-RPL 1 • Lab Komputer 1")).toBeInTheDocument();
     expect(screen.getByText("Pengumuman Upacara Bendera")).toBeInTheDocument();
+  });
+
+  it("AttentionQueueCard merender Aksi Cepat & Prioritas Guru saat tidak ada siswa bermasalah", () => {
+    render(<AttentionQueueCard items={[]} />);
+
+    expect(
+      screen.getByText("Seluruh siswa dalam batas aman akademik & kehadiran.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Mulai Sesi Mengajar")).toBeInTheDocument();
+    expect(screen.getByText("Input Nilai Harian")).toBeInTheDocument();
+    expect(screen.getByText("Kelola Ujian Online")).toBeInTheDocument();
+    expect(screen.getByText("Bina Profil Siswa")).toBeInTheDocument();
+  });
+
+  it("TeacherAttendanceCard merender Rekap Presensi Rombel dengan metrik Terlambat dan filter rombel", () => {
+    const mockPresensi = [
+      { status: "HADIR", sesi_kelas_id: "s1", rombel_id: "r1" },
+      { status: "TERLAMBAT", sesi_kelas_id: "s1", rombel_id: "r1" },
+      { status: "SAKIT", sesi_kelas_id: "s1", rombel_id: "r1" },
+    ];
+    const mockRombels = [
+      { id: "r1", nama: "X DKV 1" },
+      { id: "r2", nama: "X TJKT 1" },
+    ];
+
+    render(
+      <TeacherAttendanceCard
+        hasSessionsToday={true}
+        totalSessionsToday={2}
+        completedSessionsToday={1}
+        completedJournalsCount={1}
+        rombelOptions={mockRombels}
+        presensiRecords={mockPresensi}
+      />
+    );
+
+    expect(screen.getByText("Rekap Presensi")).toBeInTheDocument();
+    expect(screen.getByText("Terlambat")).toBeInTheDocument();
+    expect(screen.getByText("Semua Rombel")).toBeInTheDocument();
+    expect(screen.getByText(/1 Hadir • 1 Terlambat \(3 Siswa\)/)).toBeInTheDocument();
   });
 });

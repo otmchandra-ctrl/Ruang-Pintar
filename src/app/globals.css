@@ -8,6 +8,16 @@
   --foreground: #0f172a;
   --card-bg: #ffffff;
   --card-border: rgba(226, 232, 240, 0.8);
+
+  /* Canonical Spacing Scale Tokens (docs/07-UI-UX-DESIGN-SYSTEM.md) */
+  --space-tight: 4px;
+  --space-2: 8px;
+  --space-compact: 12px;
+  --space-4: 16px;
+  --space-comfortable: 20px;
+  --space-section: 24px;
+  --space-8: 32px;
+  --space-hero: 48px;
 }
 
 .dark {
@@ -15,32 +25,73 @@
   --foreground: #f1f5f9;
   --card-bg: #0f172a;
   --card-border: rgba(30, 41, 59, 0.8);
+
+  /* Canonical Spacing Scale Tokens */
+  --space-tight: 4px;
+  --space-2: 8px;
+  --space-compact: 12px;
+  --space-4: 16px;
+  --space-comfortable: 20px;
+  --space-section: 24px;
+  --space-8: 32px;
+  --space-hero: 48px;
+}
+
+/* ==========================================================================
+   Space Mono Local Self-Hosted Declarations (Zero Network Delay / 100% Offline)
+   ========================================================================== */
+@font-face {
+  font-family: "Space Mono Local";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src:
+    local("Space Mono"),
+    local("SpaceMono-Regular"),
+    url("/fonts/space-mono/space-mono-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Space Mono Local";
+  font-style: normal;
+  font-weight: 600 900;
+  font-display: swap;
+  src:
+    local("Space Mono Bold"),
+    local("SpaceMono-Bold"),
+    url("/fonts/space-mono/space-mono-700.woff2") format("woff2");
 }
 
 @theme {
-  --font-century:
-    "Century Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Plus Jakarta Sans",
-    sans-serif;
   --font-sans:
-    var(--font-lato), "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Plus Jakarta Sans", sans-serif;
-  --font-lato: var(--font-lato), "Lato", sans-serif;
+    var(--font-plus-jakarta), var(--font-lexend), "Plus Jakarta Sans", "Lexend", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono:
-    var(--font-space-mono), var(--font-roboto-mono), "Space Mono", "Roboto Mono", monospace;
+    "Space Mono Local", var(--font-space-mono), "Space Mono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, "Liberation Mono", monospace;
+  --font-teacher-identity:
+    "Space Mono Local", var(--font-space-mono), "Space Mono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, "Liberation Mono", monospace;
+  --font-lato: var(--font-lato), "Lato", sans-serif;
   --font-roboto-mono: var(--font-roboto-mono), "Roboto Mono", monospace;
+  --font-century: var(--font-lexend), "Lexend", sans-serif;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-century), var(--font-sans);
+  font-family: var(--font-sans);
   min-height: 100vh;
   transition:
     background-color 0.25s ease,
     color 0.25s ease;
 }
 
-/* Dashboard Guru Identity Typography (Space Mono) */
+/* ==========================================================================
+   Teacher Workspace Scoped Typography (Identity: Space Mono)
+   Stage UI-03 Canonical Standard: Hero greeting, card titles, widget titles,
+   KPI numbers, stats, and explicit monospace data elements.
+   ========================================================================== */
 html.teacher-workspace h1,
 html.teacher-workspace h2,
 html.teacher-workspace h3,
@@ -54,23 +105,56 @@ html.teacher-workspace .widget-title,
 html.teacher-workspace .kpi-number,
 html.teacher-workspace .section-heading,
 html.teacher-workspace .font-mono,
-.font-mono {
-  font-family: var(--font-space-mono), "Space Mono", monospace !important;
+.teacher-workspace h1,
+.teacher-workspace h2,
+.teacher-workspace h3,
+.teacher-workspace h4,
+.teacher-workspace h5,
+.teacher-workspace h6,
+.teacher-workspace .teacher-hero-title,
+.teacher-workspace .teacher-stat,
+.teacher-workspace .card-title,
+.teacher-workspace .widget-title,
+.teacher-workspace .kpi-number,
+.teacher-workspace .section-heading,
+.teacher-workspace .font-mono,
+.font-mono,
+.academic-mono,
+.font-space-mono {
+  font-family:
+    "Space Mono Local", var(--font-space-mono), "Space Mono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, "Liberation Mono", monospace !important;
   letter-spacing: -0.02em;
 }
 
-/* Dialog & Modal headings must remain clean sans-serif */
+/* Dialog & Modal headings strictly adhere to clean sans-serif */
 html.teacher-workspace [role="dialog"] h1,
 html.teacher-workspace [role="dialog"] h2,
 html.teacher-workspace [role="dialog"] h3,
 html.teacher-workspace [role="dialog"] h4,
 html.teacher-workspace .modal-title,
+.teacher-workspace [role="dialog"] h1,
+.teacher-workspace [role="dialog"] h2,
+.teacher-workspace [role="dialog"] h3,
+.teacher-workspace [role="dialog"] h4,
+.teacher-workspace .modal-title,
 [role="dialog"] h1,
 [role="dialog"] h2,
 [role="dialog"] h3,
 [role="dialog"] h4 {
-  font-family: var(--font-sans), "Lato", sans-serif !important;
+  font-family: var(--font-sans), sans-serif !important;
   letter-spacing: normal !important;
+}
+
+/* Headings outside teacher workspace default to clean sans-serif */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.modal-title {
+  font-family: var(--font-sans);
 }
 
 .font-lato {
@@ -79,6 +163,85 @@ html.teacher-workspace .modal-title,
 
 .font-roboto-mono {
   font-family: var(--font-roboto-mono), "Roboto Mono", monospace !important;
+}
+
+/* Responsive Layout Containers & Standard Gutters (16px mobile, 24px tablet, 32px desktop) */
+.page-container {
+  width: 100%;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .page-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Canonical Surface Tiers (docs/07-UI-UX-DESIGN-SYSTEM.md §10) */
+.surface-solid {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+.dark .surface-solid {
+  background-color: #0f172a;
+  border-color: #1e293b;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
+.surface-glass-soft {
+  background-color: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+.dark .surface-glass-soft {
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(30, 41, 59, 0.6);
+}
+
+.surface-glass-elevated {
+  background-color: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  box-shadow: 0 4px 16px 0 rgba(15, 23, 42, 0.08);
+}
+.dark .surface-glass-elevated {
+  background-color: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.4);
+}
+
+.surface-glass-strong {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 8px 24px 0 rgba(15, 23, 42, 0.16);
+}
+.dark .surface-glass-strong {
+  background-color: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+  box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.5);
 }
 
 /* Academic Glass Card & Glow */
@@ -112,6 +275,24 @@ html.teacher-workspace .modal-title,
   box-shadow:
     0 0 38px -2px rgba(59, 130, 246, 0.28),
     0 14px 30px -5px rgba(0, 0, 0, 0.6);
+}
+
+/* Unified Dashboard Viewport Canvas — 100% Pure & Seamless Blend with Sidebar & Notch */
+.dashboard-viewport-canvas {
+  background-color: #f8fafc;
+}
+
+.dark .dashboard-viewport-canvas {
+  background-color: #090d16;
+}
+
+/* Academic Glass Dashboard v1.2 Seamless Canvas (STAGE UI-GLASS-02) */
+.dashboard-glass-surface {
+  background: transparent;
+}
+
+.dark .dashboard-glass-surface {
+  background: transparent;
 }
 
 /* Curved Notch Inverted Radius for Active Sidebar Item */

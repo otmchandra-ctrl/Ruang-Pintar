@@ -101,14 +101,18 @@ async function main() {
     }
 
     if (!canonical) {
-      console.warn(`  [WARNING] Tidak ditemukan record Canonical untuk kode ${code} (${jt.nama_lengkap})!`);
+      console.warn(
+        `  [WARNING] Tidak ditemukan record Canonical untuk kode ${code} (${jt.nama_lengkap})!`
+      );
       continue;
     }
 
     // Filter duplicates: semua record cocok KECUALI canonical
     const duplicates = matches.filter((g) => g.id !== canonical.id);
 
-    console.log(`\n[Kode ${code}] ${jt.nama_lengkap} -> Canonical: ${canonical.id} | Duplikat: ${duplicates.length}`);
+    console.log(
+      `\n[Kode ${code}] ${jt.nama_lengkap} -> Canonical: ${canonical.id} | Duplikat: ${duplicates.length}`
+    );
 
     // Update nama Canonical dan Pengguna
     await prisma.guru.update({
@@ -243,7 +247,9 @@ async function main() {
 
     const targetGuru = teacherMapByCode.get(jr.kode_guru_wali);
     if (!targetGuru) {
-      console.warn(`[WARNING] Guru kode ${jr.kode_guru_wali} untuk rombel ${jr.nama} tidak ditemukan!`);
+      console.warn(
+        `[WARNING] Guru kode ${jr.kode_guru_wali} untuk rombel ${jr.nama} tidak ditemukan!`
+      );
       continue;
     }
 
@@ -334,4 +340,6 @@ async function main() {
   console.log("\nRekonsiliasi selesai dengan sukses.");
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect());
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

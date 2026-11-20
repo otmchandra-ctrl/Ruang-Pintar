@@ -5,10 +5,10 @@
 | --- | --- |
 | **Project Identity** | Ruang Pintar — School Digital Operating Platform |
 | **Product Type** | Application (Modular Monolith SaaS Multi-Tenant) |
-| **Current Phase** | PHASE SAAS-04 — MULTI-TENANT FOUNDATION IMPLEMENTATION |
-| **Phase Lifecycle Gate** | `TEST` (Stabilization, Regression & Verification Gate) |
+| **Current Phase** | STAGE CBT-05 — GENERAL AVAILABILITY (GA) READINESS & PRODUCTION RELEASE |
+| **Phase Lifecycle Gate** | `TEST → DEPLOY GATE` (GA Verification & Production Readiness Gate) |
 | **Status** | `active` |
-| **Version** | 2.0 (Fikran Engineering Aligned) |
+| **Version** | 2.1 (Fikran Engineering Aligned) |
 | **Operating Contract** | `.gemini/config/skills/fikran-engineering/SKILL.md` |
 
 ---
@@ -19,8 +19,8 @@ Ruang Pintar adalah:
 > **School Digital Operating Platform modular yang menyatukan proses akademik, pembelajaran, administrasi, komunikasi, monitoring, dan layanan sekolah dalam satu ekosistem digital terintegrasi.**
 
 - **Target Pengguna & Peran:** `SUPER_ADMIN`, `SCHOOL_STAFF`, `TEACHER`, `STUDENT`, `GUARDIAN` (dengan posisi kontekstual `HEADMASTER` dan `HOMEROOM_TEACHER`).
-- **Fase Aktif Saat Ini:** `PHASE SAAS-04 — MULTI-TENANT FOUNDATION IMPLEMENTATION` (Status: `READY FOR HUMAN REVIEW`).
-- **Fokus Fase:** Stabilisasi fondasi SaaS multi-tenant (`KeanggotaanSekolah`, `sekolah_aktif_id`, `TenantEntitlementService`), kepatuhan quality gate, dan audit pencegahan kebocoran data antar-sekolah.
+- **Fase Aktif Saat Ini:** `STAGE CBT-05 — GENERAL AVAILABILITY (GA) READINESS & PRODUCTION RELEASE` (Status: `READY FOR HUMAN REVIEW`).
+- **Fokus Fase:** Audit kesiapan rilis umum (GA) Universal CBT Exam Engine (CBT-01 s/d CBT-05), verifikasi zero-data loss, konkurensi 500 siswa per sesi, paket cetak 10-dokumen administrasi resmi sekolah, dan kelulusan 100% seluruh Quality Gates.
 
 ---
 
@@ -75,7 +75,7 @@ Missing Grade ≠ Zero Grade
 ```text
 Bahasa: Bahasa Indonesia & snake_case untuk entitas first-party
 Identifier: ULID 26 karakter
-Engine: SQLite + Prisma ORM
+Engine: SQLite (development/testing) + Supabase PostgreSQL (production), Prisma ORM
 Immutability: Migrasi yang telah diterapkan bersifat immutable (dilarang rewrite destructive)
 ```
 
@@ -205,6 +205,11 @@ npx prisma migrate dev       # Membuat dan menerapkan migrasi lokal
 npx prisma migrate deploy    # Menerapkan migrasi pada target produksi
 npx prisma generate          # Mengenerate Prisma Client terbaru
 npx prisma studio            # Membuka UI web inspector database
+npm run db:generate:sqlite   # Mengenerate Prisma Client untuk pengembangan SQLite
+npm run db:generate:supabase # Mengenerate Prisma Client PostgreSQL untuk Vercel
+npm run db:migrate:supabase  # Menerapkan baseline/migrasi PostgreSQL ke Supabase
+npm run db:audit:supabase-source # Memeriksa integrity, tabel, dan foreign key SQLite sumber
+npm run db:transfer:supabase # Menyalin SQLite ke target Supabase kosong dan memverifikasi checksum
 
 # Data Scripts
 npm run data:jadwal:check    # Memeriksa data impor jadwal

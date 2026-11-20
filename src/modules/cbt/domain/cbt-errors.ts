@@ -102,3 +102,55 @@ export class CbtAttemptLockedError extends CbtError {
     this.name = "CbtAttemptLockedError";
   }
 }
+
+export class CbtSnapshotImmutableError extends CbtError {
+  constructor(
+    message = "Snapshot ujian telah berstatus beku (immutable) dan tidak dapat dimodifikasi atau dihapus."
+  ) {
+    super(message);
+    this.name = "CbtSnapshotImmutableError";
+  }
+}
+
+export class CbtInvalidTransitionError extends CbtError {
+  constructor(fromStatus: string, toStatus: string, reason?: string) {
+    super(
+      `Transisi status publikasi tidak diizinkan dari '${fromStatus}' ke '${toStatus}'${
+        reason ? `: ${reason}` : "."
+      }`
+    );
+    this.name = "CbtInvalidTransitionError";
+  }
+}
+
+export class CbtInvalidTokenError extends CbtError {
+  constructor(message = "Token ujian tidak valid, salah, atau telah kedaluwarsa.") {
+    super(message);
+    this.name = "CbtInvalidTokenError";
+  }
+}
+
+export class CbtStudentNotEligibleError extends CbtError {
+  constructor(reasons: string[]) {
+    super(`Siswa tidak berhak mengikuti ujian: ${reasons.join(", ")}`);
+    this.name = "CbtStudentNotEligibleError";
+  }
+}
+
+export class CbtSessionClosedError extends CbtError {
+  constructor(
+    message = "Sesi ujian ini belum dibuka, telah ditutup, atau berada di luar rentang jadwal aktif."
+  ) {
+    super(message);
+    this.name = "CbtSessionClosedError";
+  }
+}
+
+export class CbtSessionInvalidatedError extends CbtError {
+  constructor(
+    message = "Sesi pengerjaan ujian Anda telah dibuka di perangkat lain. Akses pada perangkat ini telah dinonaktifkan."
+  ) {
+    super(message);
+    this.name = "CbtSessionInvalidatedError";
+  }
+}

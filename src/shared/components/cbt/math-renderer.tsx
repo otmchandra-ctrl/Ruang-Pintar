@@ -9,16 +9,59 @@ interface MathRendererProps {
   isArabic?: boolean;
 }
 
+function renderTextWithCode(text: string, keyPrefix: string) {
+  const codeRegex = /```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g;
+  const elements: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let codeMatch: RegExpExecArray | null;
+  let subKey = 0;
+
+  while ((codeMatch = codeRegex.exec(text)) !== null) {
+    if (codeMatch.index > lastIdx) {
+      elements.push(
+        <span key={`${keyPrefix}-t-${subKey++}`} className="whitespace-pre-wrap">
+          {text.substring(lastIdx, codeMatch.index)}
+        </span>
+      );
+    }
+    const lang = codeMatch[1]?.trim();
+    const codeBody = codeMatch[2]?.trimEnd();
+    elements.push(
+      <div
+        key={`${keyPrefix}-c-${subKey++}`}
+        className="my-3 rounded-xl bg-slate-900 border border-slate-800 text-emerald-400 p-3.5 font-mono text-xs sm:text-sm overflow-x-auto shadow-inner leading-relaxed select-text"
+      >
+        {lang && (
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 pb-1 border-b border-slate-800">
+            {lang}
+          </div>
+        )}
+        <pre className="m-0 p-0 font-mono whitespace-pre">{codeBody}</pre>
+      </div>
+    );
+    lastIdx = codeRegex.lastIndex;
+  }
+
+  if (lastIdx < text.length) {
+    elements.push(
+      <span key={`${keyPrefix}-t-${subKey++}`} className="whitespace-pre-wrap">
+        {text.substring(lastIdx)}
+      </span>
+    );
+  }
+  return elements;
+}
+
 /**
- * MathRenderer — Merender teks campuran dengan rumus LaTeX / KaTeX ($...$ atau $$...$$)
- * dan mendukung orientasi teks Arab (RTL) secara otomatis atau eksplisit.
+ * MathRenderer — Merender teks campuran dengan rumus LaTeX / KaTeX ($...$ atau $$...$$),
+ * blok kode sintaks pemrograman (```java ... ```), dan mendukung orientasi teks Arab (RTL).
  */
 export function MathRenderer({ content, className = "", isArabic = false }: MathRendererProps) {
   // Deteksi otomatis jika teks mengandung karakter Arab
   const hasArabicChars = useMemo(() => {
     return (
       isArabic ||
-      /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(content)
+      /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(content || "")
     );
   }, [content, isArabic]);
 
@@ -38,11 +81,7 @@ export function MathRenderer({ content, className = "", isArabic = false }: Math
       // Teks sebelum rumus
       if (match.index > lastIndex) {
         const textBefore = content.substring(lastIndex, match.index);
-        parts.push(
-          <span key={`text-${keyIdx++}`} className="whitespace-pre-wrap">
-            {textBefore}
-          </span>
-        );
+        parts.push(...renderTextWithCode(textBefore, `pre-${keyIdx++}`));
       }
 
       const mathStr = match[0];
@@ -72,7 +111,7 @@ export function MathRenderer({ content, className = "", isArabic = false }: Math
         parts.push(
           <code
             key={`math-err-${keyIdx++}`}
-            className="text-red-500 bg-red-50 px-1 rounded text-xs font-mono"
+            className="text-red-500 bg-red-50 dark:bg-red-950/40 dark:text-red-300 px-1 rounded text-xs font-mono"
           >
             {mathStr}
           </code>
@@ -84,11 +123,7 @@ export function MathRenderer({ content, className = "", isArabic = false }: Math
 
     // Sisa teks setelah rumus terakhir
     if (lastIndex < content.length) {
-      parts.push(
-        <span key={`text-${keyIdx++}`} className="whitespace-pre-wrap">
-          {content.substring(lastIndex)}
-        </span>
-      );
+      parts.push(...renderTextWithCode(content.substring(lastIndex), `post-${keyIdx++}`));
     }
 
     return parts;
@@ -97,10 +132,8 @@ export function MathRenderer({ content, className = "", isArabic = false }: Math
   return (
     <div
       dir={hasArabicChars ? "rtl" : "ltr"}
-      className={`leading-relaxed ${
-        hasArabicChars
-          ? "font-serif text-lg leading-loose text-right antialiased"
-          : "text-slate-800 dark:text-slate-200"
+      className={`leading-relaxed text-inherit ${
+        hasArabicChars ? "font-serif text-lg leading-loose text-right antialiased" : ""
       } ${className}`}
     >
       {renderedElements}

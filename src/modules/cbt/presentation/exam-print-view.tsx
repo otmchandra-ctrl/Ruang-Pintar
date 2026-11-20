@@ -347,22 +347,59 @@ export function ExamPrintView({ data, penugasanId }: ExamPrintViewProps) {
                         <div className="flex items-start gap-1.5">
                           <span className="font-bold shrink-0">{soal.nomor}.</span>
                           <div className="flex-1 space-y-2">
-                            <p className="leading-relaxed text-slate-900">{soal.pertanyaan}</p>
-
-                            {/* Stimulus Gambar jika ada */}
-                            {soal.gambar_url && (
-                              <div className="my-2 border border-slate-300 rounded p-1 max-w-xs bg-slate-50">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={soal.gambar_url}
-                                  alt={`Stimulus Soal ${soal.nomor}`}
-                                  className="max-h-48 object-contain mx-auto"
-                                />
-                                <span className="block text-center text-[9px] text-slate-500 mt-1 italic">
-                                  [Gambar Soal {soal.nomor}]
-                                </span>
-                              </div>
-                            )}
+                            {(() => {
+                              const hasTag = /\[(?:gambar|image)\]/i.test(soal.pertanyaan);
+                              if (hasTag) {
+                                const [tAtas, ...tSisa] =
+                                  soal.pertanyaan.split(/\[(?:gambar|image)\]/i);
+                                const tBawah = tSisa.join("\n\n").trim();
+                                return (
+                                  <>
+                                    {tAtas?.trim() && (
+                                      <p className="leading-relaxed text-slate-900">
+                                        {tAtas.trim()}
+                                      </p>
+                                    )}
+                                    {soal.gambar_url && (
+                                      <div className="my-2 border border-slate-300 rounded p-1 max-w-xs bg-slate-50">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                          src={soal.gambar_url.split("#")[0]}
+                                          alt={`Stimulus Soal ${soal.nomor}`}
+                                          className="max-h-48 object-contain mx-auto"
+                                        />
+                                        <span className="block text-center text-[9px] text-slate-500 mt-1 italic">
+                                          [Gambar Soal {soal.nomor}]
+                                        </span>
+                                      </div>
+                                    )}
+                                    {tBawah && (
+                                      <p className="leading-relaxed text-slate-900">{tBawah}</p>
+                                    )}
+                                  </>
+                                );
+                              }
+                              return (
+                                <>
+                                  <p className="leading-relaxed text-slate-900">
+                                    {soal.pertanyaan}
+                                  </p>
+                                  {soal.gambar_url && (
+                                    <div className="my-2 border border-slate-300 rounded p-1 max-w-xs bg-slate-50">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={soal.gambar_url.split("#")[0]}
+                                        alt={`Stimulus Soal ${soal.nomor}`}
+                                        className="max-h-48 object-contain mx-auto"
+                                      />
+                                      <span className="block text-center text-[9px] text-slate-500 mt-1 italic">
+                                        [Gambar Soal {soal.nomor}]
+                                      </span>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
 
                             {/* Opsi A - E */}
                             <div className="space-y-1 pl-1">

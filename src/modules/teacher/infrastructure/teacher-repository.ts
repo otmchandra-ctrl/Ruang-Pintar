@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
+import { containsText } from "@/shared/infrastructure/database/query-filters";
 import { generateUlid } from "@/shared/lib/ulid";
 import { parseUserAgent, calculatePresence } from "@/shared/lib/device-detector";
 import { formatNamaDenganGelar } from "@/shared/utils/name-formatter";
@@ -59,10 +60,10 @@ export class TeacherRepository {
     if (options?.search) {
       const q = options.search.trim();
       where.OR = [
-        { nama_lengkap: { contains: q } },
-        { nip: { contains: q } },
-        { nuptk: { contains: q } },
-        { email: { contains: q } },
+        { nama_lengkap: containsText(q) },
+        { nip: containsText(q) },
+        { nuptk: containsText(q) },
+        { email: containsText(q) },
       ];
     }
 
@@ -636,7 +637,7 @@ export class TeacherRepository {
     }
     if (options?.search) {
       const q = options.search.trim();
-      where.OR = [{ kode: { contains: q } }, { nama: { contains: q } }];
+      where.OR = [{ kode: containsText(q) }, { nama: containsText(q) }];
     }
 
     const records = await prisma.mataPelajaran.findMany({

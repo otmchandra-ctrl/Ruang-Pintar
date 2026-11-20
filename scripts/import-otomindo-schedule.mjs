@@ -501,14 +501,20 @@ async function applyImport(prisma, source, schedule, sourceHash, sourceWarnings,
           const cleanDB = item.nama_lengkap
             .toLowerCase()
             .replace(/,/g, "")
-            .replace(/\b(s\.pd|s\.kom|m\.pd|se|mm|sp|mt|s\.ds|s\.sos\.i|s\.pd\.i|a\.md|drs|dr)\b/gi, "")
+            .replace(
+              /\b(s\.pd|s\.kom|m\.pd|se|mm|sp|mt|s\.ds|s\.sos\.i|s\.pd\.i|a\.md|drs|dr)\b/gi,
+              ""
+            )
             .replace(/\./g, "")
             .trim()
             .replace(/\s+/g, " ");
           const cleanSource = teacher.nama_lengkap
             .toLowerCase()
             .replace(/,/g, "")
-            .replace(/\b(s\.pd|s\.kom|m\.pd|se|mm|sp|mt|s\.ds|s\.sos\.i|s\.pd\.i|a\.md|drs|dr)\b/gi, "")
+            .replace(
+              /\b(s\.pd|s\.kom|m\.pd|se|mm|sp|mt|s\.ds|s\.sos\.i|s\.pd\.i|a\.md|drs|dr)\b/gi,
+              ""
+            )
             .replace(/\./g, "")
             .trim()
             .replace(/\s+/g, " ");
@@ -517,7 +523,9 @@ async function applyImport(prisma, source, schedule, sourceHash, sourceWarnings,
         const repurposeLinkedProfile = teacher.kode === 21 && !record && linkedProfile;
         if (repurposeLinkedProfile) record = linkedProfile;
 
-        const formattedName = [teacher.gelar_depan, teacher.nama_lengkap].filter(Boolean).join(" ") + (teacher.gelar_belakang ? ", " + teacher.gelar_belakang : "");
+        const formattedName =
+          [teacher.gelar_depan, teacher.nama_lengkap].filter(Boolean).join(" ") +
+          (teacher.gelar_belakang ? ", " + teacher.gelar_belakang : "");
         const data = {
           nama_lengkap: record?.nama_lengkap || formattedName,
           gelar_depan: teacher.gelar_depan,

@@ -30,6 +30,7 @@ describe("M11 Learning Application Service", () => {
       deleteTugas: vi.fn(),
       createAdministrasi: vi.fn(),
       deleteAdministrasi: vi.fn(),
+      getClassActivityFeed: vi.fn(),
     };
     service = new LearningService(mockRepo);
   });
@@ -182,6 +183,28 @@ describe("M11 Learning Application Service", () => {
       const res = await service.createAdministrasi("USER_01", "TEACHER", input);
       expect(res).toEqual(mockCreated);
       expect(mockRepo.createAdministrasi).toHaveBeenCalled();
+    });
+  });
+
+  describe("Class Activity Feed Operations", () => {
+    it("should fetch class activity feed with tenant isolation", async () => {
+      const mockActivities = [
+        {
+          id: "act-mat-1",
+          tipe: "MATERI" as const,
+          judul: 'Materi "HTML Semantik"',
+          deskripsi: "Materi dokumen telah diterbitkan",
+          pelaku_nama: "Pak Budi",
+          pelaku_peran: "GURU" as const,
+          waktu: new Date(),
+          target_tab: "MATERI" as const,
+        },
+      ];
+      mockRepo.getClassActivityFeed.mockResolvedValue(mockActivities);
+
+      const res = await service.getClassActivityFeed("PENUGASAN_01", "SCH_01", 8);
+      expect(res).toEqual(mockActivities);
+      expect(mockRepo.getClassActivityFeed).toHaveBeenCalledWith("PENUGASAN_01", "SCH_01", 8);
     });
   });
 });

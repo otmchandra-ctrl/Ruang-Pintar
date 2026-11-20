@@ -21,12 +21,12 @@ export function PageHeader({
     <div className={`flex flex-col gap-3 pb-6 ${className}`}>
       {breadcrumb && <div className="text-sm">{breadcrumb}</div>}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl break-words min-w-0">
               {title}
             </h1>
-            {badge}
+            {badge && <div className="shrink-0">{badge}</div>}
           </div>
           {description && (
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl">

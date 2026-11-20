@@ -42,9 +42,9 @@ Sistem menetapkan 4 batas kepercayaan (*Trust Boundaries*) yang tegas:
           │  Permission Resolution & Active Tenant Membership Check
           ▼
 [ Boundary 3: Multi-Tenant Data Layer & Prisma Engine ]
-          │  Tenant-Scoped SQLite Queries (WHERE sekolah_id = active_tenant_id)
+          │  Tenant-Scoped Prisma Queries (WHERE sekolah_id = active_tenant_id)
           ▼
-[ Boundary 4: Persistent Database (SQLite Storage) ]
+[ Boundary 4: Persistent Database (Supabase PostgreSQL in production) ]
 ```
 
 ### Karakteristik Aktor:

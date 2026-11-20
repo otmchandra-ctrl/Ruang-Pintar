@@ -23,6 +23,8 @@ import {
   ChevronLeft,
   HelpCircle,
   Sparkles,
+  Bot,
+  ArrowUpRight,
   Megaphone,
   School,
   Presentation,
@@ -31,10 +33,13 @@ import {
   FileSpreadsheet,
   MonitorPlay,
   Plug,
+  User,
+  LogOut,
   LucideIcon,
 } from "lucide-react";
 import { BaseRole, CapabilityBundle } from "@/shared/infrastructure/authorization/types";
 import { getFilteredNavigation } from "./navigation-config";
+import { logoutAction } from "@/app/actions/auth-actions";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -53,6 +58,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ShieldAlert,
   Building2,
   Sparkles,
+  Bot,
   Megaphone,
   School,
   Presentation,
@@ -71,6 +77,15 @@ export interface SidebarProps {
   onToggleCollapse: () => void;
   isSubscribed?: boolean;
   className?: string;
+  user?: {
+    id: string;
+    username: string;
+    nama_lengkap: string;
+    peran_dasar: string;
+    sekolah_id?: string | null;
+    foto_url?: string | null;
+    avatar_id?: string | null;
+  };
 }
 
 export function Sidebar({
@@ -81,6 +96,7 @@ export function Sidebar({
   onToggleCollapse,
   isSubscribed = false,
   className = "",
+  user,
 }: SidebarProps) {
   const pathname = usePathname();
   const navigationGroups = getFilteredNavigation(userRole, userCapabilities, isOwner);
@@ -226,15 +242,35 @@ export function Sidebar({
               type="button"
               className="w-full mt-1 py-2 rounded-xl bg-white text-[#2563EB] hover:bg-blue-50 text-xs font-bold shadow-sm transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              <ArrowUpRight className="h-3.5 w-3.5" />
               Upgrade Sekarang
             </button>
           </div>
         )}
       </div>
 
-      {/* Footer Area: Help Center */}
-      <div className="p-2 sm:p-3 border-t border-white/10 flex flex-col gap-1 flex-shrink-0">
+      {/* Footer Area: Profil Siswa, Pusat Bantuan, Keluar */}
+      <div className="p-2 sm:p-3 border-t border-white/10 flex flex-col gap-0.5 flex-shrink-0">
+        {/* 1. Profil Siswa / Profil Saya */}
+        <Link
+          href="/profil"
+          aria-label={userRole === "STUDENT" ? "Profil Siswa" : "Profil Saya"}
+          title={userRole === "STUDENT" ? "Profil Siswa" : "Profil Saya"}
+          className={`flex items-center gap-3 rounded-xl text-xs font-medium text-blue-100/90 hover:bg-white/10 hover:text-white transition-colors min-h-[40px] ${
+            isCollapsed
+              ? "justify-center p-2"
+              : "justify-center xl:justify-start p-2 xl:px-3 xl:py-2"
+          }`}
+        >
+          <User className="h-4 w-4 text-blue-200/90 flex-shrink-0" />
+          {!isCollapsed && (
+            <span className="hidden xl:inline truncate flex-1">
+              {userRole === "STUDENT" ? "Profil Siswa" : "Profil Saya"}
+            </span>
+          )}
+        </Link>
+
+        {/* 2. Pusat Bantuan */}
         <Link
           href="#"
           aria-label="Pusat Bantuan"
@@ -242,12 +278,30 @@ export function Sidebar({
           className={`flex items-center gap-3 rounded-xl text-xs font-medium text-blue-100/85 hover:bg-white/10 hover:text-white transition-colors min-h-[40px] ${
             isCollapsed
               ? "justify-center p-2"
-              : "justify-center xl:justify-start p-2 xl:px-3 xl:py-2.5"
+              : "justify-center xl:justify-start p-2 xl:px-3 xl:py-2"
           }`}
         >
           <HelpCircle className="h-4 w-4 text-blue-200/90 flex-shrink-0" />
           {!isCollapsed && <span className="hidden xl:inline truncate flex-1">Pusat Bantuan</span>}
         </Link>
+
+        {/* 3. Keluar */}
+        <button
+          type="button"
+          onClick={async () => {
+            await logoutAction();
+          }}
+          aria-label="Keluar"
+          title="Keluar"
+          className={`flex items-center gap-3 rounded-xl text-xs font-medium text-blue-100/80 hover:bg-rose-500/20 hover:text-rose-200 transition-colors min-h-[40px] cursor-pointer text-left w-full ${
+            isCollapsed
+              ? "justify-center p-2"
+              : "justify-center xl:justify-start p-2 xl:px-3 xl:py-2"
+          }`}
+        >
+          <LogOut className="h-4 w-4 text-blue-200/80 flex-shrink-0" />
+          {!isCollapsed && <span className="hidden xl:inline truncate flex-1">Keluar</span>}
+        </button>
       </div>
     </aside>
   );

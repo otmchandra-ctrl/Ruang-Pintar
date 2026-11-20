@@ -22,7 +22,7 @@ export function AttentionQueueCard({ items = [] }: AttentionQueueCardProps) {
   const hasItems = items.length > 0;
 
   return (
-    <div className="rounded-[28px] bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 p-6 shadow-xs dark:shadow-[0_0_30px_-5px_rgba(37,99,235,0.16)] space-y-4">
+    <div className="rounded-[28px] bg-white/65 dark:bg-slate-900/65 backdrop-blur-[20px] border border-white/75 dark:border-white/15 p-6 shadow-[0_12px_36px_rgba(0,0,0,0.04)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.4)] space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2">
@@ -48,7 +48,7 @@ export function AttentionQueueCard({ items = [] }: AttentionQueueCardProps) {
         </Link>
       </div>
 
-      {/* Content: List or Genuine Empty State */}
+      {/* Content: List or Smart Action Priority Queue */}
       {hasItems ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {items.map((item) => {
@@ -128,18 +128,105 @@ export function AttentionQueueCard({ items = [] }: AttentionQueueCardProps) {
           })}
         </div>
       ) : (
-        <div className="py-7 px-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-blue-500/10 text-center flex flex-col items-center justify-center space-y-2.5">
-          <div className="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-900/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs">
-            <CheckCircle2 className="h-5 w-5" />
+        <div className="space-y-3.5">
+          {/* Status banner */}
+          <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-900/50">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-mono font-bold text-emerald-800 dark:text-emerald-300">
+                Seluruh siswa dalam batas aman akademik & kehadiran.
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold hidden sm:inline">
+              Tidak ada catatan remedial aktif
+            </span>
           </div>
-          <div className="space-y-0.5">
-            <h4 className="font-mono text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
-              Menunggu Aktivitas Pembelajaran
-            </h4>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-              Belum ada catatan tindak lanjut. Data perhatian khusus siswa (remedial nilai, tugas
-              tertunda, atau absensi) akan terakumulasi otomatis seiring berjalannya KBM.
-            </p>
+
+          {/* Quick Action Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Link
+              href="/jadwal-saya"
+              className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/60 hover:bg-blue-50/70 dark:hover:bg-blue-950/40 border border-slate-200/70 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-800 transition-all group flex flex-col justify-between shadow-2xs"
+            >
+              <div>
+                <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                  Jadwal & Sesi KBM
+                </span>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white mt-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Mulai Sesi Mengajar
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                  Buka presensi kelas & catat jurnal pembelajaran hari ini
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                <span>Buka Jadwal</span>
+                <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/penilaian"
+              className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/60 hover:bg-blue-50/70 dark:hover:bg-blue-950/40 border border-slate-200/70 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-800 transition-all group flex flex-col justify-between shadow-2xs"
+            >
+              <div>
+                <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                  Buku Nilai & Tugas
+                </span>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white mt-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Input Nilai Harian
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                  Catat nilai formatif, periksa tugas, atau publikasikan asesmen
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                <span>Buka Penilaian</span>
+                <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/cbt-ujian"
+              className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/60 hover:bg-blue-50/70 dark:hover:bg-blue-950/40 border border-slate-200/70 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-800 transition-all group flex flex-col justify-between shadow-2xs"
+            >
+              <div>
+                <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                  CBT & Bank Soal
+                </span>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white mt-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Kelola Ujian Online
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                  Susun bank soal atau terbitkan token ujian online kelas
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                <span>Buka CBT</span>
+                <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/data-siswa"
+              className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/60 hover:bg-blue-50/70 dark:hover:bg-blue-950/40 border border-slate-200/70 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-800 transition-all group flex flex-col justify-between shadow-2xs"
+            >
+              <div>
+                <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                  Direktori Siswa
+                </span>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white mt-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Bina Profil Siswa
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                  Pantau riwayat absensi, rekap nilai, dan kontak wali murid
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                <span>Buka Siswa</span>
+                <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </Link>
           </div>
         </div>
       )}

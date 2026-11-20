@@ -413,7 +413,7 @@ export function ManageCurriculumModal({
             }`}
           >
             <FolderPlus className="h-4 w-4" />
-            <span>+ Buat BAB Baru</span>
+            <span>Buat BAB Baru</span>
           </button>
 
           <button
@@ -463,7 +463,7 @@ export function ManageCurriculumModal({
                       className="shrink-0 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold"
                       title="Buat BAB baru jika belum ada di daftar"
                     >
-                      + BAB Baru
+                      BAB Baru
                     </button>
                   </div>
                 ) : (
@@ -773,14 +773,14 @@ export function ManageCurriculumModal({
                   <Layers className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                   <p className="text-xs font-bold text-slate-600">Belum ada BAB yang dibuat</p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Klik tab &quot;+ Buat BAB Baru&quot; untuk menyusun bab kurikulum Anda.
+                    Klik tab &quot;Buat BAB Baru&quot; untuk menyusun bab kurikulum Anda.
                   </p>
                   <button
                     type="button"
                     onClick={() => setActiveTab("BAB")}
                     className="mt-3 px-3 py-1.5 rounded-xl bg-[#2563EB] text-white text-xs font-bold"
                   >
-                    + Buat BAB Sekarang
+                    Buat BAB Sekarang
                   </button>
                 </div>
               ) : (
@@ -845,7 +845,7 @@ export function ManageCurriculumModal({
                           }}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 text-[#2563EB] hover:bg-blue-100 text-xs font-bold transition-colors cursor-pointer shrink-0"
                         >
-                          <span>+ Isi Materi</span>
+                          <span>Isi Materi</span>
                           <ChevronRight className="h-3 w-3" />
                         </button>
                       </div>

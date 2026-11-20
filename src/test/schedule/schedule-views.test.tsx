@@ -125,9 +125,9 @@ describe("Phase 10 Presentation Views", () => {
         <MyScheduleView entries={mockEntries} teacherName="Siti Rahma, M.Kom" isTeacher={true} />
       );
 
-      expect(screen.getByText("Algoritma Pemrograman")).toBeInTheDocument();
+      expect(screen.getAllByText("Algoritma Pemrograman").length).toBeGreaterThan(0);
       expect(screen.getByText("1 JP / Minggu")).toBeInTheDocument();
-      expect(screen.getByText(/buka kelas/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/kelola kelas/i).length).toBeGreaterThan(0);
     });
 
     it("merges 2 consecutive periods of same subject and class into 1 unified schedule card", () => {
@@ -211,11 +211,13 @@ describe("Phase 10 Presentation Views", () => {
         />
       );
 
-      expect(screen.getByText("Administrasi Server")).toBeInTheDocument();
-      expect(screen.getByText("XI TKJ 1")).toBeInTheDocument();
-      expect(screen.getByText("Ahmad Dahlan, S.T")).toBeInTheDocument();
-      expect(screen.getByText("Konfigurasi DHCP Server")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /tutup kelas/i })).toBeInTheDocument();
+      expect(screen.getAllByText("Administrasi Server").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("XI TKJ 1").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Ahmad Dahlan, S.T").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Konfigurasi DHCP Server").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByRole("button", { name: /tutup kelas/i }).length).toBeGreaterThanOrEqual(
+        1
+      );
     });
   });
 });

@@ -5,12 +5,15 @@ import { ClassCbtTabView } from "@/modules/cbt/presentation/class-cbt-tab-view";
 import { CbtPlayerView } from "@/modules/cbt/presentation/cbt-player-view";
 import { UjianCbtDTO, ManifestItemSoal } from "@/modules/cbt/domain/cbt-types";
 
+import { CreateQuestionFullView } from "@/modules/cbt/presentation/create-question-full-view";
+
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn(),
     refresh: vi.fn(),
   }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 // Mock CBT Server Actions
@@ -162,13 +165,12 @@ describe("M14 CBT — Presentation Views (Academic Glass UI v1.2)", () => {
       />
     );
 
-    expect(screen.getByText("PTS Biologi Genap")).toBeDefined();
+    expect(screen.getAllByText("PTS Biologi Genap").length).toBeGreaterThan(0);
     expect(
       screen.getByText("Organel sel yang berfungsi menghasilkan energi adalah...")
     ).toBeDefined();
     expect(screen.getByText("Mitokondria")).toBeDefined();
-    expect(screen.getAllByText("Ragu-ragu").length).toBeGreaterThan(0);
-    expect(screen.getByText("Navigasi Soal")).toBeDefined();
+    expect(screen.getAllByText("Daftar Soal").length).toBeGreaterThan(0);
   });
 
   it("allows selecting choice and navigating questions", () => {
@@ -207,5 +209,38 @@ describe("M14 CBT — Presentation Views (Academic Glass UI v1.2)", () => {
     fireEvent.click(nextBtn);
 
     expect(screen.getByText("Bahan fotosintesis yang diserap dari akar adalah...")).toBeDefined();
+  });
+
+  it("renders CreateQuestionFullView with action buttons at both top and bottom and selects KKA mapel", () => {
+    const mockMapelList = [
+      { id: "MAPEL_KKA", nama: "Koding dan Kecerdasan Artifisial", kode: "KKA" },
+      { id: "MAPEL_BIO", nama: "Biologi", kode: "BIO" },
+    ];
+
+    render(
+      <CreateQuestionFullView
+        sekolahId="SCH_1"
+        mapelList={mockMapelList}
+        initialMapelId="MAPEL_KKA"
+        initialQuestion={null}
+      />
+    );
+
+    // Verifikasi tombol Simpan Butir Soal dan Simpan & Buat Lagi tersedia di formulir (atas dan bawah)
+    const simpanBtns = screen.getAllByRole("button", { name: /Simpan Butir Soal/i });
+    expect(simpanBtns.length).toBeGreaterThanOrEqual(2);
+
+    const simpanBuatLagiBtns = screen.getAllByRole("button", { name: /Simpan & Buat Lagi/i });
+    expect(simpanBuatLagiBtns.length).toBeGreaterThanOrEqual(2);
+
+    // Verifikasi tombol Kembali tersedia di formulir
+    const kembaliLinks = screen.getAllByRole("link", { name: /Kembali/i });
+    expect(kembaliLinks.length).toBeGreaterThanOrEqual(2);
+
+    // Verifikasi bahwa mata pelajaran KKA terpilih sebagai target soal
+    const selects = screen.getAllByRole("combobox");
+    const mapelSelect = selects[0] as HTMLSelectElement;
+    expect(mapelSelect.value).toBe("MAPEL_KKA");
+    expect(screen.getAllByText("Koding dan Kecerdasan Artifisial").length).toBeGreaterThan(0);
   });
 });

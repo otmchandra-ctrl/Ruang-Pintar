@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { X, Target, Award, Calendar, Layers, ShieldCheck } from "lucide-react";
 import { createAssessmentAction } from "@/app/actions/assessment-actions";
 import { AssessmentCategory, AssessmentTechnique } from "../domain/assessment-types";
@@ -63,7 +64,7 @@ export function CreateAssessmentModal({
     }
   }
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   // Filter TP berdasarkan BAB yang dipilih
   const availableTps =
@@ -99,25 +100,27 @@ export function CreateAssessmentModal({
     });
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-assessment-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[86vh] animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-[#2563EB] dark:text-blue-400">
+            <div className="h-10 w-10 rounded-2xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-[#2563EB] dark:text-blue-400 shrink-0">
               <Target className="h-5 w-5" />
             </div>
             <div>
               <h2
                 id="create-assessment-title"
-                className="text-base font-bold font-sans tracking-normal text-slate-800 dark:text-slate-100"
-                style={{ fontFamily: "var(--font-sans), sans-serif", letterSpacing: "normal" }}
+                className="text-base font-bold font-sans tracking-tight text-slate-800 dark:text-slate-100"
               >
                 Buat Asesmen Pembelajaran Baru
               </h2>
@@ -136,183 +139,189 @@ export function CreateAssessmentModal({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
-          {/* Judul Asesmen */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-              Judul Asesmen <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={judul}
-              onChange={(e) => setJudul(e.target.value)}
-              placeholder="Contoh: Formatif TP 1.1: Pemrograman Modular"
-              className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-            />
-          </div>
-
-          {/* Kategori & Teknik Penilaian */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Form with Flex Layout: Scrollable Body + Pinned Footer */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+            {/* Judul Asesmen */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                Kategori Asesmen
-              </label>
-              <select
-                value={kategori}
-                onChange={(e) => setKategori(e.target.value as AssessmentCategory)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all cursor-pointer"
-              >
-                <option value="FORMATIF">Formatif (Tujuan Pembelajaran)</option>
-                <option value="SUMATIF">Sumatif (Lingkup Materi / BAB)</option>
-                <option value="SUMATIF_AKHIR">Sumatif Akhir Semester (SAS)</option>
-                <option value="TUGAS">Tugas / Proyek Mandiri</option>
-                <option value="PRAKTIK">Unjuk Kerja / Praktik Lab</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                Teknik Penilaian
-              </label>
-              <select
-                value={teknikPenilaian}
-                onChange={(e) => setTeknikPenilaian(e.target.value as AssessmentTechnique)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all cursor-pointer"
-              >
-                <option value="TES_TERTULIS">Tes Tertulis</option>
-                <option value="TES_LISAN">Tes Lisan</option>
-                <option value="PENUGASAN">Penugasan</option>
-                <option value="KINERJA">Kinerja / Praktik</option>
-                <option value="PORTOFOLIO">Portofolio</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Lingkup Materi (BAB) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                Lingkup Materi (BAB)
-              </label>
-              <select
-                value={selectedBabId}
-                onChange={(e) => {
-                  setSelectedBabId(e.target.value);
-                  setSelectedTpId("");
-                }}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all cursor-pointer"
-              >
-                <option value="">-- Pilih BAB (Opsional) --</option>
-                {lingkupMateriList.map((lm) => (
-                  <option key={lm.id} value={lm.id}>
-                    {lm.judul}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tujuan Pembelajaran (TP) */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                Tujuan Pembelajaran (TP)
-              </label>
-              <select
-                value={selectedTpId}
-                disabled={!selectedBabId}
-                onChange={(e) => setSelectedTpId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:bg-slate-100 dark:disabled:bg-slate-800/40 disabled:text-slate-400 dark:disabled:text-slate-600 cursor-pointer"
-              >
-                <option value="">-- Pilih TP Terkait --</option>
-                {availableTps.map((tp) => (
-                  <option key={tp.id} value={tp.id}>
-                    {tp.kode ? `${tp.kode} - ` : ""}
-                    {tp.deskripsi.slice(0, 45)}...
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Bobot, KKTP, Tanggal */}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                Bobot Nilai
+                Judul Asesmen <span className="text-rose-500">*</span>
               </label>
               <input
-                type="number"
-                min="0.1"
-                max="100"
-                step="0.1"
-                value={bobot}
-                onChange={(e) => setBobot(Number(e.target.value))}
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                type="text"
+                required
+                value={judul}
+                onChange={(e) => setJudul(e.target.value)}
+                placeholder="Contoh: Formatif TP 1.1: Pemrograman Modular"
+                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                KKTP / KKM
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={kkmKktp}
-                onChange={(e) => setKkmKktp(Number(e.target.value))}
-                className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-semibold text-blue-600 dark:text-blue-400"
-              />
+            {/* Kategori & Teknik Penilaian */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Kategori Asesmen
+                </label>
+                <select
+                  value={kategori}
+                  onChange={(e) => setKategori(e.target.value as AssessmentCategory)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all cursor-pointer"
+                >
+                  <option value="FORMATIF">Formatif (Tujuan Pembelajaran)</option>
+                  <option value="SUMATIF">Sumatif (Lingkup Materi / BAB)</option>
+                  <option value="SUMATIF_AKHIR">Sumatif Akhir Semester (SAS)</option>
+                  <option value="TUGAS">Tugas / Proyek Mandiri</option>
+                  <option value="PRAKTIK">Unjuk Kerja / Praktik Lab</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Teknik Penilaian
+                </label>
+                <select
+                  value={teknikPenilaian}
+                  onChange={(e) => setTeknikPenilaian(e.target.value as AssessmentTechnique)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all cursor-pointer"
+                >
+                  <option value="TES_TERTULIS">Tes Tertulis</option>
+                  <option value="TES_LISAN">Tes Lisan</option>
+                  <option value="PENUGASAN">Penugasan</option>
+                  <option value="KINERJA">Kinerja / Praktik</option>
+                  <option value="PORTOFOLIO">Portofolio</option>
+                </select>
+              </div>
             </div>
 
+            {/* Lingkup Materi (BAB) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Lingkup Materi (BAB)
+                </label>
+                <select
+                  value={selectedBabId}
+                  onChange={(e) => {
+                    setSelectedBabId(e.target.value);
+                    setSelectedTpId("");
+                  }}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all cursor-pointer"
+                >
+                  <option value="">-- Pilih BAB (Opsional) --</option>
+                  {lingkupMateriList.map((lm) => (
+                    <option key={lm.id} value={lm.id}>
+                      {lm.judul}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tujuan Pembelajaran (TP) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Tujuan Pembelajaran (TP)
+                </label>
+                <select
+                  value={selectedTpId}
+                  disabled={!selectedBabId}
+                  onChange={(e) => setSelectedTpId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:bg-slate-100 dark:disabled:bg-slate-800/40 disabled:text-slate-400 dark:disabled:text-slate-600 cursor-pointer"
+                >
+                  <option value="">-- Pilih TP Terkait --</option>
+                  {availableTps.map((tp) => (
+                    <option key={tp.id} value={tp.id}>
+                      {tp.kode ? `${tp.kode} - ` : ""}
+                      {tp.deskripsi.slice(0, 45)}...
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Bobot, KKTP, Tanggal */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Bobot Nilai
+                </label>
+                <input
+                  type="number"
+                  min="0.1"
+                  max="100"
+                  step="0.1"
+                  value={bobot}
+                  onChange={(e) => setBobot(Number(e.target.value))}
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  KKTP / KKM
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={kkmKktp}
+                  onChange={(e) => setKkmKktp(Number(e.target.value))}
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-semibold text-blue-600 dark:text-blue-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Tanggal
+                </label>
+                <input
+                  type="date"
+                  value={tanggalPelaksanaan}
+                  onChange={(e) => setTanggalPelaksanaan(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Deskripsi Asesmen */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                Tanggal
+                Deskripsi / Petunjuk Penilaian
               </label>
-              <input
-                type="date"
-                value={tanggalPelaksanaan}
-                onChange={(e) => setTanggalPelaksanaan(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+              <textarea
+                rows={2}
+                value={deskripsi}
+                onChange={(e) => setDeskripsi(e.target.value)}
+                placeholder="Catatan pelaksanaan atau kisi-kisi penilaian..."
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none"
               />
             </div>
           </div>
 
-          {/* Deskripsi Asesmen */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-              Deskripsi / Petunjuk Penilaian
-            </label>
-            <textarea
-              rows={2}
-              value={deskripsi}
-              onChange={(e) => setDeskripsi(e.target.value)}
-              placeholder="Catatan pelaksanaan atau kisi-kisi penilaian..."
-              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none"
-            />
-          </div>
-
-          {/* Footer Actions */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
+          {/* Footer Actions (Pinned at Bottom) */}
+          <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="px-5 py-2 text-xs font-bold text-white bg-[#2563EB] hover:bg-blue-700 active:scale-98 rounded-xl shadow-xs shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-[#2563EB] hover:bg-blue-700 active:scale-98 rounded-xl shadow-xs shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
-              {isPending ? "Menyimpan..." : "Simpan Asesmen"}
+              {isPending && (
+                <span className="inline-block h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
+              <span>{isPending ? "Menyimpan..." : "Simpan Asesmen"}</span>
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

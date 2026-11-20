@@ -320,9 +320,12 @@ export function StudentReportCardView({ reportCard, grades }: StudentReportCardV
                           <p className="font-medium text-slate-800">
                             {mapel.deskripsiCapaianTertinggi}
                           </p>
-                          {mapel.deskripsiPerluPeningkatan && (
-                            <p className="text-slate-500 mt-1">{mapel.deskripsiPerluPeningkatan}</p>
-                          )}
+                          {mapel.deskripsiPerluPeningkatan &&
+                            mapel.deskripsiPerluPeningkatan !== "-" && (
+                              <p className="text-slate-500 mt-1">
+                                {mapel.deskripsiPerluPeningkatan}
+                              </p>
+                            )}
                         </td>
                       </tr>
                     ))}

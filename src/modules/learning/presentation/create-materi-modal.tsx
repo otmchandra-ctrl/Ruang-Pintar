@@ -23,6 +23,7 @@ interface CreateMateriModalProps {
   guruId: string;
   mapelId: string;
   lingkupMateriList: LingkupMateriDTO[];
+  initialBabId?: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (msg: string) => void;
@@ -34,6 +35,7 @@ export function CreateMateriModal({
   guruId,
   mapelId,
   lingkupMateriList,
+  initialBabId,
   isOpen,
   onClose,
   onSuccess,
@@ -114,6 +116,7 @@ export function CreateMateriModal({
             </label>
             <select
               name="lingkup_materi_id"
+              defaultValue={initialBabId || ""}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
             >
               <option value="">Umum / Tidak terikat BAB tertentu</option>

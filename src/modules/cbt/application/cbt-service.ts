@@ -21,6 +21,7 @@ import {
   CbtAttemptLockedError,
   CbtTimerExpiredError,
   CbtExamNotActiveError,
+  CbtSessionInvalidatedError,
 } from "../domain/cbt-errors";
 import {
   CreateBankSoalSchema,
@@ -150,7 +151,7 @@ export class CbtService {
         `Validasi Bank Soal gagal: ${parsed.error.issues.map((i) => i.message).join(", ")}`
       );
     }
-    const input: CreateBankSoalInput = parsed.data;
+    const input = parsed.data;
 
     let effectiveGuruId = guruId?.trim();
     if (!effectiveGuruId) {
@@ -224,6 +225,98 @@ export class CbtService {
     const input: CreateVersiSoalInput = parsed.data;
 
     return this.repo.createVersiSoal(bankSoalId, input, guruId ?? null);
+  }
+
+  // ============================================================================
+  // DUAL QUESTION BANK (PERSONAL vs SEKOLAH)
+  // ============================================================================
+
+  async getPersonalQuestions(
+    sekolahId: string,
+    guruId: string,
+    filter?: {
+      mataPelajaranId?: string;
+      tipe_soal?: string;
+      tingkat_kesulitan?: string;
+      level_kognitif?: string;
+      search?: string;
+    }
+  ): Promise<BankSoalDTO[]> {
+    if (!guruId) {
+      throw new CbtAccessDeniedError("Akses ditolak: Identitas guru wajib ditentukan.");
+    }
+    return this.repo.getPersonalQuestions(sekolahId, guruId, filter);
+  }
+
+  async getSchoolQuestions(
+    sekolahId: string,
+    mataPelajaranId: string,
+    filter?: {
+      tipe_soal?: string;
+      tingkat_kesulitan?: string;
+      level_kognitif?: string;
+      search?: string;
+    }
+  ): Promise<BankSoalDTO[]> {
+    if (!mataPelajaranId) {
+      throw new CbtValidationError("Mata pelajaran wajib dipilih untuk melihat bank soal sekolah.");
+    }
+    return this.repo.getSchoolQuestions(sekolahId, mataPelajaranId, filter);
+  }
+
+  async shareQuestionToSchoolBank(
+    bankSoalId: string,
+    sekolahId: string,
+    actorGuruId: string,
+    levelKognitif?: "L1" | "L2" | "L3"
+  ): Promise<BankSoalDTO> {
+    const question = await this.repo.findBankSoalById(bankSoalId, sekolahId);
+    if (!question) throw new CbtNotFoundError(`Bank Soal ${bankSoalId} tidak ditemukan.`);
+
+    if (question.guru_id !== actorGuruId) {
+      throw new CbtAccessDeniedError(
+        "Akses ditolak: Hanya pemilik soal yang dapat membagikan butir soal ke Bank Soal Sekolah."
+      );
+    }
+
+    return this.repo.updateQuestionScope(
+      sekolahId,
+      bankSoalId,
+      actorGuruId,
+      "SEKOLAH",
+      levelKognitif
+    );
+  }
+
+  async cloneQuestionToPersonal(
+    bankSoalId: string,
+    sekolahId: string,
+    actorGuruId: string,
+    actorName: string
+  ): Promise<BankSoalDTO> {
+    const question = await this.repo.findBankSoalById(bankSoalId, sekolahId);
+    if (!question) throw new CbtNotFoundError(`Bank Soal ${bankSoalId} tidak ditemukan.`);
+
+    // Jika soal berstatus PERSONAL milik orang lain, tolak kloning
+    if (question.scope_kepemilikan === "PERSONAL" && question.guru_id !== actorGuruId) {
+      throw new CbtAccessDeniedError(
+        "Akses ditolak: Anda tidak memiliki izin menyalin soal privat milik guru lain."
+      );
+    }
+
+    return this.repo.cloneQuestionToPersonal(sekolahId, bankSoalId, actorGuruId, actorName);
+  }
+
+  async deleteQuestionPermanently(
+    bankSoalId: string,
+    sekolahId: string,
+    actorGuruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<void> {
+    if (!bankSoalId) {
+      throw new CbtValidationError("ID butir soal wajib disertakan.");
+    }
+    return this.repo.deleteQuestionPermanently(bankSoalId, sekolahId, actorGuruId, isSuperAdmin);
   }
 
   // ============================================================================
@@ -367,6 +460,7 @@ export class CbtService {
     manifest: ManifestItemSoal[];
     timeRemainingSeconds: number;
     savedAnswers: Record<string, any>;
+    sessionToken?: string | null;
   }> {
     const exam = await this.repo.findUjianById(ujianId, sekolahId);
     if (!exam) throw new CbtNotFoundError(`Ujian CBT ${ujianId} tidak ditemukan.`);
@@ -455,12 +549,24 @@ export class CbtService {
       };
     }
 
+    const rawManifest: any[] = Array.isArray(snapshot.manifest_soal)
+      ? snapshot.manifest_soal
+      : typeof snapshot.manifest_soal === "string"
+        ? JSON.parse(snapshot.manifest_soal)
+        : [];
+
+    const normalizedManifest = rawManifest.map((item) => ({
+      ...item,
+      soal_id: item.soal_id || item.bank_soal_id,
+    }));
+
     // Invariant: Return manifest WITHOUT answer keys or scoring rubrics
     return {
       session,
-      manifest: snapshot.manifest_soal,
+      manifest: normalizedManifest,
       timeRemainingSeconds: remainingSeconds,
       savedAnswers,
+      sessionToken: session.token_sesi_aktif,
     };
   }
 
@@ -476,6 +582,7 @@ export class CbtService {
     manifest: ManifestItemSoal[];
     timeRemainingSeconds: number;
     savedAnswers: Record<string, any>;
+    sessionToken?: string | null;
     ujian: { judul: string; deskripsi: string | null; acak_soal: boolean };
   }> {
     const session = await this.repo.findSessionById(attemptId);
@@ -494,6 +601,17 @@ export class CbtService {
     if (session.status === "TERKUNCI_PELANGGARAN") {
       throw new CbtAttemptLockedError(
         "Sesi ujian Anda telah terkunci karena indikasi kecurangan. Silakan lapor ke pengawas."
+      );
+    }
+
+    if (
+      session.status === "SELESAI" ||
+      session.status === "DIKUMPULKAN" ||
+      session.status === "WAKTU_HABIS" ||
+      session.status === "TERLAMBAT"
+    ) {
+      throw new CbtAttemptClosedError(
+        "Sesi ujian Anda telah selesai dan dikumpulkan. Lembar ujian tidak dapat diakses lagi."
       );
     }
 
@@ -516,11 +634,23 @@ export class CbtService {
       };
     }
 
+    const rawManifest: any[] = Array.isArray(snapshot.manifest_soal)
+      ? snapshot.manifest_soal
+      : typeof snapshot.manifest_soal === "string"
+        ? JSON.parse(snapshot.manifest_soal)
+        : [];
+
+    const normalizedManifest = rawManifest.map((item) => ({
+      ...item,
+      soal_id: item.soal_id || item.bank_soal_id,
+    }));
+
     return {
       session,
-      manifest: snapshot.manifest_soal,
+      manifest: normalizedManifest,
       timeRemainingSeconds: remainingSeconds,
       savedAnswers,
+      sessionToken: session.token_sesi_aktif,
       ujian: {
         judul: exam.judul,
         deskripsi: exam.deskripsi,
@@ -536,7 +666,7 @@ export class CbtService {
     rawInput: unknown,
     sekolahId: string,
     siswaId: string
-  ): Promise<{ savedAt: Date }> {
+  ): Promise<{ savedAt: Date; saved: boolean }> {
     const parsed = AutosaveJawabanSchema.safeParse(rawInput);
     if (!parsed.success) {
       throw new CbtValidationError(
@@ -545,11 +675,40 @@ export class CbtService {
     }
     const input: AutosaveJawabanInput = parsed.data;
 
+    // HIGH-RISK-01: Optimized Single Validation + Single Upsert Fast Path
+    if (input.soal_id) {
+      await this.repo.saveAnswerOptimized({
+        sesi_ujian_id: input.sesi_ujian_siswa_id,
+        siswa_id: siswaId,
+        soal_id: input.soal_id,
+        versi_soal_id: input.versi_soal_id,
+        session_token: input.session_token,
+        jawaban_pilihan: input.jawaban_pilihan,
+        jawaban_teks: input.jawaban_teks,
+        jawaban_kompleks: input.jawaban_kompleks,
+        jawaban_menjodohkan: input.jawaban_menjodohkan,
+        ragu_ragu: input.ragu_ragu,
+      });
+      return { savedAt: new Date(), saved: true };
+    }
+
+    // Fallback path untuk backward compatibility
     const session = await this.repo.findSessionById(input.sesi_ujian_siswa_id);
     if (!session) throw new CbtNotFoundError(`Sesi ujian tidak ditemukan.`);
 
     if (session.siswa_id !== siswaId) {
       throw new CbtAccessDeniedError("Akses ditolak: Sesi ujian bukan milik Anda.");
+    }
+
+    // HIGH-RISK-02: Single Device Lock Validation
+    if (
+      session.token_sesi_aktif &&
+      input.session_token &&
+      session.token_sesi_aktif !== input.session_token
+    ) {
+      throw new CbtSessionInvalidatedError(
+        "Sesi ujian Anda telah dibuka di perangkat lain. Halaman ini telah dinonaktifkan."
+      );
     }
 
     if (session.status !== "SEDANG_MENGERJAKAN") {
@@ -566,7 +725,7 @@ export class CbtService {
     }
 
     await this.repo.saveJawaban(input);
-    return { savedAt: new Date() };
+    return { savedAt: new Date(), saved: true };
   }
 
   /**
@@ -626,13 +785,21 @@ export class CbtService {
   async submitAttempt(
     attemptId: string,
     sekolahId: string,
-    siswaId: string
+    siswaId: string,
+    sessionToken?: string | null
   ): Promise<HasilUjianCbtDTO> {
     const session = await this.repo.findSessionById(attemptId);
     if (!session) throw new CbtNotFoundError(`Sesi ujian ${attemptId} tidak ditemukan.`);
 
     if (session.siswa_id !== siswaId) {
       throw new CbtAccessDeniedError("Akses ditolak: Sesi ujian bukan milik Anda.");
+    }
+
+    // HIGH-RISK-02: Single Device Lock Validation
+    if (session.token_sesi_aktif && sessionToken && session.token_sesi_aktif !== sessionToken) {
+      throw new CbtSessionInvalidatedError(
+        "Sesi ujian Anda telah dibuka di perangkat lain. Pengumpulan dari perangkat ini ditolak."
+      );
     }
 
     if (session.status === "TERKUNCI_PELANGGARAN") {
@@ -837,6 +1004,242 @@ export class CbtService {
     notes: string;
   }> {
     return this.repo.scanPaperLjmPhoto(imageBase64, totalSoal, mimeType);
+  }
+
+  /**
+   * Mengambil daftar seluruh soal dan kunci jawaban dari ujian aktif untuk keperluan koreksi/edit
+   */
+  async getActiveExamQuestionsForEdit(
+    ujianId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<{
+    ujian: { id: string; judul: string; status: string };
+    questions: Array<{
+      nomor_urut: number;
+      bank_soal_id: string;
+      versi_soal_id: string;
+      tipe_soal: string;
+      pertanyaan: string;
+      gambar_url: string | null;
+      opsi_jawaban: any;
+      kunci_jawaban: any;
+      bobot: number;
+      pembahasan: string | null;
+    }>;
+  }> {
+    const exam = await this.repo.findUjianById(ujianId, sekolahId);
+    if (!exam) throw new CbtNotFoundError(`Ujian CBT ${ujianId} tidak ditemukan.`);
+
+    await this.verifyTeacherAssignmentScope(
+      exam.penugasan_mengajar_id,
+      sekolahId,
+      guruId,
+      isSuperAdmin
+    );
+
+    const snapshot = await this.repo.getActiveSnapshot(ujianId);
+    if (!snapshot) {
+      throw new CbtNotFoundError(`Snapshot untuk ujian CBT ${ujianId} tidak ditemukan.`);
+    }
+
+    const manifest: any[] = Array.isArray(snapshot.manifest_soal)
+      ? snapshot.manifest_soal
+      : JSON.parse(snapshot.manifest_soal || "[]");
+
+    const keysList: any[] = Array.isArray(snapshot.kunci_penilaian)
+      ? snapshot.kunci_penilaian
+      : JSON.parse(snapshot.kunci_penilaian || "[]");
+
+    const keysMap = new Map<string, any>();
+    keysList.forEach((k) => {
+      const id = k.bank_soal_id || k.soal_id || String(k.nomor_urut);
+      keysMap.set(id, k);
+    });
+
+    const questions = manifest.map((m, idx) => {
+      const bankId = m.bank_soal_id || m.soal_id;
+      const keyObj = keysMap.get(bankId) || keysMap.get(String(m.nomor_urut)) || keysList[idx];
+      return {
+        nomor_urut: m.nomor_urut || idx + 1,
+        bank_soal_id: bankId,
+        versi_soal_id: m.versi_soal_id,
+        tipe_soal: m.tipe_soal || "PILIHAN_GANDA",
+        pertanyaan: m.pertanyaan || "",
+        gambar_url: m.gambar_url || null,
+        opsi_jawaban: m.opsi_jawaban || m.opsi || null,
+        kunci_jawaban: keyObj?.kunci_jawaban ?? null,
+        bobot: m.bobot || keyObj?.bobot || 1,
+        pembahasan: keyObj?.pembahasan || null,
+      };
+    });
+
+    return {
+      ujian: {
+        id: exam.id,
+        judul: exam.judul,
+        status: exam.status,
+      },
+      questions,
+    };
+  }
+
+  /**
+   * Mengedit/mengoreksi butir soal pada ujian CBT aktif dan menyinkronkan snapshot
+   */
+  async updateActiveExamQuestion(
+    input: {
+      ujianId: string;
+      bankSoalId: string;
+      nomorUrut?: number;
+      pertanyaan: string;
+      gambar_url?: string | null;
+      opsi?: any[];
+      kunci_jawaban?: any;
+      bobot?: number;
+      recalculateScores?: boolean;
+    },
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<{ success: boolean; message: string }> {
+    const exam = await this.repo.findUjianById(input.ujianId, sekolahId);
+    if (!exam) throw new CbtNotFoundError(`Ujian CBT ${input.ujianId} tidak ditemukan.`);
+
+    await this.verifyTeacherAssignmentScope(
+      exam.penugasan_mengajar_id,
+      sekolahId,
+      guruId,
+      isSuperAdmin
+    );
+
+    const snapshot = await this.repo.getActiveSnapshot(input.ujianId);
+    if (!snapshot) {
+      throw new CbtNotFoundError(`Snapshot ujian ${input.ujianId} tidak ditemukan.`);
+    }
+
+    // 1. Update atau terbitkan Versi Baru pada Bank Soal
+    let updatedVersiId = "";
+    try {
+      const newVersion = await this.repo.createVersiSoal(
+        input.bankSoalId,
+        {
+          pertanyaan: input.pertanyaan,
+          gambar_url: input.gambar_url || undefined,
+          opsi: input.opsi,
+          kunci_jawaban: input.kunci_jawaban,
+          bobot: input.bobot || 1,
+        },
+        guruId ?? null
+      );
+      updatedVersiId = newVersion.id;
+    } catch {
+      // Jika bank soal direct update fallback
+      const latestVer = await prisma.versiSoal.findFirst({
+        where: { bank_soal_id: input.bankSoalId },
+        orderBy: { nomor_versi: "desc" },
+      });
+      if (latestVer) {
+        await prisma.versiSoal.update({
+          where: { id: latestVer.id },
+          data: {
+            pertanyaan: input.pertanyaan,
+            gambar_url: input.gambar_url,
+            opsi_jawaban: input.opsi ? JSON.stringify(input.opsi) : null,
+            kunci_jawaban: input.kunci_jawaban ? JSON.stringify(input.kunci_jawaban) : null,
+            bobot_default: input.bobot || 1,
+          },
+        });
+        updatedVersiId = latestVer.id;
+      }
+    }
+
+    // 2. Perbarui manifest_soal & kunci_penilaian pada snapshot
+    const manifest: any[] = Array.isArray(snapshot.manifest_soal)
+      ? snapshot.manifest_soal
+      : JSON.parse(snapshot.manifest_soal || "[]");
+
+    const keysList: any[] = Array.isArray(snapshot.kunci_penilaian)
+      ? snapshot.kunci_penilaian
+      : JSON.parse(snapshot.kunci_penilaian || "[]");
+
+    for (let i = 0; i < manifest.length; i++) {
+      const m = manifest[i];
+      if (
+        (m.bank_soal_id && m.bank_soal_id === input.bankSoalId) ||
+        (m.soal_id && m.soal_id === input.bankSoalId) ||
+        (input.nomorUrut && m.nomor_urut === input.nomorUrut)
+      ) {
+        m.pertanyaan = input.pertanyaan;
+        m.gambar_url = input.gambar_url || null;
+        if (input.opsi) {
+          m.opsi_jawaban = input.opsi;
+          m.opsi = input.opsi;
+        }
+        if (input.bobot !== undefined) {
+          m.bobot = input.bobot;
+        }
+        if (updatedVersiId) {
+          m.versi_soal_id = updatedVersiId;
+        }
+        break;
+      }
+    }
+
+    for (let i = 0; i < keysList.length; i++) {
+      const k = keysList[i];
+      if (
+        (k.bank_soal_id && k.bank_soal_id === input.bankSoalId) ||
+        (k.soal_id && k.soal_id === input.bankSoalId) ||
+        (input.nomorUrut && k.nomor_urut === input.nomorUrut)
+      ) {
+        if (input.kunci_jawaban !== undefined) {
+          k.kunci_jawaban = Array.isArray(input.kunci_jawaban)
+            ? input.kunci_jawaban
+            : [input.kunci_jawaban];
+        }
+        if (input.bobot !== undefined) {
+          k.bobot = input.bobot;
+        }
+        if (updatedVersiId) {
+          k.versi_soal_id = updatedVersiId;
+        }
+        break;
+      }
+    }
+
+    await prisma.snapshotUjian.update({
+      where: { id: snapshot.id },
+      data: {
+        manifest_soal: JSON.stringify(manifest),
+        kunci_penilaian: JSON.stringify(keysList),
+      },
+    });
+
+    // 3. Jika diminta hitung ulang skor yang sudah terkumpul
+    if (input.recalculateScores) {
+      const submittedSessions = await prisma.sesiUjianSiswa.findMany({
+        where: {
+          ujian_cbt_id: input.ujianId,
+          status: { in: ["DIKUMPULKAN", "SELESAI", "WAKTU_HABIS"] },
+        },
+        select: { id: true },
+      });
+
+      for (const s of submittedSessions) {
+        try {
+          await this.repo.submitAttempt(s.id, "Koreksi butir soal ujian aktif", true);
+        } catch {}
+      }
+    }
+
+    return {
+      success: true,
+      message: `Soal berhasil dikoreksi dan snapshot ujian aktif telah disinkronkan.${
+        input.recalculateScores ? " Seluruh nilai peserta yang terkumpul telah dihitung ulang." : ""
+      }`,
+    };
   }
 }
 

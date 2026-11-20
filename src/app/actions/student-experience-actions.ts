@@ -13,7 +13,7 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/shared/infrastructure/auth/auth-guard";
 import { requirePermission } from "@/shared/infrastructure/authorization/authz-guard";
 import { studentExperienceService } from "@/modules/student/application/student-experience-service";
-import { LocalStorageAdapter } from "@/shared/infrastructure/storage/local-storage-adapter";
+import { storageService } from "@/shared/infrastructure/storage/storage-service";
 import { StudentExperienceError } from "@/modules/student/domain/student-experience-errors";
 
 export interface StudentExperienceActionResult {
@@ -61,7 +61,7 @@ export async function submitStudentAssignmentAction(
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      const storage = new LocalStorageAdapter();
+      const storage = storageService;
       const metadata = await storage.saveFile({
         sekolah_id: user.sekolah_id,
         nama_file_asli: file.name,

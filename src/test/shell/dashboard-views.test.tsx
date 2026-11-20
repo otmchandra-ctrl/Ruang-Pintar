@@ -193,7 +193,7 @@ describe("Role Dashboard Views & Page Contracts (Phase 05)", () => {
 
     expect(screen.getByText(/Ahmad Dahlan, S\.Pd\./)).toBeInTheDocument();
     expect(screen.getByText("Teaching Command Center")).toBeInTheDocument();
-    expect(screen.getByText("Jadwal Mengajar")).toBeInTheDocument();
+    expect(screen.getAllByText("Jadwal Mengajar")[0]).toBeInTheDocument();
     expect(screen.getByText("Agenda & Pengumuman")).toBeInTheDocument();
     expect(
       screen.getByText("Sosialisasi Implementasi Asesmen Kurikulum Merdeka")
@@ -244,7 +244,7 @@ describe("Role Dashboard Views & Page Contracts (Phase 05)", () => {
     expect(screen.getByText("Siswa Aktif")).toBeInTheDocument();
     expect(screen.getByText("Jadwal Pelajaran Hari Ini")).toBeInTheDocument();
     expect(screen.getByText("CBT & Ujian Online")).toBeInTheDocument();
-    expect(screen.getByText("Aksi Cepat Siswa")).toBeInTheDocument();
+    expect(screen.queryByText("Aksi Cepat Siswa")).not.toBeInTheDocument();
   });
 
   it("renders GuardianDashboard with child learning progress and quick actions", async () => {

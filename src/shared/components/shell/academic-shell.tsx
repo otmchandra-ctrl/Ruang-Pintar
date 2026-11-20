@@ -14,6 +14,7 @@ const teacherWorkspaceRoutes = [
   "/dashboard",
   "/kelas-saya",
   "/data-siswa",
+  "/materi",
   "/jadwal-saya",
   "/sesi-pembelajaran",
   "/kalender-akademik",
@@ -54,18 +55,15 @@ export function AcademicShell({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = React.useState(false);
   const pathname = usePathname();
+  const isTeacherWorkspace =
+    user.peran_dasar === "TEACHER" &&
+    teacherWorkspaceRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   React.useEffect(() => {
-    const isTeacherWorkspace =
-      user.peran_dasar === "TEACHER" &&
-      teacherWorkspaceRoutes.some(
-        (route) => pathname === route || pathname.startsWith(`${route}/`)
-      );
-
     document.documentElement.classList.toggle("teacher-workspace", isTeacherWorkspace);
 
     return () => document.documentElement.classList.remove("teacher-workspace");
-  }, [pathname, user.peran_dasar]);
+  }, [isTeacherWorkspace]);
 
   // Global Keyboard Shortcut: Cmd+B / Ctrl+B to toggle sidebar
   React.useEffect(() => {
@@ -87,9 +85,14 @@ export function AcademicShell({
 
   return (
     <ThemeProvider>
-      <div className="flex h-screen w-full overflow-hidden bg-[#F8FAFC] dark:bg-[#090D16] text-slate-900 dark:text-slate-100 transition-colors duration-200">
+      <div
+        className={`flex h-screen w-full overflow-hidden bg-[#F8FAFC] dark:bg-[#090D16] text-slate-900 dark:text-slate-100 transition-colors duration-200 ${
+          isTeacherWorkspace ? "teacher-workspace" : ""
+        }`}
+      >
         {/* Desktop Sidebar / Rail */}
         <Sidebar
+          user={user}
           userRole={user.peran_dasar as BaseRole}
           userCapabilities={userCapabilities}
           isOwner={isOwner}
@@ -108,7 +111,7 @@ export function AcademicShell({
         />
 
         {/* Main Content Viewport */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden relative bg-[#F8FAFC] dark:bg-[#090D16] dashboard-viewport-canvas">
           {/* Topbar */}
           <Topbar
             user={user}

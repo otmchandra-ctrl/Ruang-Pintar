@@ -115,7 +115,7 @@ export function SuperAdminSchoolDirectoryView({
   const totalCbtAll = schools.reduce((acc, s) => acc + (s._count?.ujian_cbt ?? 0), 0);
 
   // Schools nearing trial expiration (<= 7 days remaining or already expired)
-  const now = new Date();
+  const now = React.useMemo(() => new Date(), []);
   const expiringSoonCount = schools.filter((s) => {
     if (s.tipe_lisensi !== "FREEMIUM" || !s.trial_berakhir_pada) return false;
     const diffDays =
@@ -127,27 +127,30 @@ export function SuperAdminSchoolDirectoryView({
   const activeImpersonatedSchool = schools.find((s) => s.id === currentUser?.sekolah_id);
 
   // Impersonate / Switch Tenant
-  const handleImpersonate = async (schoolId: string) => {
-    setSwitchingSchoolId(schoolId);
-    setFeedback(null);
-    try {
-      const res = await switchActiveTenantAction(schoolId);
-      if (!res.success) {
-        setFeedback({ type: "error", text: res.error });
-        return;
+  const handleImpersonate = React.useCallback(
+    async (schoolId: string) => {
+      setSwitchingSchoolId(schoolId);
+      setFeedback(null);
+      try {
+        const res = await switchActiveTenantAction(schoolId);
+        if (!res.success) {
+          setFeedback({ type: "error", text: res.error });
+          return;
+        }
+        setFeedback({
+          type: "success",
+          text: "Berhasil beralih ke sesi sekolah. Membuka dashboard sekolah...",
+        });
+        router.push("/dashboard");
+        router.refresh();
+      } catch {
+        setFeedback({ type: "error", text: "Terjadi kesalahan saat berpindah sekolah." });
+      } finally {
+        setSwitchingSchoolId(null);
       }
-      setFeedback({
-        type: "success",
-        text: "Berhasil beralih ke sesi sekolah. Membuka dashboard sekolah...",
-      });
-      router.push("/dashboard");
-      router.refresh();
-    } catch {
-      setFeedback({ type: "error", text: "Terjadi kesalahan saat berpindah sekolah." });
-    } finally {
-      setSwitchingSchoolId(null);
-    }
-  };
+    },
+    [router]
+  );
 
   // Exit Impersonation / Clear Tenant
   const handleClearImpersonation = async () => {
@@ -176,37 +179,40 @@ export function SuperAdminSchoolDirectoryView({
   };
 
   // Toggle Active / Suspended
-  const handleToggleStatus = async (school: SchoolTenantItem) => {
-    const nextStatus = !school.status_aktif;
-    const confirmText = nextStatus
-      ? `Apakah Anda yakin ingin mengaktifkan kembali sekolah ${school.nama}?`
-      : `PERINGATAN: Menonaktifkan sekolah ${school.nama} akan men-suspend akses staf dan siswa ke sekolah ini. Lanjutkan?`;
+  const handleToggleStatus = React.useCallback(
+    async (school: SchoolTenantItem) => {
+      const nextStatus = !school.status_aktif;
+      const confirmText = nextStatus
+        ? `Apakah Anda yakin ingin mengaktifkan kembali sekolah ${school.nama}?`
+        : `PERINGATAN: Menonaktifkan sekolah ${school.nama} akan men-suspend akses staf dan siswa ke sekolah ini. Lanjutkan?`;
 
-    if (!window.confirm(confirmText)) return;
+      if (!window.confirm(confirmText)) return;
 
-    setTogglingSchoolId(school.id);
-    setFeedback(null);
-    try {
-      const res = await toggleSchoolActiveStatusAction(
-        school.id,
-        nextStatus,
-        "Diubah oleh Super Admin dari direktori lisensi"
-      );
-      if (!res.success) {
-        setFeedback({ type: "error", text: res.error });
-        return;
+      setTogglingSchoolId(school.id);
+      setFeedback(null);
+      try {
+        const res = await toggleSchoolActiveStatusAction(
+          school.id,
+          nextStatus,
+          "Diubah oleh Super Admin dari direktori lisensi"
+        );
+        if (!res.success) {
+          setFeedback({ type: "error", text: res.error });
+          return;
+        }
+        setFeedback({ type: "success", text: res.message || "Status sekolah berhasil diubah." });
+        router.refresh();
+      } catch {
+        setFeedback({
+          type: "error",
+          text: "Terjadi kesalahan saat memperbarui status operasional.",
+        });
+      } finally {
+        setTogglingSchoolId(null);
       }
-      setFeedback({ type: "success", text: res.message || "Status sekolah berhasil diubah." });
-      router.refresh();
-    } catch {
-      setFeedback({
-        type: "error",
-        text: "Terjadi kesalahan saat memperbarui status operasional.",
-      });
-    } finally {
-      setTogglingSchoolId(null);
-    }
-  };
+    },
+    [router]
+  );
 
   // Open License Modal
   const handleOpenLicenseModal = (school: SchoolTenantItem) => {
@@ -485,7 +491,14 @@ export function SuperAdminSchoolDirectoryView({
         },
       },
     ],
-    [currentUser?.sekolah_id, switchingSchoolId, togglingSchoolId]
+    [
+      currentUser?.sekolah_id,
+      switchingSchoolId,
+      togglingSchoolId,
+      handleImpersonate,
+      handleToggleStatus,
+      now,
+    ]
   );
 
   const filters: DataTableFilterOption<SchoolTenantItem>[] = React.useMemo(

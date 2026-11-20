@@ -804,7 +804,9 @@ export function UnifiedAcademicLedgerTable({
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-900 dark:text-white">{gradebook.rombel_nama}</span>
           <span className="text-slate-300 dark:text-slate-600">•</span>
-          <span className="text-slate-700 dark:text-slate-200">{gradebook.mata_pelajaran_nama}</span>
+          <span className="text-slate-700 dark:text-slate-200">
+            {gradebook.mata_pelajaran_nama}
+          </span>
           <span className="text-slate-300 dark:text-slate-600">•</span>
           <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/60 font-semibold text-[11px]">
             KKTP Target: {gradebook.kkm_default}
@@ -1107,9 +1109,13 @@ export function UnifiedAcademicLedgerTable({
 
                       {/* Sticky 2: NIS / NISN */}
                       <td className="py-2 px-2.5 font-mono text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-800 sticky left-[40px] z-20 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-850">
-                        <div className="font-semibold text-slate-700 dark:text-slate-200">{row.nis || "-"}</div>
+                        <div className="font-semibold text-slate-700 dark:text-slate-200">
+                          {row.nis || "-"}
+                        </div>
                         {row.nisn && (
-                          <div className="text-[9px] text-slate-400 dark:text-slate-500 tracking-tight">{row.nisn}</div>
+                          <div className="text-[9px] text-slate-400 dark:text-slate-500 tracking-tight">
+                            {row.nisn}
+                          </div>
                         )}
                       </td>
 
@@ -1182,7 +1188,9 @@ export function UnifiedAcademicLedgerTable({
                                 {score}
                               </span>
                             ) : (
-                              <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                              <span className="text-slate-300 dark:text-slate-600 font-normal">
+                                -
+                              </span>
                             )}
                           </td>
                         );
@@ -1223,7 +1231,9 @@ export function UnifiedAcademicLedgerTable({
                                 {score}
                               </span>
                             ) : (
-                              <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                              <span className="text-slate-300 dark:text-slate-600 font-normal">
+                                -
+                              </span>
                             )}
                           </td>
                         );
@@ -1264,7 +1274,9 @@ export function UnifiedAcademicLedgerTable({
                                 {score}
                               </span>
                             ) : (
-                              <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                              <span className="text-slate-300 dark:text-slate-600 font-normal">
+                                -
+                              </span>
                             )}
                           </td>
                         );
@@ -1411,7 +1423,8 @@ export function UnifiedAcademicLedgerTable({
           </span>
         </div>
         <div>
-          Total Siswa Rombel: <strong className="text-slate-700 dark:text-slate-300">{gradebook.rows.length}</strong>
+          Total Siswa Rombel:{" "}
+          <strong className="text-slate-700 dark:text-slate-300">{gradebook.rows.length}</strong>
         </div>
       </div>
     </div>

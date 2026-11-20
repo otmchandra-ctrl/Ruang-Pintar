@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="photoFrameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F8FAFC" />
+    </linearGradient>
+    <linearGradient id="catFur" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDBA74" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+    <linearGradient id="catCheeks" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF7ED" />
+      <stop offset="100%" stop-color="#FED7AA" />
+    </linearGradient>
+    <filter id="photoShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="600" height="360" rx="16" fill="#F1F5F9" />
+
+  <!-- Photo Polarized / Bordered Card -->
+  <g transform="translate(160, 20)" filter="url(#photoShadow)">
+    <rect x="0" y="0" width="280" height="280" rx="16" fill="url(#photoFrameGrad)" stroke="#E2E8F0" stroke-width="2" />
+    <!-- Photo Inner Area -->
+    <rect x="15" y="15" width="250" height="210" rx="10" fill="#FEF3C7" />
+
+    <!-- Cute Cat Art Illustration -->
+    <!-- Cat Ears -->
+    <polygon points="75,95 105,45 130,95" fill="#EA580C" stroke="#C2410C" stroke-width="2" />
+    <polygon points="85,92 105,58 122,92" fill="#FDA4AF" />
+
+    <polygon points="150,95 175,45 205,95" fill="#EA580C" stroke="#C2410C" stroke-width="2" />
+    <polygon points="158,92 175,58 195,92" fill="#FDA4AF" />
+
+    <!-- Cat Body -->
+    <ellipse cx="140" cy="195" rx="75" ry="55" fill="url(#catFur)" />
+    <ellipse cx="140" cy="205" rx="45" ry="40" fill="#FFF7ED" />
+
+    <!-- Cat Head -->
+    <circle cx="140" cy="120" r="55" fill="url(#catFur)" stroke="#EA580C" stroke-width="1.5" />
+    <ellipse cx="140" cy="135" rx="42" ry="32" fill="url(#catCheeks)" />
+
+    <!-- Stripes on Forehead -->
+    <path d="M 140 75 L 140 92 M 130 80 L 132 94 M 150 80 L 148 94" stroke="#C2410C" stroke-width="3.5" stroke-linecap="round" />
+
+    <!-- Cat Eyes -->
+    <ellipse cx="118" cy="118" rx="8.5" ry="11" fill="#065F46" />
+    <circle cx="116" cy="115" r="3.5" fill="#FFFFFF" />
+    <ellipse cx="162" cy="118" rx="8.5" ry="11" fill="#065F46" />
+    <circle cx="160" cy="115" r="3.5" fill="#FFFFFF" />
+
+    <!-- Nose & Mouth -->
+    <polygon points="135,132 145,132 140,138" fill="#F43F5E" />
+    <path d="M 140 138 C 135 145 128 144 125 142 M 140 138 C 145 145 152 144 155 142" fill="none" stroke="#78350F" stroke-width="2" stroke-linecap="round" />
+
+    <!-- Whiskers -->
+    <line x1="85" y1="133" x2="115" y2="136" stroke="#9A3412" stroke-width="1.8" stroke-linecap="round" />
+    <line x1="82" y1="142" x2="113" y2="142" stroke="#9A3412" stroke-width="1.8" stroke-linecap="round" />
+    <line x1="88" y1="151" x2="116" y2="147" stroke="#9A3412" stroke-width="1.8" stroke-linecap="round" />
+
+    <line x1="195" y1="136" x2="165" y2="133" stroke="#9A3412" stroke-width="1.8" stroke-linecap="round" />
+    <line x1="198" y1="142" x2="167" y2="142" stroke="#9A3412" stroke-width="1.8" stroke-linecap="round" />
+    <line x1="192" y1="147" x2="164" y2="151" stroke="#9A3412" stroke-width="1.8" stroke-linecap="round" />
+
+    <!-- Photo Caption Label Inside Polaroid -->
+    <text x="140" y="255" font-family="sans-serif" font-size="11" font-weight="bold" fill="#475569" text-anchor="middle">
+      Dokumentasi Foto: Kucing (Format Gambar)
+    </text>
+  </g>
+
+  <!-- Banner Tag at Bottom -->
+  <g transform="translate(170, 312)">
+    <rect x="0" y="0" width="260" height="32" rx="16" fill="#F97316" opacity="0.12" stroke="#F97316" stroke-width="1.5" />
+    <text x="130" y="21" font-family="sans-serif" font-size="12" font-weight="bold" fill="#C2410C" text-anchor="middle">
+      Contoh Elemen Multimedia: Gambar (Visual)
+    </text>
+  </g>
+</svg>

@@ -18,6 +18,7 @@ import {
   Menu,
   School,
   LucideIcon,
+  MonitorPlay,
 } from "lucide-react";
 import { BaseRole, CapabilityBundle } from "@/shared/infrastructure/authorization/types";
 
@@ -93,8 +94,9 @@ export function getMobileBottomNavItems(
     case "STUDENT":
       return [
         { id: "home", label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+        { id: "cbt", label: "CBT", href: "/cbt-ujian", icon: MonitorPlay },
         { id: "schedule", label: "Jadwal", href: "/jadwal-saya", icon: Calendar },
-        { id: "calendar", label: "Kalender", href: "/kalender-akademik", icon: CalendarDays },
+        { id: "learning", label: "Materi & Tugas", href: "/tugas-siswa", icon: BookOpen },
       ];
 
     case "GUARDIAN":
@@ -161,7 +163,7 @@ export function MobileBottomNav({
               />
             </div>
             <span
-              className={`mt-1 text-[10px] font-mono tracking-tight text-center truncate max-w-[64px] leading-tight transition-colors ${
+              className={`mt-1 text-[10px] sm:text-[11px] font-sans tracking-tight text-center truncate max-w-[72px] leading-tight transition-colors ${
                 isActive
                   ? "font-bold text-[#2563EB] dark:text-blue-400"
                   : "font-medium text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200"
@@ -184,7 +186,7 @@ export function MobileBottomNav({
         <div className="flex items-center justify-center px-3.5 py-1 rounded-full transition-all duration-200 group-hover:bg-slate-100 dark:group-hover:bg-slate-800/80 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300">
           <Menu className="h-5 w-5 stroke-[1.75] transition-transform group-active:scale-95" />
         </div>
-        <span className="mt-1 text-[10px] font-mono tracking-tight text-center truncate max-w-[64px] leading-tight font-medium text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+        <span className="mt-1 text-[11px] font-sans tracking-tight text-center truncate max-w-[68px] leading-tight font-medium text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
           Menu
         </span>
       </button>

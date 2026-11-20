@@ -16,7 +16,7 @@ const prisma = new PrismaClient();
 // Konfigurasi Bot
 const BOT_TOKEN = "8892332687:AAEZVcnRPoUxiy1T6ASwkStT8UhivBc71x4";
 const ALLOWED_CHAT_ID = 1255737663; // Khusus Pak Eri Chandra (@erichandra)
-const CLOUDFLARE_URL = "https://matthew-estimated-coordinated-warranties.trycloudflare.com";
+const CLOUDFLARE_URL = "https://serves-burke-curve-considers.trycloudflare.com";
 
 // Muat GEMINI_API_KEY dari .env jika belum ada di process.env
 let GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -215,7 +215,7 @@ Kirim screenshot error dari HP Anda, Maestro akan langsung memeriksa tampilannya
 
     let gitInfo = "";
     try {
-      const { stdout } = await execAsync("git log -1 --pretty=format:\"%h - %s (%cr)\"");
+      const { stdout } = await execAsync('git log -1 --pretty=format:"%h - %s (%cr)"');
       gitInfo = `• Git Commit: \`${stdout.trim()}\``;
     } catch {
       gitInfo = `• Git: ⚠️ Gagal membaca git`;
@@ -276,9 +276,15 @@ Data ganda telah dibersihkan secara tuntas.`;
     await sendMessage(chatId, "⏳ Menjalankan `npm run typecheck` di laptop, mohon tunggu...");
     try {
       const { stdout, stderr } = await execAsync("npm run typecheck", { timeout: 45000 });
-      await sendMessage(chatId, `✅ *TypeScript Check: 100% PASS (0 Errors)*\n\n\`\`\`\n${(stdout + stderr).slice(0, 1000)}\n\`\`\``);
+      await sendMessage(
+        chatId,
+        `✅ *TypeScript Check: 100% PASS (0 Errors)*\n\n\`\`\`\n${(stdout + stderr).slice(0, 1000)}\n\`\`\``
+      );
     } catch (e) {
-      await sendMessage(chatId, `❌ *TypeScript Error:*\n\`\`\`\n${(e.stdout || e.message).slice(0, 1500)}\n\`\`\``);
+      await sendMessage(
+        chatId,
+        `❌ *TypeScript Error:*\n\`\`\`\n${(e.stdout || e.message).slice(0, 1500)}\n\`\`\``
+      );
     }
     return;
   }
@@ -292,14 +298,20 @@ Data ganda telah dibersihkan secara tuntas.`;
       const out = (stdout + "\n" + stderr).trim() || "(Perintah selesai tanpa output)";
       await sendMessage(chatId, `*Hasil Eksekusi:*\n\`\`\`\n${out.slice(0, 2000)}\n\`\`\``);
     } catch (e) {
-      await sendMessage(chatId, `❌ *Gagal Eksekusi:*\n\`\`\`\n${(e.stderr || e.message).slice(0, 1500)}\n\`\`\``);
+      await sendMessage(
+        chatId,
+        `❌ *Gagal Eksekusi:*\n\`\`\`\n${(e.stderr || e.message).slice(0, 1500)}\n\`\`\``
+      );
     }
     return;
   }
 
   // 8. Penanganan Foto (Screenshot dari HP)
   if (msg.photo && msg.photo.length > 0) {
-    await sendMessage(chatId, "🔍 Maestro menerima screenshot Anda. Sedang menganalisis gambar dengan Vision AI...");
+    await sendMessage(
+      chatId,
+      "🔍 Maestro menerima screenshot Anda. Sedang menganalisis gambar dengan Vision AI..."
+    );
     const highestResPhoto = msg.photo[msg.photo.length - 1];
     const imageBase64 = await getTelegramPhotoBase64(highestResPhoto.file_id);
     if (!imageBase64) {
@@ -307,7 +319,9 @@ Data ganda telah dibersihkan secara tuntas.`;
       return;
     }
 
-    const aiPrompt = text || "Analisis screenshot layar sistem Ruang Pintar ini. Jika ada bug, error, atau keanehan tampilan, tolong jelaskan apa masalahnya dan cara memperbaikinya.";
+    const aiPrompt =
+      text ||
+      "Analisis screenshot layar sistem Ruang Pintar ini. Jika ada bug, error, atau keanehan tampilan, tolong jelaskan apa masalahnya dan cara memperbaikinya.";
     const response = await askGemini(aiPrompt, imageBase64);
     await sendMessage(chatId, `🧠 *Analisis Maestro:*\n\n${response}`);
     return;

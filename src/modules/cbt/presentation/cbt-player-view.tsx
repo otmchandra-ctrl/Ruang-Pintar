@@ -1,21 +1,35 @@
 "use client";
 
 /**
- * Ruang Pintar — M14 CBT Secure Player View (Academic Glass UI v1.2)
+ * Ruang Pintar — M14 CBT Secure Player View (Professional High-Taste Academic CBT)
  *
  * Invariant & Security Principles:
  * - Server Authoritative Timer: countdown sinkron dengan batas_waktu_server.
  * - Zero Answer Key Leakage: Hanya manifest_soal tanpa flag is_correct atau kunci_jawaban.
  * - Idempotent Autosave: Jawaban disimpan otomatis per pilihan / debounce teks.
- * - Anti-Cheat Integrity Guard:
- *   - Deteksi fullscreen exit, tab switch (visibilitychange), window blur.
- *   - Audio alert indicator ("Peringatan keluar layar").
- *   - Strike 1: Modal peringatan keras.
- *   - Strike 2: Attempt terkunci otomatis (TERKUNCI_PELANGGARAN) & lapor ke pengawas.
+ * - Safe Reload Guarantee: F5 / browser reload TIDAK dianggap curang.
+ * - Fullscreen Enforcement Gate: Membuka layar penuh dengan transisi anggun tanpa lockout instan.
+ * - High-Contrast Typography: Font terbaca sempurna 100% pada light dan dark theme.
  */
 
-import React, { useState, useEffect, useRef, useTransition, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useTransition,
+  useCallback,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
+
+const subscribeFullscreen = (callback: () => void) => {
+  if (typeof document === "undefined") return () => {};
+  document.addEventListener("fullscreenchange", callback);
+  return () => document.removeEventListener("fullscreenchange", callback);
+};
+const getFullscreenSnapshot = () =>
+  Boolean(typeof document !== "undefined" && document.fullscreenElement);
+const getFullscreenServerSnapshot = () => false;
 import {
   Clock,
   CheckCircle2,
@@ -37,6 +51,11 @@ import {
   Image as ImageIcon,
   ArrowRight,
   WifiOff,
+  RefreshCw,
+  LayoutGrid,
+  ZoomIn,
+  Flag,
+  Filter,
 } from "lucide-react";
 import { SesiUjianSiswaDTO, ManifestItemSoal, HasilUjianCbtDTO } from "../domain/cbt-types";
 import {
@@ -47,6 +66,31 @@ import {
 import { MathRenderer } from "@/shared/components/cbt/math-renderer";
 import { ImageStimulus } from "@/shared/components/cbt/image-stimulus";
 import { AudioStimulusPlayer } from "@/shared/components/cbt/audio-stimulus-player";
+
+function getAnswerDetails(ans: any): { isAnswered: boolean; label: string | null } {
+  if (!ans) return { isAnswered: false, label: null };
+  const hasChoice =
+    ans.jawaban_pilihan !== undefined && ans.jawaban_pilihan !== null && ans.jawaban_pilihan !== "";
+  if (hasChoice) {
+    return { isAnswered: true, label: String(ans.jawaban_pilihan) };
+  }
+  const hasComplex = Array.isArray(ans.jawaban_kompleks) && ans.jawaban_kompleks.length > 0;
+  if (hasComplex) {
+    return { isAnswered: true, label: ans.jawaban_kompleks.join(",") };
+  }
+  const hasMatch =
+    ans.jawaban_menjodohkan &&
+    typeof ans.jawaban_menjodohkan === "object" &&
+    Object.keys(ans.jawaban_menjodohkan).length > 0;
+  if (hasMatch) {
+    return { isAnswered: true, label: "✓" };
+  }
+  const hasText = typeof ans.jawaban_teks === "string" && ans.jawaban_teks.trim() !== "";
+  if (hasText) {
+    return { isAnswered: true, label: "✓" };
+  }
+  return { isAnswered: false, label: null };
+}
 
 interface CbtPlayerViewProps {
   initialSession: SesiUjianSiswaDTO;
@@ -81,7 +125,10 @@ export function CbtPlayerView({
   const [currentIndex, setCurrentIndex] = useState(0);
   const STORAGE_KEY = `rp_cbt_answers_${session.id}`;
 
-  // Exam Recovery: Restore answers from local cache on mount without cascading render
+  // Font size scaler
+  const [fontSize, setFontSize] = useState<"NORMAL" | "LARGE" | "XLARGE">("NORMAL");
+
+  // Exam Recovery: Restore answers from local cache on mount
   const [answers, setAnswers] = useState<Record<string, any>>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -99,7 +146,48 @@ export function CbtPlayerView({
     return initialSavedAnswers;
   });
 
-  const [secondsLeft, setSecondsLeft] = useState(initialTimeRemainingSeconds);
+  const sessionTokenRef = useRef<string | null>(initialSession.token_sesi_aktif || null);
+  const [isSessionInvalidated, setIsSessionInvalidated] = useState(false);
+
+  // Pre-Submit Synchronization Barrier
+  const pendingSyncMap = useRef<Map<number, any>>(new Map());
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const lastInputBlurTimeRef = useRef<number>(0);
+
+  // Safe Reload & Mount tracker: suppress false blur strikes during page reload / first 3s
+  const isUnloadingRef = useRef<boolean>(false);
+  const isInitialMountRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      isInitialMountRef.current = false;
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      isUnloadingRef.current = true;
+    };
+    const handlePageHide = () => {
+      isUnloadingRef.current = true;
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
+
+  // Server Authoritative Countdown Timer
+  const calculateRemainingSeconds = useCallback(() => {
+    const deadline = new Date(session.batas_waktu_server).getTime();
+    return Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+  }, [session.batas_waktu_server]);
+
+  const [secondsLeft, setSecondsLeft] = useState<number>(initialTimeRemainingSeconds);
+
   const [isOnline, setIsOnline] = useState<boolean>(() => {
     if (typeof navigator !== "undefined" && typeof navigator.onLine === "boolean") {
       return navigator.onLine;
@@ -112,11 +200,23 @@ export function CbtPlayerView({
     }
     return "SAVED";
   });
-  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Fullscreen management via useSyncExternalStore
+  const isFullscreen = useSyncExternalStore(
+    subscribeFullscreen,
+    getFullscreenSnapshot,
+    getFullscreenServerSnapshot
+  );
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
+  const [showFullscreenPromptModal, setShowFullscreenPromptModal] = useState(false);
+
+  // Show gate modal until student explicitly enters fullscreen or fullscreen is active
+  const showFullscreenGate = !hasEnteredFullscreen && !isFullscreen;
+
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showDaftarSoalModal, setShowDaftarSoalModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [finalResult, setFinalResult] = useState<HasilUjianCbtDTO | null>(null);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Network connection listener
   useEffect(() => {
@@ -124,7 +224,7 @@ export function CbtPlayerView({
 
     const handleOnline = () => {
       setIsOnline(true);
-      setSaveStatus("SAVED");
+      setSaveStatus(pendingSyncMap.current.size > 0 ? "SAVING" : "SAVED");
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -148,11 +248,9 @@ export function CbtPlayerView({
   const isLocked = internalLocked || session.status === "TERKUNCI_PELANGGARAN";
 
   const [isPending, startTransition] = useTransition();
-  const activeQuestion = manifest[currentIndex];
+  const activeQuestion = manifest[currentIndex] || manifest[0];
 
-  // ============================================================================
   // AUDIO SYNTHESIS ALERT INDICATOR
-  // ============================================================================
   const playAlertSound = useCallback(() => {
     try {
       if (typeof window !== "undefined" && "AudioContext" in window) {
@@ -161,7 +259,6 @@ export function CbtPlayerView({
         const gain = audioCtx.createGain();
 
         osc.type = "sine";
-        // Two-tone warning beep (800Hz -> 500Hz)
         osc.frequency.setValueAtTime(800, audioCtx.currentTime);
         osc.frequency.setValueAtTime(500, audioCtx.currentTime + 0.15);
 
@@ -175,59 +272,72 @@ export function CbtPlayerView({
         osc.stop(audioCtx.currentTime + 0.35);
       }
     } catch {
-      // Ignore audio failure if restricted by browser policy
+      // Ignore audio failure
     }
   }, []);
 
-  // Periodic Countdown (Authoritative Server Deadline Invariant)
   const handleForceSubmit = useCallback(
     async (_reason: string) => {
       setIsSubmitting(true);
       try {
-        const res = await submitAttemptAction(session.id);
+        const res = await submitAttemptAction(session.id, sessionTokenRef.current);
         if (res.success && res.data) {
           setFinalResult(res.data);
+          router.push(`/cbt/finished/${session.id}`);
+        } else if (res.message?.includes("perangkat lain")) {
+          setIsSessionInvalidated(true);
         }
-      } catch {
-        // Ignored
+      } catch (err: any) {
+        if (err?.message?.includes("perangkat lain")) {
+          setIsSessionInvalidated(true);
+        }
       } finally {
         setIsSubmitting(false);
       }
     },
-    [session.id]
+    [router, session.id]
   );
 
   useEffect(() => {
-    if (finalResult || isLocked) return;
+    if (finalResult || isLocked || isSessionInvalidated) return;
 
-    const timer = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // Auto-submit when authoritative timer hits 0
-          handleForceSubmit("Waktu ujian telah berakhir");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const syncTick = () => {
+      const remaining = calculateRemainingSeconds();
+      setSecondsLeft(remaining);
+      if (remaining <= 0) {
+        handleForceSubmit("Waktu ujian telah berakhir");
+      }
+    };
 
-    return () => clearInterval(timer);
-  }, [finalResult, handleForceSubmit, isLocked]);
+    syncTick();
+    const timer = setInterval(syncTick, 1000);
 
-  // Audio warning on strike count increment
+    const handleResumeSync = () => {
+      if (!document.hidden) {
+        syncTick();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleResumeSync);
+    window.addEventListener("focus", handleResumeSync);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleResumeSync);
+      window.removeEventListener("focus", handleResumeSync);
+    };
+  }, [calculateRemainingSeconds, finalResult, handleForceSubmit, isLocked, isSessionInvalidated]);
+
   useEffect(() => {
     if (strikeCount > 0) {
       playAlertSound();
     }
   }, [strikeCount, playAlertSound]);
 
-  // ============================================================================
   // INTEGRITY MONITORING & AUDIT EVENT DISPATCH
-  // ============================================================================
   const triggerIntegrityViolation = useCallback(
     async (type: "PINDAH_TAB_ATAU_WINDOW" | "KELUAR_LAYAR_PENUH", desc: string) => {
-      if (finalResult || isLocked) return;
+      if (finalResult || isLocked || isUnloadingRef.current || isInitialMountRef.current) return;
 
       try {
         const res = await recordIntegrityEventAction({
@@ -260,6 +370,7 @@ export function CbtPlayerView({
     if (finalResult || isLocked) return;
 
     const handleVisibilityChange = () => {
+      if (isUnloadingRef.current || isInitialMountRef.current) return;
       if (document.hidden) {
         triggerIntegrityViolation(
           "PINDAH_TAB_ATAU_WINDOW",
@@ -269,7 +380,8 @@ export function CbtPlayerView({
     };
 
     const handleBlur = () => {
-      if (!isStrikeModalOpen && !showSubmitModal) {
+      if (isUnloadingRef.current || isInitialMountRef.current) return;
+      if (!isStrikeModalOpen && !showSubmitModal && !showFullscreenGate) {
         triggerIntegrityViolation(
           "PINDAH_TAB_ATAU_WINDOW",
           "Fokus jendela ujian terlepas (membuka jendela / notifikasi eksternal)."
@@ -279,12 +391,14 @@ export function CbtPlayerView({
 
     const handleFullscreenChange = () => {
       const isFull = Boolean(document.fullscreenElement);
-      setIsFullscreen(isFull);
-      if (!isFull && !isStrikeModalOpen && !showSubmitModal) {
-        triggerIntegrityViolation(
-          "KELUAR_LAYAR_PENUH",
-          "Terdeteksi keluar dari mode layar penuh (fullscreen)."
-        );
+      if (
+        !isFull &&
+        !isUnloadingRef.current &&
+        !isInitialMountRef.current &&
+        !isStrikeModalOpen &&
+        !showSubmitModal
+      ) {
+        setShowFullscreenPromptModal(true);
       }
     };
 
@@ -293,19 +407,16 @@ export function CbtPlayerView({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Block Developer Tools (F12)
       if (e.key === "F12") {
         e.preventDefault();
         return;
       }
-      // Block Ctrl/Cmd combinations (Copy, Paste, Cut, Select All, View Source, Print, Save)
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
         if (["c", "v", "x", "a", "u", "p", "s"].includes(key)) {
           e.preventDefault();
         }
       }
-      // Block PrintScreen
       if (e.key === "PrintScreen") {
         e.preventDefault();
       }
@@ -315,43 +426,14 @@ export function CbtPlayerView({
       e.preventDefault();
     };
 
-    // Mobile AI menu blocker: Prevent long-press text selection popup ("Ask Gemini", "Search Web", "Copy")
-    const handleSelectionChange = () => {
-      const activeEl = document.activeElement;
-      const isEditing =
-        activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
-      if (!isEditing) {
-        const sel = window.getSelection();
-        if (sel && sel.toString().length > 0) {
-          sel.removeAllRanges();
-        }
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+        lastInputBlurTimeRef.current = Date.now();
       }
     };
 
-    // Mobile Split-Screen / Floating Window AI Detector
-    let resizeDebounce: any;
-    const handleResize = () => {
-      clearTimeout(resizeDebounce);
-      resizeDebounce = setTimeout(() => {
-        if (typeof window === "undefined") return;
-        const isMobile =
-          window.matchMedia("(max-width: 1024px)").matches || "ontouchstart" in window;
-        if (isMobile && window.screen && window.screen.availHeight > 0) {
-          const activeEl = document.activeElement;
-          const isInputFocused =
-            activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
-          // If viewport height collapses significantly without keyboard open, split-screen / floating AI is active
-          const heightRatio = window.innerHeight / window.screen.availHeight;
-          if (!isInputFocused && heightRatio < 0.6 && !isStrikeModalOpen && !showSubmitModal) {
-            triggerIntegrityViolation(
-              "PINDAH_TAB_ATAU_WINDOW",
-              "Terdeteksi mode layar terbelah (Split Screen / Floating Window AI). Sesi ujian mewajibkan satu layar penuh."
-            );
-          }
-        }
-      }, 300);
-    };
-
+    document.addEventListener("focusout", handleFocusOut);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleBlur);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -360,11 +442,9 @@ export function CbtPlayerView({
     document.addEventListener("copy", handleCopyCutPaste);
     document.addEventListener("cut", handleCopyCutPaste);
     document.addEventListener("paste", handleCopyCutPaste);
-    document.addEventListener("selectionchange", handleSelectionChange);
-    window.addEventListener("resize", handleResize);
 
     return () => {
-      clearTimeout(resizeDebounce);
+      document.removeEventListener("focusout", handleFocusOut);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", handleBlur);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
@@ -373,23 +453,42 @@ export function CbtPlayerView({
       document.removeEventListener("copy", handleCopyCutPaste);
       document.removeEventListener("cut", handleCopyCutPaste);
       document.removeEventListener("paste", handleCopyCutPaste);
-      document.removeEventListener("selectionchange", handleSelectionChange);
-      window.removeEventListener("resize", handleResize);
     };
-  }, [finalResult, isLocked, isStrikeModalOpen, showSubmitModal, triggerIntegrityViolation]);
+  }, [
+    finalResult,
+    isLocked,
+    isStrikeModalOpen,
+    showSubmitModal,
+    showFullscreenGate,
+    triggerIntegrityViolation,
+  ]);
+
+  const requestFullscreenSafe = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      } else if ((document.documentElement as any).webkitRequestFullscreen) {
+        await (document.documentElement as any).webkitRequestFullscreen();
+      }
+      setHasEnteredFullscreen(true);
+      setShowFullscreenPromptModal(false);
+    } catch {
+      // In mobile or restricted browser where fullscreen API is unavailable, permit continuation
+      setHasEnteredFullscreen(true);
+      setShowFullscreenPromptModal(false);
+    }
+  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      requestFullscreenSafe();
     } else {
       document.exitFullscreen().catch(() => {});
     }
   };
 
-  // ============================================================================
-  // AUTOSAVE LOGIC
-  // ============================================================================
-  const persistAnswer = async (
+  // AUTOSAVE LOGIC WITH WRITE-AHEAD CACHE
+  const handleSavePatch = async (
     nomorUrut: number,
     patch: {
       jawaban_pilihan?: string | null;
@@ -402,20 +501,35 @@ export function CbtPlayerView({
     const current = answers[nomorUrut] || {};
     const merged = { ...current, ...patch };
 
-    // 1. Instant Write-Ahead Buffer to LocalStorage (Zero Answer Loss Invariant)
+    // 1. Write-Ahead Cache to LocalStorage
     setAnswers((prev) => {
       const updated = { ...prev, [nomorUrut]: merged };
       try {
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
         }
-      } catch {
-        // Fallback if localStorage quota exceeded
-      }
+      } catch {}
       return updated;
     });
 
-    // Check offline status
+    const qItem = manifest.find((m) => m.nomor_urut === nomorUrut);
+    const resolvedSoalId = qItem?.soal_id || (qItem as any)?.bank_soal_id;
+    const payload = {
+      sesi_ujian_siswa_id: session.id,
+      nomor_urut: nomorUrut,
+      soal_id: resolvedSoalId,
+      versi_soal_id: qItem?.versi_soal_id,
+      session_token: sessionTokenRef.current,
+      jawaban_pilihan: merged.jawaban_pilihan,
+      jawaban_teks: merged.jawaban_teks,
+      jawaban_kompleks: merged.jawaban_kompleks,
+      jawaban_menjodohkan: merged.jawaban_menjodohkan,
+      ragu_ragu: merged.ragu_ragu,
+    };
+
+    pendingSyncMap.current.set(nomorUrut, payload);
+    setPendingSyncCount(pendingSyncMap.current.size);
+
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       setSaveStatus("OFFLINE");
       return;
@@ -424,226 +538,226 @@ export function CbtPlayerView({
     setSaveStatus("SAVING");
 
     try {
-      const res = await autosaveAnswerAction({
-        sesi_ujian_siswa_id: session.id,
-        nomor_urut: nomorUrut,
-        jawaban_pilihan: merged.jawaban_pilihan,
-        jawaban_teks: merged.jawaban_teks,
-        jawaban_kompleks: merged.jawaban_kompleks,
-        jawaban_menjodohkan: merged.jawaban_menjodohkan,
-        ragu_ragu: merged.ragu_ragu,
-      });
-
+      const res = await autosaveAnswerAction(payload);
       if (res.success) {
-        setSaveStatus("SAVED");
+        pendingSyncMap.current.delete(nomorUrut);
+        setPendingSyncCount(pendingSyncMap.current.size);
+        setSaveStatus(pendingSyncMap.current.size === 0 ? "SAVED" : "SAVING");
       } else {
+        if (res.message?.includes("perangkat lain")) {
+          setIsSessionInvalidated(true);
+          return;
+        }
         setSaveStatus("OFFLINE");
       }
-    } catch {
+    } catch (err: any) {
+      if (err?.message?.includes("perangkat lain")) {
+        setIsSessionInvalidated(true);
+        return;
+      }
       setSaveStatus("OFFLINE");
     }
   };
 
-  const handleMatchingChange = (premiseId: string, val: string) => {
-    if (isLocked || finalResult) return;
-    const current = answers[activeQuestion.nomor_urut]?.jawaban_menjodohkan || {};
-    const updated = { ...current, [premiseId]: val };
-    persistAnswer(activeQuestion.nomor_urut, { jawaban_menjodohkan: updated });
-  };
-
   const handleSelectChoice = (label: string) => {
-    if (isLocked || finalResult) return;
-    persistAnswer(activeQuestion.nomor_urut, { jawaban_pilihan: label });
+    if (isLocked) return;
+    handleSavePatch(activeQuestion.nomor_urut, { jawaban_pilihan: label });
   };
 
   const handleToggleComplexChoice = (label: string) => {
-    if (isLocked || finalResult) return;
-    const currentList: string[] = answers[activeQuestion.nomor_urut]?.jawaban_kompleks || [];
-    const updated = currentList.includes(label)
-      ? currentList.filter((item: string) => item !== label)
-      : [...currentList, label];
-    persistAnswer(activeQuestion.nomor_urut, { jawaban_kompleks: updated });
-  };
-
-  const handleTextChange = (text: string) => {
-    if (isLocked || finalResult) return;
-    persistAnswer(activeQuestion.nomor_urut, { jawaban_teks: text });
+    if (isLocked) return;
+    const current = answers[activeQuestion.nomor_urut]?.jawaban_kompleks || [];
+    const next = current.includes(label)
+      ? current.filter((item: string) => item !== label)
+      : [...current, label].sort();
+    handleSavePatch(activeQuestion.nomor_urut, { jawaban_kompleks: next });
   };
 
   const handleToggleRagu = () => {
-    if (isLocked || finalResult) return;
-    const currentRagu = Boolean(answers[activeQuestion.nomor_urut]?.ragu_ragu);
-    persistAnswer(activeQuestion.nomor_urut, { ragu_ragu: !currentRagu });
+    if (isLocked) return;
+    const current = Boolean(answers[activeQuestion.nomor_urut]?.ragu_ragu);
+    handleSavePatch(activeQuestion.nomor_urut, { ragu_ragu: !current });
   };
 
-  const handleSubmitAttempt = async () => {
-    if (isSubmitting) return; // Prevent double-submit race condition
+  const textDebounceTimer = useRef<any>(null);
+  const handleTextChange = (value: string) => {
+    if (isLocked) return;
+    setAnswers((prev) => ({
+      ...prev,
+      [activeQuestion.nomor_urut]: {
+        ...(prev[activeQuestion.nomor_urut] || {}),
+        jawaban_teks: value,
+      },
+    }));
+
+    clearTimeout(textDebounceTimer.current);
+    textDebounceTimer.current = setTimeout(() => {
+      handleSavePatch(activeQuestion.nomor_urut, { jawaban_teks: value });
+    }, 600);
+  };
+
+  // Submit Final
+  const handleFinalSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const res = await submitAttemptAction(session.id);
+      const res = await submitAttemptAction(session.id, sessionTokenRef.current);
       if (res.success && res.data) {
         setFinalResult(res.data);
-        setShowSubmitModal(false);
-        // Clear local storage after verified submission
-        try {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem(STORAGE_KEY);
-          }
-        } catch {
-          // Ignored
-        }
+        router.push(`/cbt/finished/${session.id}`);
+      } else {
+        alert(res.message || "Gagal mengumpulkan lembar ujian.");
       }
-    } catch {
-      // Ignored
+    } catch (err: any) {
+      alert(err?.message || "Terjadi kendala jaringan saat mengumpulkan.");
     } finally {
       setIsSubmitting(false);
+      setShowSubmitModal(false);
     }
   };
 
-  // Time formatter
-  const hours = Math.floor(secondsLeft / 3600);
-  const minutes = Math.floor((secondsLeft % 3600) / 60);
+  // Formatted timer
+  const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
-  const formattedTime = `${hours > 0 ? `${hours.toString().padStart(2, "0")}:` : ""}${minutes
-    .toString()
-    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  const formattedTime = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
-  // Tally answered
-  const answeredCount = Object.values(answers).filter(
-    (a) =>
-      a.jawaban_pilihan !== undefined ||
-      (a.jawaban_teks && a.jawaban_teks.trim() !== "") ||
-      (a.jawaban_kompleks && a.jawaban_kompleks.length > 0) ||
-      (a.jawaban_menjodohkan && Object.keys(a.jawaban_menjodohkan).length > 0)
-  ).length;
-  const raguCount = Object.values(answers).filter((a) => a.ragu_ragu).length;
+  const [gridFilter, setGridFilter] = useState<"ALL" | "UNANSWERED" | "RAGU" | "ANSWERED">("ALL");
 
-  // ============================================================================
-  // RENDER FINAL RESULT SCREEN
-  // ============================================================================
-  if (finalResult) {
-    const isPassed = finalResult.status_kelulusan === "TUNTAS";
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Ambient academic glow */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+  const answeredCount = manifest.filter((item) => {
+    const ans = answers[item.nomor_urut] || answers[String(item.nomor_urut)];
+    return getAnswerDetails(ans).isAnswered;
+  }).length;
 
-        <div className="w-full max-w-lg bg-white/95 backdrop-blur-md rounded-3xl p-8 text-center space-y-6 shadow-xl border border-slate-200/80 relative z-10">
-          <div
-            className={`w-20 h-20 mx-auto rounded-3xl flex items-center justify-center ${
-              isPassed ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"
-            }`}
-          >
-            <Award className="h-10 w-10" />
-          </div>
+  const raguCount = manifest.filter((item) => {
+    const ans = answers[item.nomor_urut] || answers[String(item.nomor_urut)];
+    return Boolean(ans?.ragu_ragu);
+  }).length;
 
-          <div className="space-y-2">
-            <span
-              className={`inline-block text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
-                isPassed
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                  : "bg-amber-50 text-amber-700 border border-amber-200/60"
-              }`}
-            >
-              {isPassed ? "Kompeten / Tuntas KKTP" : "Belum Mencapai KKTP"}
-            </span>
-            <h2 className="text-xl font-bold text-slate-900">{ujian.judul}</h2>
-            <p className="text-xs text-slate-500">
-              Ujian Anda telah berhasil dikumpulkan dan dinilai secara otomatis oleh server.
-            </p>
-          </div>
+  const belumCount = Math.max(0, manifest.length - answeredCount);
 
-          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 grid grid-cols-3 gap-2 text-center">
-            <div>
-              <div className="text-[11px] font-semibold text-slate-400">Skor Akhir</div>
-              <div className="text-2xl font-bold font-mono text-slate-900">
-                {finalResult.nilai_akhir}
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-slate-400">Benar / Total</div>
-              <div className="text-lg font-bold font-mono text-emerald-600">
-                {finalResult.total_benar}{" "}
-                <span className="text-xs text-slate-400">/ {manifest.length}</span>
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-slate-400">Status</div>
-              <div className="text-xs font-bold text-slate-800 mt-1">
-                {finalResult.status_kelulusan}
-              </div>
-            </div>
-          </div>
+  const filteredManifest = manifest.filter((item) => {
+    const ans = answers[item.nomor_urut] || answers[String(item.nomor_urut)];
+    const details = getAnswerDetails(ans);
+    if (gridFilter === "UNANSWERED") return !details.isAnswered;
+    if (gridFilter === "RAGU") return Boolean(ans?.ragu_ragu);
+    if (gridFilter === "ANSWERED") return details.isAnswered;
+    return true;
+  });
 
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            className="w-full py-3 rounded-2xl bg-blue-600 text-white text-xs font-bold shadow-xs hover:bg-blue-700 transition"
-          >
-            Kembali ke Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const fontSizeClass =
+    fontSize === "XLARGE"
+      ? "text-lg sm:text-xl"
+      : fontSize === "LARGE"
+        ? "text-base sm:text-lg"
+        : "text-sm sm:text-base";
 
-  // ============================================================================
-  // RENDER PLAYER SCREEN
-  // ============================================================================
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col select-none text-slate-900 relative [-webkit-touch-callout:none] [-webkit-user-select:none]">
-      {/* Anti-Cheat & Anti-Leakage Dynamic Watermark */}
-      <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden opacity-[0.035] select-none">
-        <div className="text-center font-mono font-black text-xl text-slate-900 rotate-[-25deg] leading-loose whitespace-pre-wrap">
-          {`RUANG PINTAR CBT • SESI: ${session.id}\nPESERTA TERVERIFIKASI • DILARANG MENYEBARLUASKAN`}
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col select-none relative font-sans antialiased">
+      {/* FULLSCREEN ENTRY GATE MODAL */}
+      {showFullscreenGate && !finalResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-8 text-center space-y-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs">
+              <Maximize2 className="h-8 w-8" />
+            </div>
+            <div className="space-y-2">
+              <span className="text-[11px] font-mono font-bold tracking-widest uppercase px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                Mode Layar Penuh Ujian CBT
+              </span>
+              <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">
+                {ujian.judul}
+              </h2>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                Untuk menjaga ketertiban, keadilan, dan fokus selama ujian berlangsung, lembar soal
+                hanya dapat diakses dalam mode Layar Penuh (Fullscreen).
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-left text-xs space-y-1.5 text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Timer berjalan sinkron dengan server sekolah.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Jawaban Anda tersimpan otomatis (autosave) secara berkala.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Dilarang berpindah tab atau membuka aplikasi lain.</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={requestFullscreenSafe}
+              className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition active:scale-[0.99] flex items-center justify-center gap-2"
+            >
+              <Maximize2 className="h-4 w-4" />
+              <span>Masuk Layar Penuh & Buka Lembar Ujian</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* FULLSCREEN EXIT PROMPT MODAL */}
+      {showFullscreenPromptModal && !showFullscreenGate && !finalResult && !isLocked && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 text-center space-y-4 shadow-2xl border-2 border-amber-500">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
+              <AlertTriangle className="h-7 w-7" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              Perhatian: Layar Penuh Terlepas
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Anda terdeteksi keluar dari mode layar penuh. Klik tombol di bawah untuk kembali ke
+              mode layar penuh dan melanjutkan ujian.
+            </p>
+            <button
+              type="button"
+              onClick={requestFullscreenSafe}
+              className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition"
+            >
+              Kembali ke Layar Penuh Sekarang
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Top Header Bar */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 py-3.5 shadow-xs">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ring-2 ring-blue-500/20">
+            <div className="w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
               RP
             </div>
             <div className="min-w-0">
-              <h1 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+              <h1 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                 {ujian.judul}
               </h1>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-700">
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
                   Soal {currentIndex + 1} dari {manifest.length}
                 </span>
                 <span>•</span>
-                {/* Autosave badge */}
+                {/* Autosave status pill */}
                 <span className="flex items-center gap-1 font-medium">
-                  {saveStatus === "SAVING" && (
+                  {saveStatus === "SAVING" ? (
                     <>
                       <Loader2 className="h-3 w-3 animate-spin text-amber-500" />
                       <span className="text-amber-600 font-semibold">Menyimpan...</span>
                     </>
-                  )}
-                  {saveStatus === "SAVED" && (
+                  ) : saveStatus === "SAVED" ? (
                     <>
                       <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                      <span className="text-emerald-600 font-semibold">Tersimpan di Cloud</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                        Tersimpan
+                      </span>
                     </>
-                  )}
-                  {saveStatus === "OFFLINE" && (
+                  ) : (
                     <>
                       <WifiOff className="h-3 w-3 text-amber-500" />
-                      <span className="text-amber-700 font-semibold">
-                        Tersimpan di Perangkat (Offline)
-                      </span>
-                    </>
-                  )}
-                  {saveStatus === "ERROR" && (
-                    <>
-                      <AlertTriangle className="h-3 w-3 text-rose-500" />
-                      <span className="text-rose-600 font-semibold">
-                        Koneksi Terganggu (Aman Lokal)
-                      </span>
+                      <span className="text-amber-600 font-semibold">Tersimpan Lokal</span>
                     </>
                   )}
                 </span>
@@ -651,36 +765,90 @@ export function CbtPlayerView({
             </div>
           </div>
 
-          {/* Right Controls: Timer, Fullscreen, Finish */}
+          {/* Right Header Controls: Font Scaler, Timer, Navigator Trigger */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Font Size Selector */}
+            <div className="hidden sm:flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden p-0.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => setFontSize("NORMAL")}
+                className={`px-2 py-1 rounded-lg transition ${
+                  fontSize === "NORMAL"
+                    ? "bg-white dark:bg-slate-700 text-blue-600 shadow-2xs font-black"
+                    : "hover:text-slate-900"
+                }`}
+                title="Ukuran Huruf Standar"
+              >
+                A
+              </button>
+              <button
+                type="button"
+                onClick={() => setFontSize("LARGE")}
+                className={`px-2 py-1 rounded-lg transition ${
+                  fontSize === "LARGE"
+                    ? "bg-white dark:bg-slate-700 text-blue-600 shadow-2xs font-black"
+                    : "hover:text-slate-900"
+                }`}
+                title="Ukuran Huruf Sedang"
+              >
+                A+
+              </button>
+              <button
+                type="button"
+                onClick={() => setFontSize("XLARGE")}
+                className={`px-2 py-1 rounded-lg transition ${
+                  fontSize === "XLARGE"
+                    ? "bg-white dark:bg-slate-700 text-blue-600 shadow-2xs font-black"
+                    : "hover:text-slate-900"
+                }`}
+                title="Ukuran Huruf Besar"
+              >
+                A++
+              </button>
+            </div>
+
             {/* Authoritative Timer */}
             <div
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl font-mono text-xs sm:text-sm font-bold transition shadow-xs ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl font-mono text-xs sm:text-sm font-bold shadow-2xs transition ${
                 secondsLeft < 300
-                  ? "bg-rose-50 text-rose-700 border border-rose-200 animate-pulse"
+                  ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 animate-pulse"
                   : secondsLeft < 900
-                    ? "bg-amber-50 text-amber-700 border border-amber-200"
-                    : "bg-blue-50 text-blue-700 border border-blue-200/80"
+                    ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300"
+                    : "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
               }`}
             >
               <Clock className="h-4 w-4 shrink-0" />
               <span>{formattedTime}</span>
             </div>
 
+            {/* Fullscreen Toggle */}
             <button
               type="button"
               onClick={toggleFullscreen}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition hidden sm:flex"
               title={isFullscreen ? "Keluar Layar Penuh" : "Mode Layar Penuh"}
-              className="p-2 rounded-xl border border-slate-200/80 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition hidden sm:flex"
             >
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
 
+            {/* Open Question Grid Drawer Button */}
+            <button
+              type="button"
+              onClick={() => setShowDaftarSoalModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+            >
+              <LayoutGrid className="h-3.5 w-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Daftar Soal</span>
+              <span className="font-mono text-[11px] text-blue-600 font-bold">
+                ({answeredCount}/{manifest.length})
+              </span>
+            </button>
+
+            {/* Finish Button */}
             <button
               type="button"
               onClick={() => setShowSubmitModal(true)}
-              disabled={isLocked}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-xs hover:bg-blue-700 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition"
             >
               <Send className="h-3.5 w-3.5" />
               <span>Selesai</span>
@@ -689,52 +857,32 @@ export function CbtPlayerView({
         </div>
       </header>
 
-      {/* Main Content Area: Question Display + Navigator */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* Left 3 Columns: Active Question Card */}
-        <div className="lg:col-span-3 bg-white/90 backdrop-blur-md rounded-3xl border border-slate-200/80 shadow-xs flex flex-col min-h-[500px] overflow-hidden">
+        {/* Active Question Card (3 Columns on desktop) */}
+        <div className="lg:col-span-3 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col min-h-[500px] overflow-hidden">
           {(() => {
             const currentQuestionType =
               activeQuestion.jenis_soal || activeQuestion.tipe_soal || "PILIHAN_GANDA";
             const currentQuestionOptions: Array<{ label: string; teks: string; urutan?: number }> =
               activeQuestion.opsi || (activeQuestion.opsi_jawaban as any) || [];
 
-            // MENJODOHKAN pair extractor
-            let menjodohkanPremis: Array<{ id: string; teks: string }> = [];
-            let menjodohkanTargetChoices: string[] = [];
-            if (currentQuestionType === "MENJODOHKAN") {
-              const rawOpsi: any = activeQuestion.opsi_jawaban || activeQuestion.opsi;
-              if (rawOpsi && typeof rawOpsi === "object" && !Array.isArray(rawOpsi)) {
-                menjodohkanPremis = rawOpsi.premis || [];
-                menjodohkanTargetChoices = rawOpsi.pilihan_target || [];
-              } else if (Array.isArray(rawOpsi)) {
-                menjodohkanPremis = rawOpsi.map((item: any, i: number) => ({
-                  id: item.label || item.id || String(i + 1),
-                  teks: item.teks || item.premis || "",
-                }));
-                menjodohkanTargetChoices = Array.from(
-                  new Set(
-                    rawOpsi
-                      .map((item: any) => item.pasangan || item.target || item.respon)
-                      .filter(Boolean)
-                  )
-                ).sort();
-              }
-            }
-
             return (
               <>
-                {/* Question Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 border border-blue-200/60 font-mono font-bold text-sm flex items-center justify-center">
+                {/* Question Card Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-xl bg-blue-600 text-white font-mono font-black text-sm flex items-center justify-center shadow-2xs">
                       {activeQuestion.nomor_urut}
                     </span>
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700 border border-slate-200/60">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                       {currentQuestionType.replace(/_/g, " ")}
                     </span>
-                    <span className="text-[11px] font-medium text-slate-500">
-                      Bobot: <strong className="text-slate-700">{activeQuestion.bobot}</strong>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      Bobot:{" "}
+                      <strong className="text-slate-700 dark:text-slate-200">
+                        {activeQuestion.bobot}
+                      </strong>
                     </span>
                   </div>
 
@@ -743,8 +891,8 @@ export function CbtPlayerView({
                     onClick={handleToggleRagu}
                     className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
                       answers[activeQuestion.nomor_urut]?.ragu_ragu
-                        ? "bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-amber-400 text-slate-950 shadow-2xs ring-2 ring-amber-400/30"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                     }`}
                   >
                     <Bookmark className="h-3.5 w-3.5" />
@@ -752,106 +900,79 @@ export function CbtPlayerView({
                   </button>
                 </div>
 
-                {/* Question Body */}
+                {/* Question Card Body */}
                 <div className="p-6 sm:p-8 flex-1 space-y-6">
-                  {/* Audio Stimulus if present */}
-                  {(() => {
-                    const isAudioMedia = Boolean(
-                      activeQuestion.gambar_url &&
-                      (/\.(mp3|wav|ogg|m4a)(\?.*)?$/i.test(activeQuestion.gambar_url) ||
-                        activeQuestion.gambar_url.startsWith("data:audio") ||
-                        activeQuestion.gambar_url.startsWith("audio:"))
-                    );
-                    const audioMatch = activeQuestion.pertanyaan?.match(
-                      /\[audio:(https?:\/\/[^\s|\]]+)(?:\|limit:(\d+))?\]/i
-                    );
-                    const extractedAudioUrl = audioMatch
-                      ? audioMatch[1]
-                      : isAudioMedia
-                        ? activeQuestion.gambar_url
-                        : null;
-                    const audioPlayLimit =
-                      audioMatch && audioMatch[2] ? parseInt(audioMatch[2], 10) : 2;
-                    const cleanPertanyaan = activeQuestion.pertanyaan
-                      ? activeQuestion.pertanyaan.replace(/\[audio:[^\]]+\]/gi, "").trim()
-                      : "";
+                  {/* Stimulus Gambar if present */}
+                  {activeQuestion.gambar_url &&
+                    !/\.(mp3|wav|ogg|m4a)/i.test(activeQuestion.gambar_url) && (
+                      <div className="flex justify-center my-2">
+                        <ImageStimulus
+                          src={activeQuestion.gambar_url}
+                          alt="Ilustrasi Soal"
+                          caption="Klik gambar untuk memperbesar tampilan"
+                        />
+                      </div>
+                    )}
 
-                    return (
-                      <>
-                        {extractedAudioUrl && (
-                          <div className="my-2">
-                            <AudioStimulusPlayer
-                              src={extractedAudioUrl}
-                              maxPlayCount={audioPlayLimit}
-                              title={`Audio Listening — Soal No. ${activeQuestion.nomor_urut}`}
-                            />
-                          </div>
-                        )}
+                  {/* Question Text with MathRenderer */}
+                  <div
+                    className={`font-normal leading-relaxed text-slate-900 dark:text-slate-100 ${fontSizeClass}`}
+                  >
+                    <MathRenderer content={activeQuestion.pertanyaan || ""} />
+                  </div>
 
-                        {activeQuestion.gambar_url && !isAudioMedia && (
-                          <div className="flex justify-center">
-                            <ImageStimulus
-                              src={activeQuestion.gambar_url}
-                              alt="Ilustrasi / Stimulus Soal"
-                              caption="Klik gambar untuk memperbesar resolusi penuh"
-                            />
-                          </div>
-                        )}
-
-                        <div className="text-sm sm:text-base font-normal text-slate-800 leading-relaxed">
-                          <MathRenderer content={cleanPertanyaan} />
-                        </div>
-                      </>
-                    );
-                  })()}
-
-                  {/* Answer Options according to question type */}
+                  {/* Pilihan Ganda & Benar Salah */}
                   {(currentQuestionType === "PILIHAN_GANDA" ||
                     currentQuestionType === "BENAR_SALAH") &&
                     currentQuestionOptions.length > 0 && (
-                      <div className="space-y-3 pt-2">
+                      <div className="space-y-3 pt-3">
                         {currentQuestionOptions.map((op: any, opIdx: number) => {
                           const choiceLabel = op.label || op.id || String.fromCharCode(65 + opIdx);
                           const isSelected = Boolean(
                             answers[activeQuestion.nomor_urut]?.jawaban_pilihan &&
                             answers[activeQuestion.nomor_urut]?.jawaban_pilihan === choiceLabel
                           );
+
                           return (
                             <button
                               key={choiceLabel}
                               type="button"
                               onClick={() => handleSelectChoice(choiceLabel)}
-                              className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center gap-3.5 ${
+                              className={`w-full text-left p-4 rounded-2xl border transition flex items-center gap-4 ${
                                 isSelected
-                                  ? "bg-blue-50/90 border-2 border-blue-600 text-slate-900 font-semibold shadow-xs"
-                                  : "bg-white border-slate-200/90 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30 shadow-2xs"
+                                  ? "bg-blue-50/90 dark:bg-blue-950/40 border-2 border-blue-600 dark:border-blue-500 shadow-sm"
+                                  : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                               }`}
                             >
                               <span
-                                className={`w-8 h-8 rounded-xl font-mono text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                                className={`w-8 h-8 rounded-xl font-mono text-xs font-black flex items-center justify-center shrink-0 transition ${
                                   isSelected
                                     ? "bg-blue-600 text-white shadow-xs"
-                                    : "bg-slate-100 text-slate-600"
+                                    : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                                 }`}
                               >
                                 {choiceLabel}
                               </span>
-                              <MathRenderer
-                                content={op.teks}
-                                className="text-sm flex-1 leading-relaxed"
-                              />
-                              {isSelected && <Check className="h-4 w-4 text-blue-600 shrink-0" />}
+                              <div
+                                className={`flex-1 text-slate-900 dark:text-slate-100 ${fontSizeClass}`}
+                              >
+                                <MathRenderer content={op.teks} />
+                              </div>
+                              {isSelected && (
+                                <Check className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                              )}
                             </button>
                           );
                         })}
                       </div>
                     )}
 
+                  {/* Pilihan Ganda Kompleks */}
                   {currentQuestionType === "PILIHAN_GANDA_KOMPLEKS" &&
                     currentQuestionOptions.length > 0 && (
-                      <div className="space-y-3 pt-2">
-                        <p className="text-xs text-blue-600 font-semibold">
-                          * Pilih satu atau lebih jawaban yang benar.
+                      <div className="space-y-3 pt-3">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-bold">
+                          * Pilih satu atau lebih opsi jawaban yang menurut Anda benar.
                         </p>
                         {currentQuestionOptions.map((op: any, opIdx: number) => {
                           const choiceLabel = op.label || op.id || String.fromCharCode(65 + opIdx);
@@ -860,330 +981,550 @@ export function CbtPlayerView({
                           const isChecked = Boolean(
                             currentComplex && currentComplex.includes(choiceLabel)
                           );
+
                           return (
                             <button
                               key={choiceLabel}
                               type="button"
                               onClick={() => handleToggleComplexChoice(choiceLabel)}
-                              className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center gap-3.5 ${
+                              className={`w-full text-left p-4 rounded-2xl border transition flex items-center gap-4 ${
                                 isChecked
-                                  ? "bg-blue-50/90 border-2 border-blue-600 text-slate-900 font-semibold shadow-xs"
-                                  : "bg-white border-slate-200/90 text-slate-700 hover:border-blue-300 hover:bg-blue-50/30 shadow-2xs"
+                                  ? "bg-blue-50/90 dark:bg-blue-950/40 border-2 border-blue-600 dark:border-blue-500 shadow-sm"
+                                  : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                               }`}
                             >
                               <span
-                                className={`w-8 h-8 rounded-xl font-mono text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                                className={`w-8 h-8 rounded-xl font-mono text-xs font-black flex items-center justify-center shrink-0 transition ${
                                   isChecked
                                     ? "bg-blue-600 text-white shadow-xs"
-                                    : "bg-slate-100 text-slate-600"
+                                    : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                                 }`}
                               >
                                 {choiceLabel}
                               </span>
-                              <MathRenderer
-                                content={op.teks}
-                                className="text-sm flex-1 leading-relaxed"
-                              />
-                              {isChecked && <Check className="h-4 w-4 text-blue-600 shrink-0" />}
+                              <div
+                                className={`flex-1 text-slate-900 dark:text-slate-100 ${fontSizeClass}`}
+                              >
+                                <MathRenderer content={op.teks} />
+                              </div>
+                              {isChecked && (
+                                <Check className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                              )}
                             </button>
                           );
                         })}
                       </div>
                     )}
 
-                  {currentQuestionType === "MENJODOHKAN" && menjodohkanPremis.length > 0 && (
-                    <div className="space-y-3 pt-2">
-                      <p className="text-xs text-blue-600 font-semibold flex items-center gap-1.5">
-                        <ArrowRight className="h-3.5 w-3.5" />
-                        Pasangkan setiap butir di kolom kiri dengan jawaban yang sesuai di kolom
-                        kanan.
-                      </p>
-                      <div className="space-y-3">
-                        {menjodohkanPremis.map((item) => {
-                          const currentMatches =
-                            answers[activeQuestion.nomor_urut]?.jawaban_menjodohkan || {};
-                          const selectedVal = currentMatches[item.id] || "";
-                          return (
-                            <div
-                              key={item.id}
-                              className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                                selectedVal
-                                  ? "bg-blue-50/50 border-blue-300 shadow-xs"
-                                  : "bg-white border-slate-200/90 shadow-2xs"
-                              }`}
-                            >
-                              <div className="flex items-start sm:items-center gap-3 flex-1">
-                                <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                                  {item.id}
-                                </span>
-                                <MathRenderer
-                                  content={item.teks}
-                                  className="text-sm text-slate-800 font-medium leading-relaxed"
-                                />
-                              </div>
-
-                              <div className="flex items-center gap-2 sm:w-72 shrink-0">
-                                <ArrowRight className="h-4 w-4 text-slate-400 shrink-0 hidden sm:block" />
-                                <select
-                                  value={selectedVal}
-                                  onChange={(e) => handleMatchingChange(item.id, e.target.value)}
-                                  className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition text-slate-800"
-                                >
-                                  <option value="">-- Pilih Pasangan --</option>
-                                  {menjodohkanTargetChoices.map((tc, tcIdx) => (
-                                    <option key={tcIdx} value={tc}>
-                                      {tc}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
+                  {/* Isian Singkat */}
                   {currentQuestionType === "ISIAN_SINGKAT" && (
-                    <div className="pt-2">
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Tuliskan Jawaban Singkat Anda:
+                    <div className="pt-3 space-y-2">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Ketikkan Jawaban Singkat Anda:
                       </label>
                       <input
                         type="text"
                         value={answers[activeQuestion.nomor_urut]?.jawaban_teks || ""}
                         onChange={(e) => handleTextChange(e.target.value)}
-                        placeholder="Ketik jawaban Anda di sini..."
-                        className="w-full text-sm px-4 py-3 rounded-2xl border border-slate-200/90 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                        placeholder="Tuliskan jawaban Anda di sini..."
+                        className="w-full text-sm sm:text-base px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                       />
                     </div>
                   )}
 
+                  {/* Uraian / Esai */}
                   {(currentQuestionType === "URAIAN_ESAI" || currentQuestionType === "ESAI") && (
-                    <div className="pt-2">
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Tuliskan Penjelasan / Uraian Lengkap Anda:
+                    <div className="pt-3 space-y-2">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Tuliskan Uraian / Penjelasan Lengkap Anda:
                       </label>
                       <textarea
                         rows={6}
                         value={answers[activeQuestion.nomor_urut]?.jawaban_teks || ""}
                         onChange={(e) => handleTextChange(e.target.value)}
-                        placeholder="Tuliskan argumen atau uraian jawaban secara runut..."
-                        className="w-full text-sm px-4 py-3 rounded-2xl border border-slate-200/90 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 leading-relaxed transition"
+                        placeholder="Tuliskan penjelasan jawaban secara runut..."
+                        className="w-full text-sm sm:text-base px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 leading-relaxed transition"
                       />
                     </div>
+                  )}
+                </div>
+
+                {/* Question Footer Navigation */}
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+                    disabled={currentIndex === 0}
+                    className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40 cursor-pointer"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span>Sebelumnya</span>
+                  </button>
+
+                  {/* Mobile Quick Jump Button to Open Daftar Soal */}
+                  <button
+                    type="button"
+                    onClick={() => setShowDaftarSoalModal(true)}
+                    className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-bold shadow-2xs active:scale-95 transition cursor-pointer"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    <span>
+                      Soal {currentIndex + 1}/{manifest.length}
+                    </span>
+                  </button>
+
+                  <div className="text-xs font-bold text-slate-500 dark:text-slate-400 hidden sm:block">
+                    Nomor {currentIndex + 1} dari {manifest.length}
+                  </div>
+
+                  {currentIndex < manifest.length - 1 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCurrentIndex((prev) => Math.min(manifest.length - 1, prev + 1))
+                      }
+                      className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                    >
+                      <span>Berikutnya</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowSubmitModal(true)}
+                      className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                    >
+                      <Check className="h-4 w-4" />
+                      <span>Selesaikan Ujian</span>
+                    </button>
                   )}
                 </div>
               </>
             );
           })()}
-
-          {/* Question Footer Navigation */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/60">
-            <button
-              type="button"
-              onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-              disabled={currentIndex === 0}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 transition disabled:opacity-40"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Sebelumnya
-            </button>
-
-            {currentIndex < manifest.length - 1 ? (
-              <button
-                type="button"
-                onClick={() => setCurrentIndex((prev) => Math.min(manifest.length - 1, prev + 1))}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition shadow-xs"
-              >
-                Berikutnya
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowSubmitModal(true)}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition shadow-xs"
-              >
-                Selesaikan Ujian
-                <Check className="h-4 w-4" />
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* Right 1 Column: Question Navigator Grid */}
-        <div className="bg-white/90 backdrop-blur-md rounded-3xl border border-slate-200/80 shadow-xs p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Navigasi Soal
+        {/* Right 1 Column: Question Navigator Grid (Desktop) */}
+        <div className="hidden lg:block bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <LayoutGrid className="h-4 w-4 text-blue-600" />
+              <span>Daftar Soal</span>
             </h3>
-            <span className="text-[11px] font-bold text-blue-600">
-              {answeredCount}/{manifest.length} Terjawab
+            <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
+              {answeredCount}/{manifest.length} Dijawab
             </span>
           </div>
 
+          {/* Progress Bar */}
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-blue-600 h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${manifest.length > 0 ? (answeredCount / manifest.length) * 100 : 0}%`,
+              }}
+            />
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setGridFilter("ALL")}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                gridFilter === "ALL"
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              Semua ({manifest.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setGridFilter("UNANSWERED")}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                gridFilter === "UNANSWERED"
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              Belum ({belumCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setGridFilter("RAGU")}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                gridFilter === "RAGU"
+                  ? "bg-amber-500 text-slate-950 font-black shadow-2xs"
+                  : "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100"
+              }`}
+            >
+              Ragu ({raguCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setGridFilter("ANSWERED")}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                gridFilter === "ANSWERED"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 hover:bg-blue-100"
+              }`}
+            >
+              Dijawab ({answeredCount})
+            </button>
+          </div>
+
           {/* Legend */}
-          <div className="grid grid-cols-3 gap-2 text-[10px] font-semibold text-slate-500">
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+          <div className="grid grid-cols-3 gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 pb-1">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
               <span>Dijawab</span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-              <span>Ragu-ragu</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+              <span>Ragu</span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-200" />
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
               <span>Belum</span>
             </div>
           </div>
 
-          {/* Grid Numbers */}
-          <div className="grid grid-cols-5 gap-2 max-h-72 overflow-y-auto pr-1">
-            {manifest.map((item, idx) => {
-              const ans = answers[item.nomor_urut];
-              const isAnswered =
-                ans?.jawaban_pilihan !== undefined ||
-                (ans?.jawaban_teks && ans.jawaban_teks.trim() !== "") ||
-                (ans?.jawaban_kompleks && ans.jawaban_kompleks.length > 0) ||
-                (ans?.jawaban_menjodohkan && Object.keys(ans.jawaban_menjodohkan).length > 0);
-              const isRagu = Boolean(ans?.ragu_ragu);
-              const isActive = idx === currentIndex;
+          {/* Grid Buttons */}
+          {filteredManifest.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+              <p>Tidak ada butir soal dalam filter ini.</p>
+              <button
+                type="button"
+                onClick={() => setGridFilter("ALL")}
+                className="text-blue-600 hover:underline font-bold"
+              >
+                Tampilkan Semua Soal
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-5 gap-2 max-h-80 overflow-y-auto pr-1">
+              {filteredManifest.map((item) => {
+                const ans = answers[item.nomor_urut] || answers[String(item.nomor_urut)];
+                const details = getAnswerDetails(ans);
+                const isAnswered = details.isAnswered;
+                const isRagu = Boolean(ans?.ragu_ragu);
+                const originalIdx = manifest.findIndex((m) => m.nomor_urut === item.nomor_urut);
+                const isActive = originalIdx === currentIndex;
 
-              return (
-                <button
-                  key={item.nomor_urut}
-                  type="button"
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`h-10 rounded-xl font-mono text-xs font-bold transition flex items-center justify-center relative ${
-                    isActive ? "ring-2 ring-blue-600 ring-offset-2 scale-105 z-10" : ""
-                  } ${
-                    isRagu
-                      ? "bg-amber-400 text-slate-900 shadow-2xs"
-                      : isAnswered
-                        ? "bg-blue-600 text-white shadow-2xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {item.nomor_urut}
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <button
+                    key={item.nomor_urut}
+                    type="button"
+                    onClick={() => setCurrentIndex(originalIdx)}
+                    className={`group relative h-11 rounded-xl transition-all flex flex-col items-center justify-center p-1 cursor-pointer select-none ${
+                      isActive
+                        ? "ring-2 ring-blue-600 dark:ring-blue-400 ring-offset-2 dark:ring-offset-slate-900 shadow-md font-black scale-105 z-10"
+                        : "hover:scale-102"
+                    } ${
+                      isRagu
+                        ? "bg-amber-400 hover:bg-amber-500 text-slate-950 font-black shadow-2xs border border-amber-500"
+                        : isAnswered
+                          ? "bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-2xs border border-blue-700"
+                          : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700"
+                    }`}
+                    title={`Soal #${item.nomor_urut}${isAnswered ? ` • Jawaban: ${details.label}` : " • Belum dijawab"}${isRagu ? " (Ragu-ragu)" : ""}`}
+                  >
+                    <span className="font-mono text-xs leading-none font-bold">
+                      {item.nomor_urut}
+                    </span>
+                    {details.label && (
+                      <span
+                        className={`text-[9px] font-mono font-black mt-0.5 px-1 rounded-xs leading-tight max-w-full truncate ${
+                          isRagu
+                            ? "bg-amber-600 text-white"
+                            : isAnswered
+                              ? "bg-white/25 text-white"
+                              : "text-slate-500"
+                        }`}
+                      >
+                        {details.label}
+                      </span>
+                    )}
+                    {isRagu && (
+                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[8px] font-black shadow-xs">
+                        ?
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <button
             type="button"
             onClick={() => setShowSubmitModal(true)}
-            className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition shadow-xs"
+            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
           >
-            Selesaikan Ujian Sekarang
+            Kumpulkan Ujian Sekarang
           </button>
         </div>
       </main>
 
-      {/* STRIKE / ANTI-CHEAT WARNING MODAL */}
-      {isStrikeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 text-center space-y-4 shadow-2xl border-2 border-rose-500">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center animate-bounce">
-              <ShieldAlert className="h-8 w-8" />
-            </div>
-
-            <h3 className="text-base font-bold text-slate-900">
-              {isLocked ? "SESI UJIAN TERKUNCI!" : "PERINGATAN INTEGRITAS UJIAN"}
-            </h3>
-
-            <p className="text-xs text-slate-600 leading-relaxed font-medium">{strikeMessage}</p>
-
-            {isLocked ? (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-bold">
-                Status: TERKUNCI_PELANGGARAN. Silakan minta izin pengawas untuk membuka kembali sesi
-                ujian Anda.
+      {/* DAFTAR SOAL MODAL (Mobile Drawer) */}
+      {showDaftarSoalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                  <LayoutGrid className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Daftar Soal Ujian
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {answeredCount} dari {manifest.length} butir telah dijawab
+                  </p>
+                </div>
               </div>
-            ) : (
               <button
                 type="button"
-                onClick={() => {
-                  setIsStrikeModalOpen(false);
-                  toggleFullscreen();
-                }}
-                className="w-full py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold shadow-xs hover:bg-rose-700 transition"
+                onClick={() => setShowDaftarSoalModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               >
-                Saya Mengerti & Kembali ke Layar Penuh
+                <X className="h-5 w-5" />
               </button>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${manifest.length > 0 ? (answeredCount / manifest.length) * 100 : 0}%`,
+                }}
+              />
+            </div>
+
+            {/* Quick Filter Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setGridFilter("ALL")}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                  gridFilter === "ALL"
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs font-bold"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200"
+                }`}
+              >
+                Semua ({manifest.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGridFilter("UNANSWERED")}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                  gridFilter === "UNANSWERED"
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs font-bold"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200"
+                }`}
+              >
+                Belum ({belumCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGridFilter("RAGU")}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                  gridFilter === "RAGU"
+                    ? "bg-amber-500 text-slate-950 font-black shadow-2xs"
+                    : "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 hover:bg-amber-100"
+                }`}
+              >
+                Ragu ({raguCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGridFilter("ANSWERED")}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                  gridFilter === "ANSWERED"
+                    ? "bg-blue-600 text-white shadow-2xs font-bold"
+                    : "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 hover:bg-blue-100"
+                }`}
+              >
+                Dijawab ({answeredCount})
+              </button>
+            </div>
+
+            {/* Grid Buttons */}
+            {filteredManifest.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                <p>Tidak ada butir soal dalam kategori ini.</p>
+                <button
+                  type="button"
+                  onClick={() => setGridFilter("ALL")}
+                  className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 transition"
+                >
+                  Lihat Semua Soal
+                </button>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-1">
+                <div className="grid grid-cols-5 gap-2">
+                  {filteredManifest.map((item) => {
+                    const ans = answers[item.nomor_urut] || answers[String(item.nomor_urut)];
+                    const details = getAnswerDetails(ans);
+                    const isAnswered = details.isAnswered;
+                    const isRagu = Boolean(ans?.ragu_ragu);
+                    const originalIdx = manifest.findIndex((m) => m.nomor_urut === item.nomor_urut);
+                    const isActive = originalIdx === currentIndex;
+
+                    return (
+                      <button
+                        key={item.nomor_urut}
+                        type="button"
+                        onClick={() => {
+                          setCurrentIndex(originalIdx);
+                          setShowDaftarSoalModal(false);
+                        }}
+                        className={`group relative h-12 rounded-xl font-mono transition-all flex flex-col items-center justify-center p-1 cursor-pointer select-none ${
+                          isActive
+                            ? "ring-2 ring-blue-600 dark:ring-blue-400 ring-offset-2 dark:ring-offset-slate-900 shadow-md font-black scale-105 z-10"
+                            : "active:scale-95"
+                        } ${
+                          isRagu
+                            ? "bg-amber-400 hover:bg-amber-500 text-slate-950 font-black shadow-2xs border border-amber-500"
+                            : isAnswered
+                              ? "bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-2xs border border-blue-700"
+                              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700"
+                        }`}
+                        title={`Soal #${item.nomor_urut}${isAnswered ? ` • Jawaban: ${details.label}` : " • Belum dijawab"}${isRagu ? " (Ragu-ragu)" : ""}`}
+                      >
+                        <span className="text-xs leading-none font-bold">{item.nomor_urut}</span>
+                        {details.label && (
+                          <span
+                            className={`text-[9px] font-mono font-black mt-0.5 px-1 rounded-xs leading-tight max-w-full truncate ${
+                              isRagu
+                                ? "bg-amber-600 text-white"
+                                : isAnswered
+                                  ? "bg-white/25 text-white"
+                                  : "text-slate-500"
+                            }`}
+                          >
+                            {details.label}
+                          </span>
+                        )}
+                        {isRagu && (
+                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[8px] font-black shadow-xs">
+                            ?
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
+
+            {/* Legend & Action */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                  <span>Dijawab</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                  <span>Ragu</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
+                  <span>Belum</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDaftarSoalModal(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* SUBMIT CONFIRMATION MODAL */}
       {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 space-y-4 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600">
+              <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Kumpulkan Lembar Ujian?</h3>
-                <p className="text-xs text-slate-500">Pastikan seluruh butir soal telah dijawab.</p>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Kumpulkan Lembar Ujian?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Pastikan seluruh soal telah Anda jawab dengan teliti.
+                </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-500">Total Soal:</span>
-                <span className="font-bold text-slate-800">{manifest.length}</span>
+                <span className="text-slate-500 dark:text-slate-400">Total Butir Soal:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  {manifest.length}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Sudah Dijawab:</span>
-                <span className="font-bold text-emerald-600">{answeredCount}</span>
+                <span className="text-slate-500 dark:text-slate-400">Sudah Dijawab:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  {answeredCount}
+                </span>
               </div>
+              {raguCount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Masih Ragu-ragu:</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">{raguCount}</span>
+                </div>
+              )}
               <div className="flex justify-between">
-                <span className="text-slate-500">Belum Dijawab:</span>
-                <span className="font-bold text-rose-600">{manifest.length - answeredCount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Ditandai Ragu-ragu:</span>
-                <span className="font-bold text-amber-600">{raguCount}</span>
+                <span className="text-slate-500 dark:text-slate-400">Belum Dijawab:</span>
+                <span className="font-bold text-rose-600 dark:text-rose-400">
+                  {manifest.length - answeredCount}
+                </span>
               </div>
             </div>
 
             {manifest.length - answeredCount > 0 && (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  Masih terdapat {manifest.length - answeredCount} butir soal yang belum Anda jawab.
-                  Soal yang tidak terjawab akan dihitung 0 poin.
-                </span>
-              </div>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                Masih terdapat {manifest.length - answeredCount} butir soal yang belum dijawab.
+                Lembar ujian yang dikumpulkan tidak dapat diubah kembali.
+              </p>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setShowSubmitModal(false)}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
-                Periksa Kembali
+                Cek Kembali
               </button>
               <button
                 type="button"
-                onClick={handleSubmitAttempt}
+                onClick={handleFinalSubmit}
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-xs hover:bg-emerald-700 transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Menilai...
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Mengumpulkan...</span>
                   </>
                 ) : (
                   <>
-                    <Send className="h-3.5 w-3.5" />
-                    Ya, Kumpulkan Sekarang
+                    <Check className="h-4 w-4" />
+                    <span>Ya, Kumpulkan Sekarang</span>
                   </>
                 )}
               </button>
@@ -1192,32 +1533,36 @@ export function CbtPlayerView({
         </div>
       )}
 
-      {/* IMAGE LIGHTBOX MODAL */}
-      {previewImage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in cursor-zoom-out"
-          onClick={() => setPreviewImage(null)}
-        >
-          <div
-            className="relative max-w-4xl max-h-[90vh] bg-white rounded-3xl p-3 shadow-2xl border border-slate-200 overflow-hidden cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setPreviewImage(null)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-slate-900/70 text-white hover:bg-slate-900 transition z-10"
-              title="Tutup Preview"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <img
-              src={previewImage}
-              alt="Stimulus Soal Resolusi Penuh"
-              className="max-h-[80vh] w-auto mx-auto object-contain rounded-2xl"
-            />
-            <div className="p-3 text-center text-xs text-slate-500 font-medium">
-              Resolusi Penuh • Klik di luar atau tombol silang untuk menutup
+      {/* STRIKE / INTEGRITY WARNING MODAL */}
+      {isStrikeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 text-center space-y-4 shadow-2xl border-2 border-rose-500">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center animate-bounce">
+              <ShieldAlert className="h-8 w-8" />
             </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              {isLocked ? "SESI UJIAN TERKUNCI!" : "PERINGATAN INTEGRITAS UJIAN"}
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              {strikeMessage}
+            </p>
+            {isLocked ? (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-200 font-bold">
+                Status: TERKUNCI_PELANGGARAN. Silakan lapor kepada pengawas ujian untuk membuka
+                kunci sesi Anda.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStrikeModalOpen(false);
+                  requestFullscreenSafe();
+                }}
+                className="w-full py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold shadow-xs hover:bg-rose-700 transition"
+              >
+                Saya Mengerti & Kembali ke Ujian
+              </button>
+            )}
           </div>
         </div>
       )}

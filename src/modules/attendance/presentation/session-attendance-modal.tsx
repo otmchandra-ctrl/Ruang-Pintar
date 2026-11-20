@@ -3,38 +3,20 @@
 /**
  * Ruang Pintar — M12 Class Session Attendance Modal (Academic Glass UI v1.2)
  *
- * Antarmuka Presensi Lembar Akademik Kelas Berkapasitas Besar (30-40+ Siswa):
- * - Dual View: Mode Lembar Tabel Kompak (Dense Attendance Sheet) & Mode Grid Kartu
- * - Interactive KPI & Filter Pills (Semua, Hadir, Tidak Hadir, Sakit, Izin, Alpha)
- * - One-Click "Tandai Semua Hadir" untuk kecepatan guru
- * - Segmented Control Status Cepat (Hadir, Izin, Sakit, Alpha, Disp., Terl.)
- * - Inline Catatan KBM terpadu
- * - Fullscreen Workspace Toggle untuk kenyamanan mengabsen di ruang kelas
- * - Sticky Header, Sticky Table Head, dan Sticky Action Footer
+ * STAGE UX-04.1: Attendance Workflow Optimization
+ * Architecture:
+ * - LIST VIEW = Lihat status (Compact rows 56px–72px max, 5-6 visible per mobile viewport)
+ * - DETAIL VIEW = Ubah status (Bottom Sheet Editor, Mobile First)
+ * - Quick Attendance: 1-Click "Tandai Semua Hadir"
+ * - Compact Summary: Minimalist status counters (Hadir 25, Sakit 1, Izin 1, Alpha 1)
+ * - Real Apple Glass Radio Buttons (backdrop-blur-xl, scale 1.02, 150ms transition)
+ * - Sticky Search: [ Cari Nama / NISN ]
+ * - Sticky Footer: "X siswa selesai", [Tutup], [Simpan Presensi]
  */
 
 import React, { useState, useEffect, useTransition, useMemo } from "react";
 import { createPortal } from "react-dom";
-import {
-  X,
-  Users,
-  CheckCircle2,
-  Clock,
-  Search,
-  CheckCheck,
-  RotateCcw,
-  Loader2,
-  AlertCircle,
-  FileText,
-  Calendar,
-  Sparkles,
-  LayoutList,
-  LayoutGrid,
-  Maximize2,
-  Minimize2,
-  ArrowUpDown,
-  Filter,
-} from "lucide-react";
+import { X, Check, Search, Loader2, FileText, ChevronRight } from "lucide-react";
 import {
   getSessionAttendanceAction,
   saveSessionAttendanceAction,
@@ -88,17 +70,16 @@ function SessionAttendanceModalContent({
     {}
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "ALL" | "HADIR" | "ABSENT" | "IZIN" | "SAKIT" | "ALPHA"
-  >("ALL");
-  const [viewMode, setViewMode] = useState<"TABLE" | "GRID">("TABLE");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [sortBy, setSortBy] = useState<"ABSEN" | "NAME" | "STATUS">("ABSEN");
   const [alasanKoreksi, setAlasanKoreksi] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Ambil data sesi dan roster siswa saat modal dibuka
+  // Bottom Sheet Editor State (Detail View)
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState<AttendanceStatus>("HADIR");
+  const [draftCatatan, setDraftCatatan] = useState<string>("");
+
+  // Ambil data sesi dan daftar siswa saat modal dibuka
   useEffect(() => {
     let isMounted = true;
 
@@ -107,7 +88,6 @@ function SessionAttendanceModalContent({
         if (!isMounted) return;
         if (res.success && res.data) {
           setSessionData(res.data);
-          // Inisialisasi status tiap siswa
           const initialMap: Record<string, { status: AttendanceStatus; catatan: string }> = {};
           res.data.daftar_siswa.forEach((s) => {
             initialMap[s.siswa_id] = {
@@ -135,29 +115,27 @@ function SessionAttendanceModalContent({
     };
   }, [sesiId, onClose, onError]);
 
-  // Handler ubah status individu siswa
-  const handleStatusChange = (siswaId: string, newStatus: AttendanceStatus) => {
-    setItems((prev) => ({
-      ...prev,
-      [siswaId]: {
-        ...prev[siswaId],
-        status: newStatus,
-      },
-    }));
+  // Buka Bottom Sheet Editor untuk siswa terpilih
+  const handleOpenEditor = (siswaId: string) => {
+    setEditingStudentId(siswaId);
+    setDraftStatus(items[siswaId]?.status || "HADIR");
+    setDraftCatatan(items[siswaId]?.catatan || "");
   };
 
-  // Handler ubah catatan individu siswa
-  const handleCatatanChange = (siswaId: string, newCatatan: string) => {
+  // Simpan perubahan dari Bottom Sheet Editor
+  const handleSaveEditor = () => {
+    if (!editingStudentId) return;
     setItems((prev) => ({
       ...prev,
-      [siswaId]: {
-        ...prev[siswaId],
-        catatan: newCatatan,
+      [editingStudentId]: {
+        status: draftStatus,
+        catatan: draftCatatan,
       },
     }));
+    setEditingStudentId(null);
   };
 
-  // Quick Action: Tandai Semua Hadir
+  // Quick Action: Tandai Semua Hadir (1-Click)
   const handleMarkAllPresent = () => {
     if (!sessionData) return;
     setItems((prev) => {
@@ -172,88 +150,57 @@ function SessionAttendanceModalContent({
     });
   };
 
-  // Quick Action: Reset ke awal
-  const handleResetToInitial = () => {
-    if (!sessionData) return;
-    const initialMap: Record<string, { status: AttendanceStatus; catatan: string }> = {};
+  const totalSiswa = sessionData?.daftar_siswa.length || 0;
+
+  // Penghitung Status Ringkas (Attendance Summary)
+  const summaryCounts = useMemo(() => {
+    const counts = {
+      HADIR: 0,
+      SAKIT: 0,
+      IZIN: 0,
+      ALPHA: 0,
+      DISPENSASI: 0,
+      TERLAMBAT: 0,
+    };
+    if (!sessionData) return counts;
     sessionData.daftar_siswa.forEach((s) => {
-      initialMap[s.siswa_id] = {
-        status: s.status,
-        catatan: s.catatan || "",
-      };
+      const st = items[s.siswa_id]?.status || "HADIR";
+      if (st in counts) {
+        counts[st as keyof typeof counts]++;
+      }
     });
-    setItems(initialMap);
+    return counts;
+  }, [sessionData, items]);
+
+  // Status Toggle Semua Hadir (State ON jika seluruh siswa HADIR, OFF jika ada minimal 1 siswa tidak HADIR)
+  const isAllPresent = useMemo(() => {
+    return totalSiswa > 0 && summaryCounts.HADIR === totalSiswa;
+  }, [totalSiswa, summaryCounts]);
+
+  const handleToggleAllPresent = () => {
+    if (!sessionData) return;
+    if (!isAllPresent) {
+      handleMarkAllPresent();
+    }
   };
 
-  // Hitung metrik real-time dari state
-  const totalSiswa = sessionData?.daftar_siswa.length || 0;
-  let countHadir = 0;
-  let countIzin = 0;
-  let countSakit = 0;
-  let countAlpha = 0;
-  let countDispensasi = 0;
-  let countTerlambat = 0;
-
-  Object.values(items).forEach((item) => {
-    if (item.status === "HADIR") countHadir++;
-    else if (item.status === "IZIN") countIzin++;
-    else if (item.status === "SAKIT") countSakit++;
-    else if (item.status === "ALPHA") countAlpha++;
-    else if (item.status === "DISPENSASI") countDispensasi++;
-    else if (item.status === "TERLAMBAT") countTerlambat++;
-  });
-
-  const totalAbsent = countIzin + countSakit + countAlpha + countDispensasi;
-
-  const livePercentage =
-    totalSiswa > 0
-      ? Math.round(((countHadir + countTerlambat + countDispensasi) / totalSiswa) * 100)
-      : 0;
-
-  // Filter dan Sort siswa berdasarkan search, status filter, dan sort order
-  const filteredAndSortedStudents = useMemo(() => {
+  // Filter siswa berdasarkan input pencarian
+  const filteredStudents = useMemo(() => {
     if (!sessionData) return [];
 
-    let list = sessionData.daftar_siswa.filter((s) => {
-      const currentStatus = items[s.siswa_id]?.status || "HADIR";
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
+    const q = searchQuery.toLowerCase().trim();
+    const list = sessionData.daftar_siswa.filter((s) => {
+      if (!q) return true;
+      return (
         s.nama_lengkap.toLowerCase().includes(q) ||
         (s.nis && s.nis.toLowerCase().includes(q)) ||
-        (s.nisn && s.nisn.toLowerCase().includes(q));
-
-      let matchesStatus = true;
-      if (statusFilter === "HADIR") matchesStatus = currentStatus === "HADIR";
-      else if (statusFilter === "ABSENT")
-        matchesStatus = ["IZIN", "SAKIT", "ALPHA", "DISPENSASI"].includes(currentStatus);
-      else if (statusFilter === "IZIN") matchesStatus = currentStatus === "IZIN";
-      else if (statusFilter === "SAKIT") matchesStatus = currentStatus === "SAKIT";
-      else if (statusFilter === "ALPHA") matchesStatus = currentStatus === "ALPHA";
-
-      return matchesSearch && matchesStatus;
+        (s.nisn && s.nisn.toLowerCase().includes(q))
+      );
     });
 
-    list.sort((a, b) => {
-      if (sortBy === "ABSEN") {
-        return (a.nomor_absen || 999) - (b.nomor_absen || 999);
-      }
-      if (sortBy === "NAME") {
-        return a.nama_lengkap.localeCompare(b.nama_lengkap);
-      }
-      if (sortBy === "STATUS") {
-        const statusA = items[a.siswa_id]?.status || "HADIR";
-        const statusB = items[b.siswa_id]?.status || "HADIR";
-        // Put absent students at the top
-        if (statusA === "HADIR" && statusB !== "HADIR") return 1;
-        if (statusA !== "HADIR" && statusB === "HADIR") return -1;
-        return a.nama_lengkap.localeCompare(b.nama_lengkap);
-      }
-      return 0;
-    });
-
+    list.sort((a, b) => (a.nomor_absen || 999) - (b.nomor_absen || 999));
     return list;
-  }, [sessionData, items, searchQuery, statusFilter, sortBy]);
+  }, [sessionData, searchQuery]);
 
   // Submit Handler
   const handleSubmit = (e: React.FormEvent) => {
@@ -284,92 +231,56 @@ function SessionAttendanceModalContent({
     });
   };
 
-  const formattedDate = sessionData
-    ? new Intl.DateTimeFormat("id-ID", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(new Date(sessionData.tanggal))
-    : "";
+  // Format tanggal lengkap: "Selasa, 06 Oktober 2026"
+  const formattedDateFull = useMemo(() => {
+    if (!sessionData) return "";
+    const d = new Date(sessionData.tanggal);
+    const dayName = d.toLocaleDateString("id-ID", { weekday: "long" });
+    const dayNum = String(d.getDate()).padStart(2, "0");
+    const monthLong = d.toLocaleDateString("id-ID", { month: "long" });
+    const year = d.getFullYear();
+    const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+    const capMonth = monthLong.charAt(0).toUpperCase() + monthLong.slice(1);
+    return `${capDay}, ${dayNum} ${capMonth} ${year}`;
+  }, [sessionData]);
+
+  // Data siswa yang sedang diedit di Bottom Sheet
+  const activeStudent = useMemo(() => {
+    if (!editingStudentId || !sessionData) return null;
+    return sessionData.daftar_siswa.find((s) => s.siswa_id === editingStudentId) || null;
+  }, [editingStudentId, sessionData]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
-      <div
-        className={`w-full bg-white flex flex-col overflow-hidden transition-all duration-300 ${
-          isFullscreen
-            ? "fixed inset-0 h-screen w-screen rounded-none z-50 border-0"
-            : "max-w-6xl max-h-[92vh] sm:rounded-3xl border border-slate-200/80 shadow-2xl"
-        }`}
-      >
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full bg-white dark:bg-slate-900 flex flex-col overflow-hidden max-w-xl h-[92vh] sm:h-auto sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl">
         {/* ========================================================= */}
-        {/* HEADER MODAL (STICKY ACADEMIC HEADER)                      */}
+        {/* HEADER: Presensi Kelas, Mapel, Rombel • Tanggal, Tutup     */}
         {/* ========================================================= */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/90 backdrop-blur-sm flex items-center justify-between gap-4 shrink-0">
-          <div className="space-y-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-lg bg-blue-100/80 text-[#2563EB] font-bold text-xs">
-                Presensi Sesi KBM
+        <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
+          <div className="space-y-0.5 min-w-0">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#2563EB] dark:text-blue-400 block">
+              Presensi Kelas
+            </span>
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white leading-tight truncate">
+              {sessionData ? sessionData.mata_pelajaran_nama : "Memuat Sesi..."}
+            </h2>
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 truncate">
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {sessionData?.rombel_nama || "Kelas"}
               </span>
-              {sessionData?.sudah_diabsen ? (
-                <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100/80 text-emerald-700 font-bold text-xs flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                  Sudah Pernah Diabsen
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-lg bg-amber-100/80 text-amber-700 font-bold text-xs flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-amber-600" />
-                  Sesi Baru (Belum Disimpan)
-                </span>
-              )}
-              <span className="hidden sm:inline-block text-xs font-semibold text-slate-400">
-                • {totalSiswa} Siswa Terdaftar
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <h2 className="text-base sm:text-xl font-bold text-slate-900 leading-tight truncate">
-                {sessionData ? sessionData.mata_pelajaran_nama : "Memuat Sesi..."}
-              </h2>
-              <span className="text-xs sm:text-sm font-bold text-[#2563EB]">
-                {sessionData?.rombel_nama}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                {formattedDate}
-              </span>
-              {sessionData?.ruangan && (
-                <>
-                  <span>•</span>
-                  <span>Ruang: {sessionData.ruangan}</span>
-                </>
-              )}
+              <span>•</span>
+              <span>{formattedDateFull}</span>
             </div>
           </div>
 
-          {/* Top Right Controls: Fullscreen toggle & Close */}
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              title={
-                isFullscreen ? "Keluar dari Layar Penuh" : "Buka Layar Penuh (Fokus Mengabsen)"
-              }
-              className="hidden sm:flex p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
-            >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            aria-label="Tutup Modal"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Content Body */}
@@ -381,545 +292,202 @@ function SessionAttendanceModalContent({
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
             {/* ========================================================= */}
-            {/* KPI METRIC BAR & QUICK INTERACTIVE CHIPS                   */}
+            {/* AREA RINGKASAN PRESENSI (MOBILE UX REFINEMENT)           */}
+            {/* Baris 1: Total Siswa                                      */}
+            {/* Baris 2: [ Toggle Semua Hadir ]  •  H S I A di sampingnya  */}
+            {/* Tinggi ultra-kompak ~46px, density efisien                */}
             {/* ========================================================= */}
-            <div className="p-3 sm:px-6 sm:py-3 bg-white border-b border-slate-100 shrink-0 space-y-2.5">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                {/* Progress Bar & Rate */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center size-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-sm shadow-xs shrink-0">
-                    {livePercentage}%
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800">Kehadiran Kelas</span>
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        ({countHadir} dari {totalSiswa} Siswa)
-                      </span>
-                    </div>
-                    {/* Linear Progress Meter */}
-                    <div className="w-36 sm:w-48 h-2 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
-                        style={{ width: `${livePercentage}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Interactive Status Summary Badges (Act as Quick Filter shortcuts!) */}
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("ALL")}
-                    className={`px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
-                      statusFilter === "ALL"
-                        ? "bg-slate-800 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    Semua: {totalSiswa}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("HADIR")}
-                    className={`px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
-                      statusFilter === "HADIR"
-                        ? "bg-emerald-600 text-white shadow-xs"
-                        : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60"
-                    }`}
-                  >
-                    Hadir: {countHadir}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("ABSENT")}
-                    className={`px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
-                      statusFilter === "ABSENT"
-                        ? "bg-rose-600 text-white shadow-xs"
-                        : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60"
-                    }`}
-                  >
-                    Tidak Hadir: {totalAbsent}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("IZIN")}
-                    className={`px-2 py-1 rounded-xl font-medium transition-all cursor-pointer ${
-                      statusFilter === "IZIN"
-                        ? "bg-sky-600 text-white font-bold"
-                        : "bg-sky-50 text-sky-700 hover:bg-sky-100"
-                    }`}
-                  >
-                    Izin: {countIzin}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("SAKIT")}
-                    className={`px-2 py-1 rounded-xl font-medium transition-all cursor-pointer ${
-                      statusFilter === "SAKIT"
-                        ? "bg-amber-600 text-white font-bold"
-                        : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                    }`}
-                  >
-                    Sakit: {countSakit}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("ALPHA")}
-                    className={`px-2 py-1 rounded-xl font-medium transition-all cursor-pointer ${
-                      statusFilter === "ALPHA"
-                        ? "bg-rose-600 text-white font-bold"
-                        : "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                    }`}
-                  >
-                    Alpha: {countAlpha}
-                  </button>
-                </div>
+            <div className="px-4 py-2 bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 flex flex-col justify-center gap-1.5 shrink-0">
+              {/* Baris 1: Total Siswa */}
+              <div className="text-xs font-bold font-mono text-slate-800 dark:text-slate-100 leading-tight">
+                {totalSiswa} Siswa
               </div>
 
-              {/* ========================================================= */}
-              {/* ACTION TOOLBAR, SEARCH, AND VIEW SWITCHER                 */}
-              {/* ========================================================= */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-                {/* Search box & Sort */}
-                <div className="flex items-center gap-2 flex-1 max-w-md">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Cari siswa atau NISN..."
-                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
+              {/* Baris 2: [ Toggle Semua Hadir ] di samping H S I A */}
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isAllPresent}
+                  aria-label="Toggle Semua Hadir"
+                  onClick={handleToggleAllPresent}
+                  className="inline-flex items-center gap-2 cursor-pointer group select-none shrink-0"
+                >
+                  <div
+                    className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isAllPresent ? "bg-[#2563EB]" : "bg-slate-300 dark:bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                        isAllPresent ? "translate-x-3.5" : "translate-x-0"
+                      }`}
                     />
                   </div>
+                  <span className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 group-hover:text-[#2563EB] dark:group-hover:text-blue-400 transition-colors">
+                    Semua Hadir
+                  </span>
+                </button>
 
-                  {/* Sort Order */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (sortBy === "ABSEN") setSortBy("NAME");
-                      else if (sortBy === "NAME") setSortBy("STATUS");
-                      else setSortBy("ABSEN");
-                    }}
-                    title={`Urutkan: ${sortBy === "ABSEN" ? "No. Absen" : sortBy === "NAME" ? "Nama A-Z" : "Yang Absen di Atas"}`}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-600 shrink-0 cursor-pointer"
-                  >
-                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                    <span className="hidden md:inline">
-                      {sortBy === "ABSEN"
-                        ? "No. Absen"
-                        : sortBy === "NAME"
-                          ? "Nama A-Z"
-                          : "Absen Teratas"}
+                {/* Counter H • S • I • A • D • T di samping kanan */}
+                <div className="flex items-center gap-1.5 text-[11px] font-mono leading-tight shrink-0 flex-wrap justify-end">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    H{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {summaryCounts.HADIR}
                     </span>
-                  </button>
-                </div>
-
-                {/* Bulk Actions & View Mode Toggle */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* View Mode Toggle */}
-                  <div className="inline-flex p-0.5 rounded-xl bg-slate-100 border border-slate-200/80">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("TABLE")}
-                      title="Tampilan Lembar Tabel (Sangat direkomendasikan untuk 30+ siswa)"
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        viewMode === "TABLE"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      <LayoutList className="h-3.5 w-3.5" />
-                      <span className="hidden md:inline">Tabel Kompak</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("GRID")}
-                      title="Tampilan Kartu Grid"
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        viewMode === "GRID"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                      <span className="hidden md:inline">Kartu Grid</span>
-                    </button>
-                  </div>
-
-                  {/* Mark All Present */}
-                  <button
-                    type="button"
-                    onClick={handleMarkAllPresent}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                    title="Atur status seluruh siswa menjadi Hadir dalam 1-klik"
-                  >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    <span>Tandai Semua Hadir</span>
-                  </button>
-
-                  {/* Reset */}
-                  <button
-                    type="button"
-                    onClick={handleResetToInitial}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs transition-colors cursor-pointer"
-                    title="Kembalikan status awal"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    <span className="hidden sm:inline">Reset</span>
-                  </button>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600 font-sans">•</span>
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">
+                    S{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {summaryCounts.SAKIT}
+                    </span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600 font-sans">•</span>
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">
+                    I{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {summaryCounts.IZIN}
+                    </span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600 font-sans">•</span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">
+                    A{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {summaryCounts.ALPHA}
+                    </span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600 font-sans">•</span>
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">
+                    D{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {summaryCounts.DISPENSASI}
+                    </span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600 font-sans">•</span>
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">
+                    T{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {summaryCounts.TERLAMBAT}
+                    </span>
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* ========================================================= */}
-            {/* STUDENT ROSTER CONTAINER                                   */}
+            {/* STEP 6: STICKY SEARCH: [ Cari Nama / NISN ]               */}
             {/* ========================================================= */}
-            <div className="flex-1 overflow-y-auto bg-slate-50/50">
-              {filteredAndSortedStudents.length === 0 ? (
-                <div className="p-16 text-center text-slate-400 space-y-2">
-                  <Users className="h-8 w-8 mx-auto text-slate-300" />
-                  {totalSiswa === 0 ? (
-                    <>
-                      <p className="text-xs font-bold text-slate-600">
-                        Belum ada siswa terdaftar pada rombel ini.
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Silakan hubungi staf kurikulum atau administrator untuk penempatan siswa ke
-                        rombel ini.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-xs font-bold text-slate-600">
-                        Tidak ada siswa yang sesuai filter.
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Coba sesuaikan kata kunci pencarian atau ganti filter status.
-                      </p>
-                    </>
-                  )}
-                </div>
-              ) : viewMode === "TABLE" ? (
-                /* ========================================================= */
-                /* MODE LEMBAR TABEL (DATA DENSE ATTENDANCE SHEET)           */
-                /* ========================================================= */
-                <div className="min-w-full inline-block align-middle">
-                  <table className="min-w-full divide-y divide-slate-200/80 text-left">
-                    {/* STICKY THEAD */}
-                    <thead className="bg-slate-100/95 sticky top-0 z-10 backdrop-blur-sm border-b border-slate-200">
-                      <tr className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        <th scope="col" className="w-12 px-3 py-2.5 text-center">
-                          No
-                        </th>
-                        <th scope="col" className="px-3 py-2.5 min-w-[200px]">
-                          Siswa
-                        </th>
-                        <th scope="col" className="px-3 py-2.5 text-center w-[330px]">
-                          Status Presensi
-                        </th>
-                        <th scope="col" className="px-3 py-2.5 min-w-[220px]">
-                          Catatan / Keterangan KBM
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {filteredAndSortedStudents.map((s, idx) => {
-                        const currentStatus = items[s.siswa_id]?.status || "HADIR";
-                        const currentCatatan = items[s.siswa_id]?.catatan || "";
-                        const isAbsent = currentStatus !== "HADIR";
+            <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 sm:px-5 py-2 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari Nama / NISN"
+                  className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
+                />
+              </div>
+            </div>
 
-                        return (
-                          <tr
-                            key={s.siswa_id}
-                            className={`transition-colors ${
-                              isAbsent
-                                ? "bg-rose-50/30 hover:bg-rose-50/50"
-                                : idx % 2 === 0
-                                  ? "bg-white hover:bg-slate-50/80"
-                                  : "bg-slate-50/30 hover:bg-slate-50/80"
-                            }`}
-                          >
-                            {/* No. Absen */}
-                            <td className="px-3 py-2 text-center text-xs font-bold text-slate-500">
-                              <span
-                                className={`inline-flex items-center justify-center size-6 rounded-lg text-[11px] font-bold ${
-                                  isAbsent
-                                    ? "bg-rose-100 text-rose-700"
-                                    : "bg-slate-100 text-slate-600"
-                                }`}
-                              >
-                                {s.nomor_absen || idx + 1}
-                              </span>
-                            </td>
-
-                            {/* Identitas Siswa */}
-                            <td className="px-3 py-2 min-w-[200px]">
-                              <div className="flex items-center gap-2.5">
-                                <div className="size-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0 overflow-hidden">
-                                  {s.foto_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={s.foto_url}
-                                      alt={s.nama_lengkap}
-                                      className="size-full object-cover"
-                                    />
-                                  ) : (
-                                    s.nama_lengkap.slice(0, 2).toUpperCase()
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold text-slate-800 truncate leading-snug">
-                                    {s.nama_lengkap}
-                                  </p>
-                                  <p className="text-[10px] text-slate-400 font-mono leading-none pt-0.5">
-                                    {s.nisn
-                                      ? `NISN: ${s.nisn}`
-                                      : s.nis
-                                        ? `NIS: ${s.nis}`
-                                        : "Siswa Aktif"}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Segmented Control Status */}
-                            <td className="px-3 py-2 text-center w-[330px]">
-                              <div className="inline-flex rounded-xl p-0.5 bg-slate-100 border border-slate-200/80 shadow-2xs">
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(s.siswa_id, "HADIR")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                    currentStatus === "HADIR"
-                                      ? "bg-emerald-600 text-white shadow-xs"
-                                      : "text-slate-600 hover:text-emerald-700 hover:bg-white"
-                                  }`}
-                                >
-                                  Hadir
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(s.siswa_id, "IZIN")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                    currentStatus === "IZIN"
-                                      ? "bg-sky-600 text-white shadow-xs"
-                                      : "text-slate-600 hover:text-sky-700 hover:bg-white"
-                                  }`}
-                                >
-                                  Izin
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(s.siswa_id, "SAKIT")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                    currentStatus === "SAKIT"
-                                      ? "bg-amber-600 text-white shadow-xs"
-                                      : "text-slate-600 hover:text-amber-700 hover:bg-white"
-                                  }`}
-                                >
-                                  Sakit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(s.siswa_id, "ALPHA")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                    currentStatus === "ALPHA"
-                                      ? "bg-rose-600 text-white shadow-xs"
-                                      : "text-slate-600 hover:text-rose-700 hover:bg-white"
-                                  }`}
-                                >
-                                  Alpha
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(s.siswa_id, "DISPENSASI")}
-                                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                    currentStatus === "DISPENSASI"
-                                      ? "bg-purple-600 text-white shadow-xs"
-                                      : "text-slate-600 hover:text-purple-700 hover:bg-white"
-                                  }`}
-                                >
-                                  Disp.
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStatusChange(s.siswa_id, "TERLAMBAT")}
-                                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                    currentStatus === "TERLAMBAT"
-                                      ? "bg-orange-600 text-white shadow-xs"
-                                      : "text-slate-600 hover:text-orange-700 hover:bg-white"
-                                  }`}
-                                >
-                                  Terl.
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* Catatan / Keterangan KBM (Hanya aktif jika tidak Hadir) */}
-                            <td className="px-3 py-2 min-w-[220px]">
-                              {isAbsent ? (
-                                <input
-                                  type="text"
-                                  value={currentCatatan}
-                                  onChange={(e) => handleCatatanChange(s.siswa_id, e.target.value)}
-                                  placeholder="Alasan / no surat..."
-                                  className="w-full px-2.5 py-1 rounded-xl text-xs border border-amber-300 bg-amber-50/50 text-slate-900 font-medium placeholder-amber-700/60 focus:bg-white focus:ring-2 focus:ring-amber-400 shadow-2xs"
-                                  autoFocus
-                                />
-                              ) : (
-                                <span className="text-[11px] text-slate-400 italic pl-1">
-                                  — Hadir tepat waktu —
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            {/* ========================================================= */}
+            {/* STEP 2 & STEP 8: COMPACT STUDENT ROWS (56px–72px max)      */}
+            {/* LIST VIEW = Lihat Status                                  */}
+            {/* ========================================================= */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-2.5">
+              {filteredStudents.length === 0 ? (
+                <div className="p-10 text-center text-slate-400 space-y-2">
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                    Tidak ada siswa yang sesuai pencarian.
+                  </p>
                 </div>
               ) : (
-                /* ========================================================= */
-                /* MODE KARTU GRID (COMPACT GRID VIEW)                       */
-                /* ========================================================= */
-                <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filteredAndSortedStudents.map((s, idx) => {
+                <div className="space-y-1.5 pb-2">
+                  {filteredStudents.map((s) => {
                     const currentStatus = items[s.siswa_id]?.status || "HADIR";
                     const currentCatatan = items[s.siswa_id]?.catatan || "";
                     const isAbsent = currentStatus !== "HADIR";
 
                     return (
-                      <div
+                      <button
                         key={s.siswa_id}
-                        className={`p-3.5 rounded-2xl border transition-all space-y-2.5 ${
+                        type="button"
+                        onClick={() => handleOpenEditor(s.siswa_id)}
+                        aria-label={`Ubah presensi ${s.nama_lengkap}`}
+                        className={`w-full text-left h-[60px] px-3.5 py-2 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer group ${
                           isAbsent
-                            ? "bg-rose-50/40 border-rose-200/80 shadow-2xs"
-                            : "bg-white border-slate-200/80 hover:border-slate-300 shadow-2xs"
+                            ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-300/80 dark:border-amber-700/50 hover:bg-amber-100/60 dark:hover:bg-amber-950/30"
+                            : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span
-                              className={`size-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
-                                isAbsent
-                                  ? "bg-rose-100 text-rose-700"
-                                  : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              {s.nomor_absen || idx + 1}
+                        {/* Siswa Info */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono font-bold text-slate-400 w-5 shrink-0">
+                              {s.nomor_absen ? String(s.nomor_absen).padStart(2, "0") : "—"}
                             </span>
-                            <div className="min-w-0">
-                              <h4 className="text-xs font-bold text-slate-900 truncate">
-                                {s.nama_lengkap}
-                              </h4>
-                              <p className="text-[10px] text-slate-400 font-mono truncate">
-                                {s.nisn ? `NISN: ${s.nisn}` : s.nis ? `NIS: ${s.nis}` : "Siswa"}
-                              </p>
-                            </div>
+                            <h4 className="text-sm font-semibold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {s.nama_lengkap}
+                            </h4>
                           </div>
-
-                          <span
-                            className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase ${
-                              currentStatus === "HADIR"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : currentStatus === "IZIN"
-                                  ? "bg-sky-100 text-sky-700"
-                                  : currentStatus === "SAKIT"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : currentStatus === "ALPHA"
-                                      ? "bg-rose-100 text-rose-700"
-                                      : currentStatus === "DISPENSASI"
-                                        ? "bg-purple-100 text-purple-700"
-                                        : "bg-orange-100 text-orange-700"
-                            }`}
-                          >
-                            {currentStatus}
-                          </span>
+                          <div className="flex items-center gap-2 ml-7 mt-0.5">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                              {s.nisn || s.nis || "Siswa"}
+                            </span>
+                            {currentCatatan && (
+                              <span className="text-[11px] text-amber-600 dark:text-amber-400 truncate max-w-[140px] italic">
+                                • {currentCatatan}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Status Buttons in Card */}
-                        <div className="flex rounded-xl p-0.5 bg-slate-100 border border-slate-200/80 justify-between">
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(s.siswa_id, "HADIR")}
-                            className={`flex-1 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === "HADIR"
-                                ? "bg-emerald-600 text-white shadow-xs"
-                                : "text-slate-600 hover:text-emerald-700"
-                            }`}
-                          >
-                            Hadir
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(s.siswa_id, "IZIN")}
-                            className={`flex-1 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === "IZIN"
-                                ? "bg-sky-600 text-white shadow-xs"
-                                : "text-slate-600 hover:text-sky-700"
-                            }`}
-                          >
-                            Izin
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(s.siswa_id, "SAKIT")}
-                            className={`flex-1 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === "SAKIT"
-                                ? "bg-amber-600 text-white shadow-xs"
-                                : "text-slate-600 hover:text-amber-700"
-                            }`}
-                          >
-                            Sakit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(s.siswa_id, "ALPHA")}
-                            className={`flex-1 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === "ALPHA"
-                                ? "bg-rose-600 text-white shadow-xs"
-                                : "text-slate-600 hover:text-rose-700"
-                            }`}
-                          >
-                            Alpha
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(s.siswa_id, "DISPENSASI")}
-                            className={`px-1.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === "DISPENSASI"
-                                ? "bg-purple-600 text-white shadow-xs"
-                                : "text-slate-600 hover:text-purple-700"
-                            }`}
-                          >
-                            Disp.
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(s.siswa_id, "TERLAMBAT")}
-                            className={`px-1.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
-                              currentStatus === "TERLAMBAT"
-                                ? "bg-orange-600 text-white shadow-xs"
-                                : "text-slate-600 hover:text-orange-700"
-                            }`}
-                          >
-                            Terl.
-                          </button>
-                        </div>
+                        {/* Status Pill & Chevron */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {currentStatus === "HADIR" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-mono font-semibold">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                ✓
+                              </span>
+                              <span>Hadir</span>
+                            </span>
+                          )}
+                          {currentStatus === "SAKIT" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-mono font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                              <span>Sakit</span>
+                            </span>
+                          )}
+                          {currentStatus === "IZIN" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-mono font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                              <span>Izin</span>
+                            </span>
+                          )}
+                          {currentStatus === "ALPHA" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-mono font-semibold">
+                              <span className="text-rose-600 dark:text-rose-400 font-bold">✕</span>
+                              <span>Alpha</span>
+                            </span>
+                          )}
+                          {currentStatus === "DISPENSASI" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-mono font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
+                              <span>Dispensasi</span>
+                            </span>
+                          )}
+                          {currentStatus === "TERLAMBAT" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 text-xs font-mono font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+                              <span>Terlambat</span>
+                            </span>
+                          )}
 
-                        {/* Catatan Field (Hanya jika tidak Hadir) */}
-                        {isAbsent && (
-                          <input
-                            type="text"
-                            value={currentCatatan}
-                            onChange={(e) => handleCatatanChange(s.siswa_id, e.target.value)}
-                            placeholder="Alasan / no surat..."
-                            className="w-full px-2.5 py-1 rounded-xl border border-amber-300 bg-amber-50/50 text-xs text-slate-850 placeholder-amber-700/60 focus:bg-white focus:ring-1 focus:ring-amber-500"
-                          />
-                        )}
-                      </div>
+                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -927,60 +495,291 @@ function SessionAttendanceModalContent({
             </div>
 
             {/* ========================================================= */}
-            {/* FOOTER MODAL (STICKY AUDIT & ACTION FOOTER)               */}
+            {/* STEP 7: STICKY FOOTER: 27 siswa selesai | [Tutup] | [Simpan] */}
             {/* ========================================================= */}
-            <div className="p-3 sm:p-4 border-t border-slate-200 bg-slate-50/95 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-              {/* Alasan Koreksi jika sudah pernah diabsen */}
-              <div className="flex-1 max-w-md">
-                {sessionData?.sudah_diabsen ? (
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-amber-500 shrink-0" />
-                    <input
-                      type="text"
-                      value={alasanKoreksi}
-                      onChange={(e) => setAlasanKoreksi(e.target.value)}
-                      placeholder="Alasan koreksi (opsional)..."
-                      className="w-full px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50/40 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                    />
-                  </div>
-                ) : (
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                    Data presensi langsung tersimpan dan terekam ke rekapitulasi semester.
-                  </span>
-                )}
-              </div>
+            <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky bottom-0 z-20 space-y-2 shrink-0">
+              {/* Alasan Koreksi jika sesi sudah pernah diabsen sebelumnya */}
+              {sessionData?.sudah_diabsen && (
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-amber-500 shrink-0" />
+                  <input
+                    type="text"
+                    value={alasanKoreksi}
+                    onChange={(e) => setAlasanKoreksi(e.target.value)}
+                    placeholder="Alasan koreksi (opsional)..."
+                    className="w-full h-8 px-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                  />
+                </div>
+              )}
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer"
-                >
-                  Tutup
-                </button>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                  {totalSiswa} siswa selesai
+                </span>
 
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Menyimpan Presensi...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>Simpan Presensi Kelas ({totalSiswa} Siswa)</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    aria-label="Simpan Presensi Kelas"
+                    className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] text-white text-xs sm:text-sm font-mono font-bold shadow-[0_4px_14px_rgba(37,99,235,0.10)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.16)] flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:hover:scale-100 disabled:shadow-none"
+                  >
+                    {isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Menyimpan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        <span>Simpan Presensi</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </form>
+        )}
+
+        {/* ========================================================= */}
+        {/* STEP 3 & STEP 4: BOTTOM SHEET EDITOR (Detail View)        */}
+        {/* Real Apple Glass Radio Buttons & Catatan                   */}
+        {/* ========================================================= */}
+        {editingStudentId && activeStudent && (
+          <div className="absolute inset-0 z-30 bg-slate-950/40 backdrop-blur-xs flex items-end justify-center animate-in fade-in duration-150">
+            <div className="w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-t-3xl border-t border-x border-slate-200/80 dark:border-slate-800 p-5 shadow-2xl animate-in slide-in-from-bottom duration-200 space-y-4 max-h-[90%] overflow-y-auto">
+              {/* Handle Bar */}
+              <div className="w-12 h-1 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto" />
+
+              {/* Header Bottom Sheet */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white truncate">
+                    {activeStudent.nama_lengkap}
+                  </h3>
+                  <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                    {activeStudent.nisn || activeStudent.nis || "Siswa"}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setEditingStudentId(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  aria-label="Tutup Editor"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Status Presensi Title */}
+              <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Status Presensi
+              </div>
+
+              {/* REAL GLASS RADIO BUTTONS (Apple Glass Style, backdrop-blur-xl, scale 1.02, 150ms) */}
+              <div
+                className="grid grid-cols-2 sm:grid-cols-3 gap-2.5"
+                role="radiogroup"
+                aria-label="Status Presensi"
+              >
+                {/* HADIR */}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draftStatus === "HADIR"}
+                  onClick={() => setDraftStatus("HADIR")}
+                  className={`h-13 px-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 backdrop-blur-xl cursor-pointer ${
+                    draftStatus === "HADIR"
+                      ? "bg-emerald-500/15 dark:bg-emerald-500/25 border border-emerald-500/50 dark:border-emerald-400/50 text-emerald-900 dark:text-emerald-200 shadow-[0_4px_16px_rgba(16,185,129,0.18)] scale-[1.02]"
+                      : "bg-white/45 dark:bg-slate-800/45 border border-white/60 dark:border-white/10 shadow-xs text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono">Hadir</span>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      draftStatus === "HADIR"
+                        ? "border-emerald-600 dark:border-emerald-400 bg-emerald-600 dark:bg-emerald-400"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {draftStatus === "HADIR" && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </button>
+
+                {/* SAKIT */}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draftStatus === "SAKIT"}
+                  onClick={() => setDraftStatus("SAKIT")}
+                  className={`h-13 px-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 backdrop-blur-xl cursor-pointer ${
+                    draftStatus === "SAKIT"
+                      ? "bg-amber-500/15 dark:bg-amber-500/25 border border-amber-500/50 dark:border-amber-400/50 text-amber-900 dark:text-amber-200 shadow-[0_4px_16px_rgba(245,158,11,0.18)] scale-[1.02]"
+                      : "bg-white/45 dark:bg-slate-800/45 border border-white/60 dark:border-white/10 shadow-xs text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono">Sakit</span>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      draftStatus === "SAKIT"
+                        ? "border-amber-600 dark:border-amber-400 bg-amber-600 dark:bg-amber-400"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {draftStatus === "SAKIT" && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </button>
+
+                {/* IZIN */}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draftStatus === "IZIN"}
+                  onClick={() => setDraftStatus("IZIN")}
+                  className={`h-13 px-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 backdrop-blur-xl cursor-pointer ${
+                    draftStatus === "IZIN"
+                      ? "bg-blue-500/15 dark:bg-blue-500/25 border border-blue-500/50 dark:border-blue-400/50 text-blue-900 dark:text-blue-200 shadow-[0_4px_16px_rgba(59,130,246,0.18)] scale-[1.02]"
+                      : "bg-white/45 dark:bg-slate-800/45 border border-white/60 dark:border-white/10 shadow-xs text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono">Izin</span>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      draftStatus === "IZIN"
+                        ? "border-blue-600 dark:border-blue-400 bg-blue-600 dark:bg-blue-400"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {draftStatus === "IZIN" && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </button>
+
+                {/* ALPHA */}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draftStatus === "ALPHA"}
+                  onClick={() => setDraftStatus("ALPHA")}
+                  className={`h-13 px-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 backdrop-blur-xl cursor-pointer ${
+                    draftStatus === "ALPHA"
+                      ? "bg-rose-500/15 dark:bg-rose-500/25 border border-rose-500/50 dark:border-rose-400/50 text-rose-900 dark:text-rose-200 shadow-[0_4px_16px_rgba(244,63,94,0.18)] scale-[1.02]"
+                      : "bg-white/45 dark:bg-slate-800/45 border border-white/60 dark:border-white/10 shadow-xs text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono">Alpha</span>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      draftStatus === "ALPHA"
+                        ? "border-rose-600 dark:border-rose-400 bg-rose-600 dark:bg-rose-400"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {draftStatus === "ALPHA" && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </button>
+
+                {/* DISPENSASI */}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draftStatus === "DISPENSASI"}
+                  onClick={() => setDraftStatus("DISPENSASI")}
+                  className={`h-13 px-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 backdrop-blur-xl cursor-pointer ${
+                    draftStatus === "DISPENSASI"
+                      ? "bg-purple-500/15 dark:bg-purple-500/25 border border-purple-500/50 dark:border-purple-400/50 text-purple-900 dark:text-purple-200 shadow-[0_4px_16px_rgba(168,85,247,0.18)] scale-[1.02]"
+                      : "bg-white/45 dark:bg-slate-800/45 border border-white/60 dark:border-white/10 shadow-xs text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono">Dispensasi</span>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      draftStatus === "DISPENSASI"
+                        ? "border-purple-600 dark:border-purple-400 bg-purple-600 dark:bg-purple-400"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {draftStatus === "DISPENSASI" && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                </button>
+
+                {/* TERLAMBAT */}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draftStatus === "TERLAMBAT"}
+                  onClick={() => setDraftStatus("TERLAMBAT")}
+                  className={`h-13 px-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 backdrop-blur-xl cursor-pointer ${
+                    draftStatus === "TERLAMBAT"
+                      ? "bg-orange-500/15 dark:bg-orange-500/25 border border-orange-500/50 dark:border-orange-400/50 text-orange-900 dark:text-orange-200 shadow-[0_4px_16px_rgba(249,115,22,0.18)] scale-[1.02]"
+                      : "bg-white/45 dark:bg-slate-800/45 border border-white/60 dark:border-white/10 shadow-xs text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono">Terlambat</span>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      draftStatus === "TERLAMBAT"
+                        ? "border-orange-600 dark:border-orange-400 bg-orange-600 dark:bg-orange-400"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {draftStatus === "TERLAMBAT" && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              {/* CATATAN / ALASAN */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
+                  Catatan
+                </label>
+                <textarea
+                  rows={2}
+                  value={draftCatatan}
+                  onChange={(e) => setDraftCatatan(e.target.value)}
+                  placeholder="Tulis alasan..."
+                  className="w-full min-h-[50px] p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] resize-none"
+                />
+              </div>
+
+              {/* BOTTOM SHEET FOOTER: [Simpan] */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleSaveEditor}
+                  className="w-full h-11 sm:h-12 rounded-xl bg-[#2563EB] hover:bg-blue-700 active:scale-[0.99] text-white text-sm font-mono font-bold shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Simpan</span>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>,

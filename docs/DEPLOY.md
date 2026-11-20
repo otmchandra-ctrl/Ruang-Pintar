@@ -16,13 +16,15 @@
 
 ## 1. Target Lingkungan & Prasyarat Sistem
 
-Ruang Pintar dioptimalkan untuk berjalan dengan arsitektur **Modular Monolith Next.js** dengan penyimpanan **SQLite** terkelola (atau turunan serverless/containerized mount):
+Ruang Pintar menggunakan arsitektur **Modular Monolith Next.js**. SQLite menjadi database pengembangan lokal; deployment Vercel menggunakan PostgreSQL Supabase. File upload masih memakai local storage dan harus dipindahkan ke storage persisten sebelum fitur upload digunakan di Vercel.
 
 - **Runtime:** Node.js v20.x atau v22.x LTS.
 - **Package Manager:** `npm` v10+ (atau kompatibel).
-- **Database Engine:** SQLite (lokasi file database diatur via variabel `DATABASE_URL`).
+- **Database lokal:** SQLite (`DATABASE_URL=file:./data/ruang-pintar.db`).
+- **Database production:** Supabase PostgreSQL. Runtime Vercel memakai connection string pooler di `DATABASE_URL`; migrasi Prisma memakai koneksi direct/session pooler di `DIRECT_URL`.
 - **Prasyarat Konfigurasi `.env`:**
-  - `DATABASE_URL`: URI path absolut/relatif ke file SQLite (contoh: `file:./data/ruang_pintar.db`).
+  - `DATABASE_URL`: SQLite lokal atau Supabase pooler saat production.
+  - `DIRECT_URL`: Supabase direct/session pooler untuk perintah migrasi Prisma.
   - `AUTH_SECRET`: Kunci rahasia enkripsi token sesi (minimal 32 karakter acak).
   - `NODE_ENV`: Diset ke `production` saat rilis.
   - `MIDTRANS_SERVER_KEY` / `MIDTRANS_CLIENT_KEY`: Kunci integrasi gateway pembayaran (opsional pada mode simulasi).
@@ -82,7 +84,7 @@ Setelah layanan berhasil di-restart, lakukan verifikasi cepat (*smoke test*):
 3. **Pemeriksaan Isolasi Tenant:**
    - Masuk ke dashboard dan pastikan data sekolah yang ditampilkan sesuai dengan `sekolah_aktif_id` pengguna.
 4. **Pemeriksaan Health Log:**
-   - Periksa log aplikasi untuk memastikan tidak ada unhandled exception atau kegagalan koneksi SQLite.
+   - Periksa log aplikasi untuk memastikan tidak ada unhandled exception atau kegagalan koneksi PostgreSQL.
 
 ---
 
@@ -90,20 +92,47 @@ Setelah layanan berhasil di-restart, lakukan verifikasi cepat (*smoke test*):
 
 ### Kondisi Pemicu Rollback (*Rollback Triggers*):
 - Layanan aplikasi mengalami crash berulang (*crash loop*) pasca-start.
-- Terjadi kegagalan query kritis atau database corruption pada SQLite.
+- Terjadi kegagalan query kritis atau database corruption pada PostgreSQL.
 - Ditemukan kebocoran data antar-tenant (*data leakage*) atau kegagalan otorisasi fatal.
 
 ### Langkah Eksekusi Rollback:
 1. **Hentikan Layanan Sementara:**
    Aktifkan halaman pemeliharaan sementara (*maintenance page*).
-2. **Kembalikan Database Snapshot:**
-   Salin kembali snapshot file database SQLite yang telah di-backup sebelum rilis dimulai:
-   ```bash
-   cp /backup/ruang_pintar_pre_deploy.db ./data/ruang_pintar.db
-   ```
+2. **Pulihkan Database Snapshot:**
+   Pulihkan backup Supabase ke project PostgreSQL baru atau titik pemulihan yang sesuai. Jangan arahkan aplikasi sesudah cutover ke file SQLite lama karena perubahan setelah cutover tidak tercatat di SQLite.
 3. **Kembalikan Versi Build Sebelumnya:**
    Checkout commit rilis stabil sebelumnya atau pulihkan build artifact `.next` sebelumnya.
 4. **Restart Layanan & Verifikasi Ulang:**
    Nyalakan kembali aplikasi dan jalankan smoke check untuk memastikan platform kembali stabil.
 5. **Dokumentasikan Insiden:**
    Catat penyebab kegagalan dan eskalasikan ke tim pengembang untuk remediasi sebelum jadwal rilis berikutnya.
+
+---
+
+## 6. Persiapan Database Supabase
+
+1. Buat project Supabase PostgreSQL dan simpan connection strings sebagai secret server-side di Vercel. Gunakan pooled URL untuk `DATABASE_URL` aplikasi dan direct/session pooler untuk `DIRECT_URL` migrasi.
+2. Siapkan salinan backup file SQLite sumber. Biarkan `DATABASE_URL` lokal tetap menunjuk ke SQLite dan tambahkan `DIRECT_URL` Supabase di `.env`. Jalankan baseline untuk membuat skema PostgreSQL kosong:
+   ```powershell
+   $env:DIRECT_URL = '<Supabase direct/session pooler URL>'
+   npm run db:migrate:supabase
+   ```
+3. Setelah baseline diterapkan ke skema kosong, transfer data:
+   ```powershell
+   # Tambahkan TARGET_DATABASE_URL='<Supabase direct/session pooler URL>' ke .env.
+   # DATABASE_URL SQLite yang sudah ada otomatis dipakai sebagai sumber.
+   npm run db:transfer:supabase
+   ```
+   Skrip menolak target yang berisi data, menyalin model menurut dependensi, lalu mencocokkan jumlah baris dan SHA-256 isi setiap tabel. Jika gagal di tengah proses, jangan gunakan target itu; siapkan database kosong baru sebelum mencoba ulang.
+4. Atur Vercel untuk memakai pooled `DATABASE_URL` Supabase dan `DIRECT_URL`. `vercel.json` menjalankan Prisma Client PostgreSQL sebelum build.
+5. Sebelum cutover data aktif, hentikan sementara penulisan ke aplikasi SQLite, ambil backup terakhir, transfer, cocokkan ringkasan data, lalu arahkan Vercel ke Supabase. Jangan hapus SQLite sampai pemilik memverifikasi hasil.
+
+### Pemindahan file ke Supabase Storage
+
+1. Buat bucket bernama `ruang-pintar-private` dengan akses publik **nonaktif** di Supabase Storage.
+2. Siapkan `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, dan `SUPABASE_STORAGE_BUCKET` hanya sebagai secret server-side. Kunci service role melewati RLS dan tidak boleh masuk ke kode browser atau Git.
+3. Sebelum cutover database, jalankan `npm run storage:transfer:supabase` saat `.env` masih menunjuk ke SQLite lokal. Skrip membaca file aktif, memeriksa checksum lokal, mengunggah lalu mengunduh ulang untuk memverifikasi checksum, dan baru kemudian mengubah `storage_provider`. File lokal dipertahankan untuk rollback.
+4. Pastikan ringkasan menunjukkan seluruh file aktif berhasil dipindahkan. Set `STORAGE_PROVIDER=SUPABASE` pada Vercel agar upload baru masuk ke bucket privat.
+5. Endpoint aplikasi tetap memeriksa autentikasi dan sekolah sebelum membaca berkas. Jangan menyajikan URL publik untuk berkas sekolah.
+
+Penyimpanan lokal tetap didukung untuk development. Vercel memakai filesystem ephemeral sehingga produksi wajib menggunakan provider persisten.

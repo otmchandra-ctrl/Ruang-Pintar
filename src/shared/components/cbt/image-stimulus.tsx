@@ -21,18 +21,36 @@ export function ImageStimulus({
 
   if (!src) return null;
 
+  // Ekstrak ukuran dinamis dari hash fragment (#size=SM/MD/LG/FULL atau #w=420)
+  const [cleanSrc, hash] = src.split("#");
+  const sizeParam = hash?.match(/size=([a-zA-Z]+)/i)?.[1]?.toUpperCase();
+  const widthParam = hash?.match(/(?:width|w)=(\d+)/i)?.[1];
+  const customWidthPx = widthParam ? parseInt(widthParam, 10) : undefined;
+
+  let sizeClassName = "max-w-md"; // default ~50%
+  if (sizeParam === "SM") {
+    sizeClassName = "max-w-[200px]"; // ~25%
+  } else if (sizeParam === "MD") {
+    sizeClassName = "max-w-[360px]"; // ~50%
+  } else if (sizeParam === "LG") {
+    sizeClassName = "max-w-[540px]"; // ~75%
+  } else if (sizeParam === "FULL") {
+    sizeClassName = "max-w-full w-full"; // ~100%
+  }
+
   return (
     <>
       <div className={`relative my-2.5 inline-block group ${className}`}>
         <div
           onClick={() => setIsOpen(true)}
-          className="relative max-w-md max-h-80 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 cursor-zoom-in transition-all group-hover:shadow-md"
+          style={customWidthPx ? { maxWidth: `${customWidthPx}px` } : undefined}
+          className={`relative ${customWidthPx ? "w-full" : sizeClassName} max-h-96 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 cursor-zoom-in transition-all group-hover:shadow-md`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={src}
+            src={cleanSrc}
             alt={alt}
-            className="w-full h-auto max-h-80 object-contain rounded-xl"
+            className="w-full h-auto max-h-96 object-contain rounded-xl"
             loading="lazy"
           />
           {/* Overlay hover cue */}
@@ -70,7 +88,7 @@ export function ImageStimulus({
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={src}
+              src={cleanSrc}
               alt={alt}
               className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/10"
             />

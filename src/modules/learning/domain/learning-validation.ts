@@ -29,12 +29,14 @@ export const UpdateLingkupMateriSchema = z.object({
 export const CreateTujuanPembelajaranSchema = z.object({
   sekolah_id: z.string().min(1, "ID Sekolah wajib diisi"),
   lingkup_materi_id: z.string().min(1, "ID Lingkup Materi wajib diisi"),
+  capaian_pembelajaran_id: z.string().optional().nullable(),
   kode: z.string().trim().max(30).optional().nullable(),
   deskripsi: z.string().trim().min(5, "Deskripsi Tujuan Pembelajaran minimal 5 karakter").max(500),
   urutan: z.coerce.number().int().min(1).default(1),
 });
 
 export const UpdateTujuanPembelajaranSchema = z.object({
+  capaian_pembelajaran_id: z.string().optional().nullable(),
   kode: z.string().trim().max(30).optional().nullable(),
   deskripsi: z
     .string()
@@ -109,4 +111,41 @@ export const UpdateAdministrasiSchema = z.object({
   catatan_refleksi: z.string().trim().max(1000).optional().nullable(),
   status_realisasi: z.enum(["TERLAKSANA", "TERTUNDA", "DIGANTI"]).optional(),
   tp_ids: z.array(z.string()).optional(),
+});
+
+export const CreateCapaianPembelajaranSchema = z.object({
+  sekolah_id: z.string().min(1, "ID Sekolah wajib diisi"),
+  mata_pelajaran_id: z.string().min(1, "ID Mata Pelajaran wajib diisi"),
+  fase_id: z.string().min(1, "ID Fase wajib diisi"),
+  kode: z.string().trim().min(3, "Kode CP minimal 3 karakter").max(50),
+  elemen: z.string().trim().max(100).optional().nullable(),
+  deskripsi: z.string().trim().min(10, "Deskripsi CP minimal 10 karakter").max(2000),
+  urutan: z.coerce.number().int().min(1).default(1),
+});
+
+export const UpdateCapaianPembelajaranSchema = z.object({
+  kode: z.string().trim().min(3).max(50).optional(),
+  elemen: z.string().trim().max(100).optional().nullable(),
+  deskripsi: z.string().trim().min(10).max(2000).optional(),
+  urutan: z.coerce.number().int().min(1).optional(),
+  status: z.enum(["AKTIF", "NONAKTIF", "ARSIP"]).optional(),
+});
+
+export const IntervalKktpItemSchema = z.object({
+  rentang_min: z.number().min(0).max(100),
+  rentang_max: z.number().min(0).max(100),
+  predikat: z.enum(["PERLU_BIMBINGAN", "CUKUP", "BAIK", "SANGAT_BAIK"]),
+  tindak_lanjut: z.string().trim().min(2, "Deskripsi tindak lanjut minimal 2 karakter"),
+});
+
+export const UpsertKriteriaKetercapaianTpSchema = z.object({
+  sekolah_id: z.string().min(1, "ID Sekolah wajib diisi"),
+  tujuan_pembelajaran_id: z.string().min(1, "ID Tujuan Pembelajaran wajib diisi"),
+  tipe_kktp: z
+    .enum(["SKALA_INTERVAL", "RUBRIK_DESKRIPTIF", "DAFTAR_KRITERIA"])
+    .default("SKALA_INTERVAL"),
+  ambang_tuntas: z.coerce.number().min(0).max(100).default(75.0),
+  interval_data: z.array(IntervalKktpItemSchema).optional().nullable(),
+  rubrik_data: z.array(z.record(z.string(), z.unknown())).optional().nullable(),
+  deskripsi: z.string().trim().max(1000).optional().nullable(),
 });

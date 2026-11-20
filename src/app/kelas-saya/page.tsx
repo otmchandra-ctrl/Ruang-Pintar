@@ -94,7 +94,7 @@ export default async function KelasSayaPage() {
         { label: isAdmin ? "Supervisi Pembelajaran" : "Kelas Saya" },
       ]}
     >
-      <div className="pt-2 sm:pt-4">
+      <div className="pt-2 sm:pt-4 w-full max-w-7xl mx-auto">
         <TeacherClassesView
           classes={classes}
           teacherName={teacherName}

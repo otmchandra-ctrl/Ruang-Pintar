@@ -6,6 +6,7 @@ import { ConcentricRingGauge } from "@/shared/components/motion/concentric-ring-
 import { StaggeredBarChart } from "@/shared/components/motion/staggered-bar-chart";
 import { SlideOverDrawer } from "@/shared/components/motion/slide-over-drawer";
 import { AttentionCenterDrilldown } from "@/shared/components/dashboard/cockpit/attention-center-drilldown";
+import { SpotlightCard, ParallaxTilt } from "@/shared/components/motion/motion-elements";
 
 describe("Motion Components Suite (Pathway LMS & DotKrafts Inspirations)", () => {
   it("AnimatedCounter merender angka target dengan prefix dan suffix di environment test", () => {
@@ -125,5 +126,39 @@ describe("Motion Components Suite (Pathway LMS & DotKrafts Inspirations)", () =>
     expect(screen.getByText("Daftar Siswa Alpha Kritis")).toBeDefined();
     expect(screen.getByText("Fajar Pratama")).toBeDefined();
     expect(screen.getByText("X RPL 1 • 3 Hari Alpha berturut-turut")).toBeDefined();
+  });
+
+  it("SpotlightCard merender konten dan merespons interaksi mousemove/mouseleave", () => {
+    const { container } = render(
+      <SpotlightCard className="test-spotlight-card">
+        <span data-testid="spotlight-content">Kartu Interaktif</span>
+      </SpotlightCard>
+    );
+
+    expect(screen.getByTestId("spotlight-content")).toBeDefined();
+    const card = container.querySelector(".test-spotlight-card");
+    expect(card).toBeDefined();
+
+    if (card) {
+      fireEvent.mouseMove(card, { clientX: 50, clientY: 50 });
+      fireEvent.mouseLeave(card);
+    }
+  });
+
+  it("ParallaxTilt merender children dengan konfigurasi 3D preserve-3d", () => {
+    const { container } = render(
+      <ParallaxTilt maxTilt={8} className="test-parallax-tilt">
+        <div data-testid="parallax-content">Hero iPad Mockup</div>
+      </ParallaxTilt>
+    );
+
+    expect(screen.getByTestId("parallax-content")).toBeDefined();
+    const element = container.querySelector(".test-parallax-tilt");
+    expect(element).toBeDefined();
+
+    if (element) {
+      fireEvent.mouseMove(element, { clientX: 100, clientY: 80 });
+      fireEvent.mouseLeave(element);
+    }
   });
 });

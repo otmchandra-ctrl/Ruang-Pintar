@@ -21,6 +21,13 @@ import {
   UpdateTujuanPembelajaranInput,
   AdministrasiPembelajaranDTO,
   DefinisiTugasDTO,
+  CapaianPembelajaranDTO,
+  CreateCapaianPembelajaranInput,
+  UpdateCapaianPembelajaranInput,
+  KriteriaKetercapaianTpDTO,
+  UpsertKktpInput,
+  CurriculumLineageNodeDTO,
+  ClassActivityItemDTO,
 } from "../domain/learning-types";
 
 export class LearningRepository {
@@ -540,6 +547,7 @@ export class LearningRepository {
         id,
         sekolah_id: input.sekolah_id,
         lingkup_materi_id: input.lingkup_materi_id,
+        capaian_pembelajaran_id: input.capaian_pembelajaran_id || null,
         kode: input.kode || null,
         deskripsi: input.deskripsi,
         urutan: input.urutan || 1,
@@ -568,6 +576,10 @@ export class LearningRepository {
     const updated = await prisma.tujuanPembelajaran.update({
       where: { id },
       data: {
+        capaian_pembelajaran_id:
+          input.capaian_pembelajaran_id !== undefined
+            ? input.capaian_pembelajaran_id
+            : existing.capaian_pembelajaran_id,
         kode: input.kode,
         deskripsi: input.deskripsi,
         urutan: input.urutan,
@@ -592,6 +604,384 @@ export class LearningRepository {
     await prisma.tujuanPembelajaran.delete({
       where: { id },
     });
+  }
+
+  // ==========================================
+  // CAPAIAN PEMBELAJARAN (CP)
+  // ==========================================
+
+  async listCapaianPembelajaran(
+    sekolahId: string,
+    filter?: { mataPelajaranId?: string; faseId?: string; status?: string }
+  ): Promise<CapaianPembelajaranDTO[]> {
+    const where: any = { sekolah_id: sekolahId };
+    if (filter?.mataPelajaranId) where.mata_pelajaran_id = filter.mataPelajaranId;
+    if (filter?.faseId) where.fase_id = filter.faseId;
+    if (filter?.status) where.status = filter.status;
+
+    const list = await prisma.capaianPembelajaran.findMany({
+      where,
+      include: {
+        mata_pelajaran: true,
+        fase: true,
+        _count: { select: { tujuan_pembelajaran: true } },
+      },
+      orderBy: [{ urutan: "asc" }, { kode: "asc" }],
+    });
+
+    return list.map((cp) => ({
+      id: cp.id,
+      sekolah_id: cp.sekolah_id,
+      mata_pelajaran_id: cp.mata_pelajaran_id,
+      mata_pelajaran_nama: cp.mata_pelajaran.nama,
+      mata_pelajaran_kode: cp.mata_pelajaran.kode,
+      fase_id: cp.fase_id,
+      fase_nama: cp.fase.nama,
+      fase_kode: cp.fase.kode,
+      kode: cp.kode,
+      elemen: cp.elemen,
+      deskripsi: cp.deskripsi,
+      urutan: cp.urutan,
+      status: cp.status as any,
+      created_at: cp.created_at,
+      updated_at: cp.updated_at,
+      tujuan_pembelajaran_count: cp._count.tujuan_pembelajaran,
+    }));
+  }
+
+  async getCapaianPembelajaranById(
+    sekolahId: string,
+    id: string
+  ): Promise<CapaianPembelajaranDTO | null> {
+    const cp = await prisma.capaianPembelajaran.findFirst({
+      where: { id, sekolah_id: sekolahId },
+      include: {
+        mata_pelajaran: true,
+        fase: true,
+        _count: { select: { tujuan_pembelajaran: true } },
+      },
+    });
+
+    if (!cp) return null;
+
+    return {
+      id: cp.id,
+      sekolah_id: cp.sekolah_id,
+      mata_pelajaran_id: cp.mata_pelajaran_id,
+      mata_pelajaran_nama: cp.mata_pelajaran.nama,
+      mata_pelajaran_kode: cp.mata_pelajaran.kode,
+      fase_id: cp.fase_id,
+      fase_nama: cp.fase.nama,
+      fase_kode: cp.fase.kode,
+      kode: cp.kode,
+      elemen: cp.elemen,
+      deskripsi: cp.deskripsi,
+      urutan: cp.urutan,
+      status: cp.status as any,
+      created_at: cp.created_at,
+      updated_at: cp.updated_at,
+      tujuan_pembelajaran_count: cp._count.tujuan_pembelajaran,
+    };
+  }
+
+  async createCapaianPembelajaran(
+    input: CreateCapaianPembelajaranInput
+  ): Promise<CapaianPembelajaranDTO> {
+    const id = generateUlid();
+    const created = await prisma.capaianPembelajaran.create({
+      data: {
+        id,
+        sekolah_id: input.sekolah_id,
+        mata_pelajaran_id: input.mata_pelajaran_id,
+        fase_id: input.fase_id,
+        kode: input.kode,
+        elemen: input.elemen || null,
+        deskripsi: input.deskripsi,
+        urutan: input.urutan || 1,
+        status: "AKTIF",
+      },
+      include: {
+        mata_pelajaran: true,
+        fase: true,
+        _count: { select: { tujuan_pembelajaran: true } },
+      },
+    });
+
+    return {
+      id: created.id,
+      sekolah_id: created.sekolah_id,
+      mata_pelajaran_id: created.mata_pelajaran_id,
+      mata_pelajaran_nama: created.mata_pelajaran.nama,
+      mata_pelajaran_kode: created.mata_pelajaran.kode,
+      fase_id: created.fase_id,
+      fase_nama: created.fase.nama,
+      fase_kode: created.fase.kode,
+      kode: created.kode,
+      elemen: created.elemen,
+      deskripsi: created.deskripsi,
+      urutan: created.urutan,
+      status: created.status as any,
+      created_at: created.created_at,
+      updated_at: created.updated_at,
+      tujuan_pembelajaran_count: created._count.tujuan_pembelajaran,
+    };
+  }
+
+  async updateCapaianPembelajaran(
+    sekolahId: string,
+    id: string,
+    input: UpdateCapaianPembelajaranInput
+  ): Promise<CapaianPembelajaranDTO> {
+    const existing = await prisma.capaianPembelajaran.findFirst({
+      where: { id, sekolah_id: sekolahId },
+    });
+    if (!existing) {
+      throw new Error(`Capaian Pembelajaran dengan ID '${id}' tidak ditemukan.`);
+    }
+
+    const updated = await prisma.capaianPembelajaran.update({
+      where: { id },
+      data: {
+        kode: input.kode,
+        elemen: input.elemen,
+        deskripsi: input.deskripsi,
+        urutan: input.urutan,
+        status: input.status,
+      },
+      include: {
+        mata_pelajaran: true,
+        fase: true,
+        _count: { select: { tujuan_pembelajaran: true } },
+      },
+    });
+
+    return {
+      id: updated.id,
+      sekolah_id: updated.sekolah_id,
+      mata_pelajaran_id: updated.mata_pelajaran_id,
+      mata_pelajaran_nama: updated.mata_pelajaran.nama,
+      mata_pelajaran_kode: updated.mata_pelajaran.kode,
+      fase_id: updated.fase_id,
+      fase_nama: updated.fase.nama,
+      fase_kode: updated.fase.kode,
+      kode: updated.kode,
+      elemen: updated.elemen,
+      deskripsi: updated.deskripsi,
+      urutan: updated.urutan,
+      status: updated.status as any,
+      created_at: updated.created_at,
+      updated_at: updated.updated_at,
+      tujuan_pembelajaran_count: updated._count.tujuan_pembelajaran,
+    };
+  }
+
+  async deleteCapaianPembelajaran(sekolahId: string, id: string): Promise<void> {
+    const existing = await prisma.capaianPembelajaran.findFirst({
+      where: { id, sekolah_id: sekolahId },
+      include: { _count: { select: { tujuan_pembelajaran: true, bank_soal: true } } },
+    });
+    if (!existing) {
+      throw new Error(`Capaian Pembelajaran dengan ID '${id}' tidak ditemukan.`);
+    }
+    if (existing._count.tujuan_pembelajaran > 0) {
+      throw new Error("Tidak dapat menghapus CP yang masih memiliki Tujuan Pembelajaran terkait.");
+    }
+
+    await prisma.capaianPembelajaran.delete({ where: { id } });
+  }
+
+  // ==========================================
+  // KRITERIA KETERCAPAIAN TP (KKTP)
+  // ==========================================
+
+  async getKktpByTpId(
+    sekolahId: string,
+    tujuanPembelajaranId: string
+  ): Promise<KriteriaKetercapaianTpDTO | null> {
+    const kktp = await prisma.kriteriaKetercapaianTp.findFirst({
+      where: {
+        tujuan_pembelajaran_id: tujuanPembelajaranId,
+        sekolah_id: sekolahId,
+      },
+    });
+
+    if (!kktp) return null;
+
+    return {
+      id: kktp.id,
+      sekolah_id: kktp.sekolah_id,
+      tujuan_pembelajaran_id: kktp.tujuan_pembelajaran_id,
+      tipe_kktp: kktp.tipe_kktp as any,
+      ambang_tuntas: kktp.ambang_tuntas,
+      interval_data: kktp.interval_json ? JSON.parse(kktp.interval_json) : null,
+      rubrik_data: kktp.rubrik_json ? JSON.parse(kktp.rubrik_json) : null,
+      deskripsi: kktp.deskripsi,
+      created_at: kktp.created_at,
+      updated_at: kktp.updated_at,
+    };
+  }
+
+  async upsertKktp(input: UpsertKktpInput): Promise<KriteriaKetercapaianTpDTO> {
+    const tp = await prisma.tujuanPembelajaran.findFirst({
+      where: { id: input.tujuan_pembelajaran_id, sekolah_id: input.sekolah_id },
+    });
+    if (!tp) {
+      throw new Error("Tujuan pembelajaran tidak ditemukan.");
+    }
+
+    const intervalJson = input.interval_data ? JSON.stringify(input.interval_data) : null;
+    const rubrikJson = input.rubrik_data ? JSON.stringify(input.rubrik_data) : null;
+
+    const existing = await prisma.kriteriaKetercapaianTp.findUnique({
+      where: { tujuan_pembelajaran_id: input.tujuan_pembelajaran_id },
+    });
+
+    let saved;
+    if (existing) {
+      saved = await prisma.kriteriaKetercapaianTp.update({
+        where: { id: existing.id },
+        data: {
+          tipe_kktp: input.tipe_kktp || existing.tipe_kktp,
+          ambang_tuntas:
+            input.ambang_tuntas !== undefined ? input.ambang_tuntas : existing.ambang_tuntas,
+          interval_json: intervalJson !== undefined ? intervalJson : existing.interval_json,
+          rubrik_json: rubrikJson !== undefined ? rubrikJson : existing.rubrik_json,
+          deskripsi: input.deskripsi !== undefined ? input.deskripsi : existing.deskripsi,
+        },
+      });
+    } else {
+      const id = generateUlid();
+      saved = await prisma.kriteriaKetercapaianTp.create({
+        data: {
+          id,
+          sekolah_id: input.sekolah_id,
+          tujuan_pembelajaran_id: input.tujuan_pembelajaran_id,
+          tipe_kktp: input.tipe_kktp || "SKALA_INTERVAL",
+          ambang_tuntas: input.ambang_tuntas ?? 75.0,
+          interval_json: intervalJson,
+          rubrik_json: rubrikJson,
+          deskripsi: input.deskripsi || null,
+        },
+      });
+    }
+
+    return {
+      id: saved.id,
+      sekolah_id: saved.sekolah_id,
+      tujuan_pembelajaran_id: saved.tujuan_pembelajaran_id,
+      tipe_kktp: saved.tipe_kktp as any,
+      ambang_tuntas: saved.ambang_tuntas,
+      interval_data: saved.interval_json ? JSON.parse(saved.interval_json) : null,
+      rubrik_data: saved.rubrik_json ? JSON.parse(saved.rubrik_json) : null,
+      deskripsi: saved.deskripsi,
+      created_at: saved.created_at,
+      updated_at: saved.updated_at,
+    };
+  }
+
+  // ==========================================
+  // CURRICULUM LINEAGE QUERY
+  // ==========================================
+
+  async getCurriculumLineage(
+    sekolahId: string,
+    mataPelajaranId: string,
+    penugasanMengajarId?: string
+  ): Promise<CurriculumLineageNodeDTO[]> {
+    const lmWhere: any = { sekolah_id: sekolahId };
+    if (penugasanMengajarId) {
+      lmWhere.penugasan_mengajar_id = penugasanMengajarId;
+    } else {
+      lmWhere.penugasan_mengajar = { mata_pelajaran_id: mataPelajaranId };
+    }
+
+    const lingkupMateriList = await prisma.lingkupMateri.findMany({
+      where: lmWhere,
+      include: {
+        tujuan_pembelajaran: {
+          include: {
+            capaian_pembelajaran: {
+              include: { fase: true, mata_pelajaran: true },
+            },
+            kriteria_ketercapaian: true,
+          },
+          orderBy: { urutan: "asc" },
+        },
+      },
+      orderBy: { urutan: "asc" },
+    });
+
+    const nodes: CurriculumLineageNodeDTO[] = [];
+
+    for (const lm of lingkupMateriList) {
+      for (const tp of lm.tujuan_pembelajaran) {
+        const cpDto = tp.capaian_pembelajaran
+          ? {
+              id: tp.capaian_pembelajaran.id,
+              sekolah_id: tp.capaian_pembelajaran.sekolah_id,
+              mata_pelajaran_id: tp.capaian_pembelajaran.mata_pelajaran_id,
+              mata_pelajaran_nama: tp.capaian_pembelajaran.mata_pelajaran.nama,
+              mata_pelajaran_kode: tp.capaian_pembelajaran.mata_pelajaran.kode,
+              fase_id: tp.capaian_pembelajaran.fase_id,
+              fase_nama: tp.capaian_pembelajaran.fase.nama,
+              fase_kode: tp.capaian_pembelajaran.fase.kode,
+              kode: tp.capaian_pembelajaran.kode,
+              elemen: tp.capaian_pembelajaran.elemen,
+              deskripsi: tp.capaian_pembelajaran.deskripsi,
+              urutan: tp.capaian_pembelajaran.urutan,
+              status: tp.capaian_pembelajaran.status as any,
+              created_at: tp.capaian_pembelajaran.created_at,
+              updated_at: tp.capaian_pembelajaran.updated_at,
+            }
+          : null;
+
+        const kktpDto = tp.kriteria_ketercapaian
+          ? {
+              id: tp.kriteria_ketercapaian.id,
+              sekolah_id: tp.kriteria_ketercapaian.sekolah_id,
+              tujuan_pembelajaran_id: tp.kriteria_ketercapaian.tujuan_pembelajaran_id,
+              tipe_kktp: tp.kriteria_ketercapaian.tipe_kktp as any,
+              ambang_tuntas: tp.kriteria_ketercapaian.ambang_tuntas,
+              interval_data: tp.kriteria_ketercapaian.interval_json
+                ? JSON.parse(tp.kriteria_ketercapaian.interval_json)
+                : null,
+              rubrik_data: tp.kriteria_ketercapaian.rubrik_json
+                ? JSON.parse(tp.kriteria_ketercapaian.rubrik_json)
+                : null,
+              deskripsi: tp.kriteria_ketercapaian.deskripsi,
+              created_at: tp.kriteria_ketercapaian.created_at,
+              updated_at: tp.kriteria_ketercapaian.updated_at,
+            }
+          : null;
+
+        nodes.push({
+          cp: cpDto,
+          lingkup_materi: {
+            id: lm.id,
+            kode: lm.kode,
+            judul: lm.judul,
+            urutan: lm.urutan,
+          },
+          tp: {
+            id: tp.id,
+            sekolah_id: tp.sekolah_id,
+            lingkup_materi_id: tp.lingkup_materi_id,
+            capaian_pembelajaran_id: tp.capaian_pembelajaran_id,
+            kode: tp.kode,
+            deskripsi: tp.deskripsi,
+            urutan: tp.urutan,
+            status: tp.status as any,
+            created_at: tp.created_at,
+            updated_at: tp.updated_at,
+            kriteria_ketercapaian: kktpDto,
+            capaian_pembelajaran: cpDto,
+          },
+          kktp: kktpDto,
+        });
+      }
+    }
+
+    return nodes;
   }
 
   // ==========================================
@@ -939,6 +1329,185 @@ export class LearningRepository {
     await prisma.administrasiPembelajaran.delete({
       where: { id },
     });
+  }
+
+  /**
+   * Mengambil activity feed aktual kelas (materi, tugas baru, tugas kumpul, presensi, penilaian)
+   * Dilengkapi tenant isolation dan zero dummy data.
+   */
+  async getClassActivityFeed(
+    penugasanId: string,
+    sekolahId: string,
+    limit: number = 8
+  ): Promise<ClassActivityItemDTO[]> {
+    const [materiPubs, tugasPubs, submissions, sesiPresensi, nilaiList] = await Promise.all([
+      // 1. Publikasi Materi
+      prisma.publikasiMateri.findMany({
+        where: {
+          penugasan_mengajar_id: penugasanId,
+          sekolah_id: sekolahId,
+        },
+        include: {
+          materi: {
+            include: {
+              guru: true,
+            },
+          },
+        },
+        orderBy: { updated_at: "desc" },
+        take: limit,
+      }),
+
+      // 2. Publikasi Tugas
+      prisma.publikasiTugas.findMany({
+        where: {
+          penugasan_mengajar_id: penugasanId,
+          sekolah_id: sekolahId,
+        },
+        include: {
+          tugas: {
+            include: {
+              guru: true,
+            },
+          },
+        },
+        orderBy: { updated_at: "desc" },
+        take: limit,
+      }),
+
+      // 3. Pengumpulan Tugas oleh Siswa
+      prisma.pengumpulanTugas.findMany({
+        where: {
+          sekolah_id: sekolahId,
+          publikasi_tugas: {
+            penugasan_mengajar_id: penugasanId,
+          },
+        },
+        include: {
+          siswa: true,
+          publikasi_tugas: {
+            include: {
+              tugas: true,
+            },
+          },
+        },
+        orderBy: { tanggal_kumpul: "desc" },
+        take: limit,
+      }),
+
+      // 4. Sesi Presensi / Jurnal KBM
+      prisma.sesiKelasAktual.findMany({
+        where: {
+          sekolah_id: sekolahId,
+          penugasan_mengajar_id: penugasanId,
+          presensi_siswa: {
+            some: {},
+          },
+        },
+        include: {
+          guru: true,
+          _count: {
+            select: { presensi_siswa: true },
+          },
+        },
+        orderBy: { updated_at: "desc" },
+        take: limit,
+      }),
+
+      // 5. Input Nilai Asesmen Siswa
+      prisma.nilaiSiswa.findMany({
+        where: {
+          sekolah_id: sekolahId,
+          asesmen: {
+            penugasan_mengajar_id: penugasanId,
+          },
+          nilai_angka: {
+            not: null,
+          },
+        },
+        include: {
+          siswa: true,
+          asesmen: true,
+        },
+        orderBy: { updated_at: "desc" },
+        take: limit,
+      }),
+    ]);
+
+    const activities: ClassActivityItemDTO[] = [];
+
+    for (const m of materiPubs) {
+      activities.push({
+        id: `act-mat-${m.id}`,
+        tipe: "MATERI",
+        judul: `Materi "${m.materi.judul}"`,
+        deskripsi: `Materi ${m.materi.tipe_konten.toLowerCase()} telah diterbitkan untuk kelas ini`,
+        pelaku_nama: m.materi.guru.nama_lengkap,
+        pelaku_peran: "GURU",
+        waktu: m.updated_at || m.tanggal_publikasi,
+        target_tab: "MATERI",
+        referensi_id: m.materi_id,
+      });
+    }
+
+    for (const t of tugasPubs) {
+      activities.push({
+        id: `act-tug-${t.id}`,
+        tipe: "TUGAS_BARU",
+        judul: `Tugas "${t.tugas.judul}"`,
+        deskripsi: `Penugasan baru diterbitkan (${t.tugas.tipe_penyerahan.toLowerCase()})`,
+        pelaku_nama: t.tugas.guru.nama_lengkap,
+        pelaku_peran: "GURU",
+        waktu: t.updated_at || t.tanggal_mulai,
+        target_tab: "TUGAS",
+        referensi_id: t.tugas_id,
+      });
+    }
+
+    for (const s of submissions) {
+      activities.push({
+        id: `act-sub-${s.id}`,
+        tipe: "TUGAS_KUMPUL",
+        judul: `Pengumpulan: "${s.publikasi_tugas.tugas.judul}"`,
+        deskripsi: `${s.siswa.nama_lengkap} mengumpulkan tugas (${s.status.toLowerCase()})`,
+        pelaku_nama: s.siswa.nama_lengkap,
+        pelaku_peran: "SISWA",
+        waktu: s.tanggal_kumpul || s.updated_at,
+        target_tab: "TUGAS",
+        referensi_id: s.id,
+      });
+    }
+
+    for (const p of sesiPresensi) {
+      activities.push({
+        id: `act-pres-${p.id}`,
+        tipe: "PRESENSI",
+        judul: `Presensi Sesi: ${p.topik_pembelajaran || "Pertemuan Kelas"}`,
+        deskripsi: `${p._count.presensi_siswa} kehadiran siswa berhasil disimpan dan diverifikasi`,
+        pelaku_nama: p.guru?.nama_lengkap || "Guru Pengampu",
+        pelaku_peran: "GURU",
+        waktu: p.updated_at,
+        target_tab: "CATATAN_KELAS",
+        referensi_id: p.id,
+      });
+    }
+
+    for (const n of nilaiList) {
+      activities.push({
+        id: `act-nil-${n.id}`,
+        tipe: "NILAI",
+        judul: `Nilai: "${n.asesmen.judul}"`,
+        deskripsi: `Nilai tercatat untuk ${n.siswa.nama_lengkap} (Skor: ${n.nilai_angka})`,
+        pelaku_nama: "Guru Pengampu",
+        pelaku_peran: "GURU",
+        waktu: n.updated_at,
+        target_tab: "RINGKASAN",
+        referensi_id: n.id,
+      });
+    }
+
+    activities.sort((a, b) => new Date(b.waktu).getTime() - new Date(a.waktu).getTime());
+    return activities.slice(0, limit);
   }
 }
 

@@ -895,33 +895,33 @@ export function TeachersView({
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                          <button
-                            onClick={() => {
-                              setResetCustomPassword("");
-                              setResettingTeacher(t);
-                            }}
-                            className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
-                            title="Reset Kata Sandi Akun"
-                          >
-                            <KeyRound className="h-4 w-4" />
-                          </button>
-                          {t.bisa_hapus_permanen ? (
-                            <button
-                              onClick={() => setDeletingTeacher(t)}
-                              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
-                              title="Hapus Data Guru"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setDeletingTeacher(t)}
-                              className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors"
-                              title="Arsipkan Guru (Memiliki Histori Akademik)"
-                            >
-                              <Archive className="h-4 w-4" />
-                            </button>
-                          )}
+                      <button
+                        onClick={() => {
+                          setResetCustomPassword("");
+                          setResettingTeacher(t);
+                        }}
+                        className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
+                        title="Reset Kata Sandi Akun"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </button>
+                      {t.bisa_hapus_permanen ? (
+                        <button
+                          onClick={() => setDeletingTeacher(t)}
+                          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
+                          title="Hapus Data Guru"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setDeletingTeacher(t)}
+                          className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors"
+                          title="Arsipkan Guru (Memiliki Histori Akademik)"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1131,36 +1131,36 @@ export function TeachersView({
                               >
                                 <Edit2 className="h-4 w-4" />
                               </button>
-                                  <button
-                                    onClick={() => {
-                                      setResetCustomPassword("");
-                                      setResettingTeacher(t);
-                                    }}
-                                    className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
-                                    title="Reset Kata Sandi Akun"
-                                  >
-                                    <KeyRound className="h-4 w-4" />
-                                  </button>
+                              <button
+                                onClick={() => {
+                                  setResetCustomPassword("");
+                                  setResettingTeacher(t);
+                                }}
+                                className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors"
+                                title="Reset Kata Sandi Akun"
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </button>
 
-                                  {t.bisa_hapus_permanen ? (
-                                    <button
-                                      onClick={() => setDeletingTeacher(t)}
-                                      className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
-                                      title="Hapus Data Guru"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => setDeletingTeacher(t)}
-                                      className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors"
-                                      title="Arsipkan Guru (Memiliki Histori Akademik)"
-                                    >
-                                      <Archive className="h-4 w-4" />
-                                    </button>
-                                  )}
-                                </>
+                              {t.bisa_hapus_permanen ? (
+                                <button
+                                  onClick={() => setDeletingTeacher(t)}
+                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
+                                  title="Hapus Data Guru"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setDeletingTeacher(t)}
+                                  className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors"
+                                  title="Arsipkan Guru (Memiliki Histori Akademik)"
+                                >
+                                  <Archive className="h-4 w-4" />
+                                </button>
                               )}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

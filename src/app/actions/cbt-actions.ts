@@ -25,6 +25,7 @@ import {
   RecordIntegrityEventInput,
   TransferToGradebookInput,
   HasilUjianCbtDTO,
+  BankSoalDTO,
 } from "@/modules/cbt/domain/cbt-types";
 import {
   generateQuestionsWithGemini,
@@ -129,6 +130,26 @@ export async function getQuestionsAction(filter?: {
   }
 }
 
+export async function getQuestionDetailAction(
+  bankSoalId: string
+): Promise<CbtActionResult<BankSoalDTO>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    await requirePermission("cbt.exam.manage", { sekolah_id: user.sekolah_id });
+    const question = await cbtService.getQuestionDetail(bankSoalId, user.sekolah_id);
+
+    return {
+      success: true,
+      message: "Detail butir soal berhasil dimuat.",
+      data: question,
+    };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
 export async function createQuestionAction(
   input: CreateBankSoalInput
 ): Promise<CbtActionResult<any>> {
@@ -221,6 +242,44 @@ export async function getExamsAction(penugasanId: string): Promise<CbtActionResu
       isSuperAdmin
     );
     return { success: true, message: "Daftar ujian CBT berhasil dimuat.", data: exams };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
+export async function deleteQuestionPermanentlyAction(
+  bankSoalId: string
+): Promise<CbtActionResult<void>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    await requirePermission("cbt.exam.manage", { sekolah_id: user.sekolah_id });
+    const { isSuperAdmin, guruId } = await resolveTeacherContext(
+      user.id,
+      user.peran_dasar,
+      user.sekolah_id
+    );
+
+    await cbtService.deleteQuestionPermanently(
+      bankSoalId,
+      user.sekolah_id,
+      isSuperAdmin ? null : guruId,
+      isSuperAdmin
+    );
+
+    await recordAuditEvent({
+      sekolah_id: user.sekolah_id,
+      aktor_id: user.id,
+      aktor_role: user.peran_dasar,
+      aksi: "CBT_QUESTION_DELETE_PERMANENT",
+      tipe_sumber: "BankSoal",
+      id_sumber: bankSoalId,
+    });
+
+    revalidatePath("/cbt");
+    revalidatePath("/cbt-ujian");
+    return { success: true, message: "Butir soal berhasil dihapus secara permanen." };
   } catch (err) {
     return { success: false, message: getSafeErrorMessage(err) };
   }
@@ -323,13 +382,237 @@ export async function archiveExamAction(
   }
 }
 
+export async function finishExamAction(
+  ujianId: string,
+  penugasanId?: string
+): Promise<CbtActionResult<any>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    await requirePermission("cbt.exam.manage", { sekolah_id: user.sekolah_id });
+    const { isSuperAdmin, guruId } = await resolveTeacherContext(
+      user.id,
+      user.peran_dasar,
+      user.sekolah_id
+    );
+
+    const exam = await prisma.ujianCbt.findFirst({
+      where: {
+        id: ujianId,
+        sekolah_id: user.sekolah_id,
+      },
+      include: {
+        penugasan_mengajar: true,
+      },
+    });
+
+    if (!exam) {
+      return { success: false, message: "Ujian CBT tidak ditemukan." };
+    }
+
+    if (!isSuperAdmin && guruId && exam.penugasan_mengajar.guru_id !== guruId) {
+      return {
+        success: false,
+        message: "Anda tidak memiliki wewenang untuk mengakhiri ujian ini.",
+      };
+    }
+
+    const now = new Date();
+    await prisma.ujianCbt.update({
+      where: { id: ujianId },
+      data: {
+        status: "SELESAI",
+        waktu_selesai: now,
+      },
+    });
+
+    // Paksa selesai sesi siswa yang masih SEDANG_MENGERJAKAN
+    await prisma.sesiUjianSiswa.updateMany({
+      where: {
+        ujian_cbt_id: ujianId,
+        status: "SEDANG_MENGERJAKAN",
+      },
+      data: {
+        status: "DIKUMPULKAN",
+        waktu_selesai: now,
+      },
+    });
+
+    revalidatePath("/cbt-ujian");
+    if (penugasanId) {
+      revalidatePath(`/kelas-saya/${penugasanId}`);
+    }
+
+    return {
+      success: true,
+      message: `Ujian "${exam.judul}" berhasil diakhiri. Seluruh sesi pengerjaan siswa telah ditutup.`,
+    };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
+export interface UpdateExamSettingsInput {
+  judul?: string;
+  deskripsi?: string;
+  durasi_menit?: number;
+  kkm_kktp?: number;
+  acak_soal?: boolean;
+  acak_opsi?: boolean;
+  tampilkan_nilai?: boolean;
+  tampilkan_pembahasan?: boolean;
+  waktu_mulai?: string | null;
+  waktu_selesai?: string | null;
+}
+
+export async function updateExamSettingsAction(
+  ujianId: string,
+  settings: UpdateExamSettingsInput
+): Promise<CbtActionResult<any>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    await requirePermission("cbt.exam.manage", { sekolah_id: user.sekolah_id });
+    const { isSuperAdmin, guruId } = await resolveTeacherContext(
+      user.id,
+      user.peran_dasar,
+      user.sekolah_id
+    );
+
+    const exam = await prisma.ujianCbt.findFirst({
+      where: { id: ujianId, sekolah_id: user.sekolah_id },
+      include: { penugasan_mengajar: true },
+    });
+
+    if (!exam) return { success: false, message: "Ujian CBT tidak ditemukan." };
+    if (!isSuperAdmin && guruId && exam.penugasan_mengajar.guru_id !== guruId) {
+      return {
+        success: false,
+        message: "Anda tidak memiliki wewenang untuk mengubah pengaturan ujian ini.",
+      };
+    }
+
+    const dataToUpdate: any = {};
+    if (settings.judul !== undefined) dataToUpdate.judul = settings.judul;
+    if (settings.deskripsi !== undefined) dataToUpdate.deskripsi = settings.deskripsi;
+    if (settings.durasi_menit !== undefined)
+      dataToUpdate.durasi_menit = Number(settings.durasi_menit);
+    if (settings.kkm_kktp !== undefined) dataToUpdate.kkm_kktp = Number(settings.kkm_kktp);
+    if (settings.acak_soal !== undefined) dataToUpdate.acak_soal = Boolean(settings.acak_soal);
+    if (settings.acak_opsi !== undefined) dataToUpdate.acak_opsi = Boolean(settings.acak_opsi);
+    if (settings.tampilkan_nilai !== undefined)
+      dataToUpdate.tampilkan_nilai = Boolean(settings.tampilkan_nilai);
+    if (settings.tampilkan_pembahasan !== undefined)
+      dataToUpdate.tampilkan_pembahasan = Boolean(settings.tampilkan_pembahasan);
+    if (settings.waktu_mulai !== undefined)
+      dataToUpdate.waktu_mulai = settings.waktu_mulai ? new Date(settings.waktu_mulai) : null;
+    if (settings.waktu_selesai !== undefined)
+      dataToUpdate.waktu_selesai = settings.waktu_selesai ? new Date(settings.waktu_selesai) : null;
+
+    const updated = await prisma.ujianCbt.update({
+      where: { id: ujianId },
+      data: dataToUpdate,
+    });
+
+    // Sinkronkan snapshot aktif agar konfigurasi runtime peserta selalu mutakhir
+    const snapshots = await prisma.snapshotUjian.findMany({
+      where: { ujian_cbt_id: ujianId },
+    });
+    for (const snap of snapshots) {
+      let conf: any = {};
+      try {
+        conf = JSON.parse(snap.konfigurasi);
+      } catch {}
+      if (settings.acak_soal !== undefined) conf.acak_soal = Boolean(settings.acak_soal);
+      if (settings.acak_opsi !== undefined) conf.acak_opsi = Boolean(settings.acak_opsi);
+      if (settings.durasi_menit !== undefined) conf.durasi_menit = Number(settings.durasi_menit);
+      if (settings.kkm_kktp !== undefined) conf.kktp = Number(settings.kkm_kktp);
+      if (settings.tampilkan_nilai !== undefined)
+        conf.tampilkan_nilai = Boolean(settings.tampilkan_nilai);
+      if (settings.tampilkan_pembahasan !== undefined)
+        conf.tampilkan_pembahasan = Boolean(settings.tampilkan_pembahasan);
+
+      await prisma.snapshotUjian.update({
+        where: { id: snap.id },
+        data: {
+          durasi_menit:
+            settings.durasi_menit !== undefined ? Number(settings.durasi_menit) : snap.durasi_menit,
+          konfigurasi: JSON.stringify(conf),
+        },
+      });
+    }
+
+    revalidatePath("/cbt-ujian");
+    revalidatePath("/cbt");
+    return { success: true, message: "Pengaturan ujian berhasil diperbarui.", data: updated };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
+export async function revertExamToDraftAction(ujianId: string): Promise<CbtActionResult<any>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    await requirePermission("cbt.exam.manage", { sekolah_id: user.sekolah_id });
+    const { isSuperAdmin, guruId } = await resolveTeacherContext(
+      user.id,
+      user.peran_dasar,
+      user.sekolah_id
+    );
+
+    const exam = await prisma.ujianCbt.findFirst({
+      where: { id: ujianId, sekolah_id: user.sekolah_id },
+      include: { penugasan_mengajar: true },
+    });
+
+    if (!exam) return { success: false, message: "Ujian CBT tidak ditemukan." };
+    if (!isSuperAdmin && guruId && exam.penugasan_mengajar.guru_id !== guruId) {
+      return {
+        success: false,
+        message: "Anda tidak memiliki wewenang untuk mengubah status ujian ini.",
+      };
+    }
+
+    const attemptCount = await prisma.sesiUjianSiswa.count({
+      where: { ujian_cbt_id: ujianId },
+    });
+
+    if (attemptCount > 0) {
+      return {
+        success: false,
+        message:
+          "Ujian tidak dapat ditarik kembali ke DRAFT karena sudah terdapat siswa yang memulai pengerjaan.",
+      };
+    }
+
+    await prisma.ujianCbt.update({
+      where: { id: ujianId },
+      data: { status: "DRAFT" },
+    });
+
+    revalidatePath("/cbt-ujian");
+    revalidatePath("/cbt");
+    return {
+      success: true,
+      message: `Ujian "${exam.judul}" berhasil dikembalikan ke status DRAFT.`,
+    };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
 // ============================================================================
 // STUDENT EXAM EXECUTION (CBT PLAYER)
 // ============================================================================
 
 export async function startOrResumeAttemptAction(
   ujianId: string,
-  metadata?: { ipAddress?: string; userAgent?: string }
+  metadata?: { ipAddress?: string; userAgent?: string },
+  tokenInput?: string
 ): Promise<CbtActionResult<any>> {
   try {
     const user = await requireAuth();
@@ -346,7 +629,8 @@ export async function startOrResumeAttemptAction(
       ujianId,
       user.sekolah_id,
       siswaId,
-      metadata
+      metadata,
+      tokenInput
     );
 
     return {
@@ -420,7 +704,10 @@ export async function recordIntegrityEventAction(
   }
 }
 
-export async function submitAttemptAction(attemptId: string): Promise<CbtActionResult<any>> {
+export async function submitAttemptAction(
+  attemptId: string,
+  sessionToken?: string | null
+): Promise<CbtActionResult<any>> {
   try {
     const user = await requireAuth();
     if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
@@ -430,7 +717,7 @@ export async function submitAttemptAction(attemptId: string): Promise<CbtActionR
       return { success: false, message: "Identitas siswa tidak valid." };
     }
 
-    const hasil = await cbtService.submitAttempt(attemptId, user.sekolah_id, siswaId);
+    const hasil = await cbtService.submitAttempt(attemptId, user.sekolah_id, siswaId, sessionToken);
 
     await recordAuditEvent({
       sekolah_id: user.sekolah_id,
@@ -613,6 +900,45 @@ export async function getCbtMapelListAction(): Promise<
     const user = await requireAuth();
     if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
 
+    const role = user.peran_dasar;
+
+    // Jika guru (TEACHER), hanya tampilkan mata pelajaran yang aktif diampunya
+    if (role === "TEACHER") {
+      const guruProfile = await prisma.guru.findFirst({
+        where: { sekolah_id: user.sekolah_id, pengguna_id: user.id },
+        include: {
+          penugasan_mengajar: {
+            where: { status: "AKTIF" },
+            include: {
+              mata_pelajaran: {
+                select: { id: true, nama: true, kode: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (guruProfile && guruProfile.penugasan_mengajar.length > 0) {
+        const mapelMap = new Map<string, { id: string; nama: string; kode: string }>();
+        for (const p of guruProfile.penugasan_mengajar) {
+          if (p.mata_pelajaran) {
+            mapelMap.set(p.mata_pelajaran.id, p.mata_pelajaran);
+          }
+        }
+        const teacherMapelList = Array.from(mapelMap.values()).sort((a, b) =>
+          a.nama.localeCompare(b.nama)
+        );
+        if (teacherMapelList.length > 0) {
+          return {
+            success: true,
+            message: "Daftar mata pelajaran guru berhasil dimuat.",
+            data: teacherMapelList,
+          };
+        }
+      }
+    }
+
+    // Untuk SUPER_ADMIN, SCHOOL_STAFF, atau fallback jika penugasan guru belum ditentukan
     const mapelList = await prisma.mataPelajaran.findMany({
       where: { sekolah_id: user.sekolah_id },
       select: { id: true, nama: true, kode: true },
@@ -1227,6 +1553,85 @@ export async function getExamPrintDataAction(
       message: "Data naskah cetak ujian berhasil dimuat.",
       data: printData,
     };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
+export async function getActiveExamQuestionsForEditAction(
+  ujianId: string
+): Promise<CbtActionResult<any>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    await requirePermission("cbt.exam.manage", { sekolah_id: user.sekolah_id });
+    const { isSuperAdmin, guruId } = await resolveTeacherContext(
+      user.id,
+      user.peran_dasar,
+      user.sekolah_id
+    );
+
+    const data = await cbtService.getActiveExamQuestionsForEdit(
+      ujianId,
+      user.sekolah_id,
+      guruId,
+      isSuperAdmin
+    );
+    return { success: true, message: "Daftar butir soal ujian aktif berhasil dimuat.", data };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
+export async function updateActiveExamQuestionAction(input: {
+  ujianId: string;
+  bankSoalId: string;
+  nomorUrut?: number;
+  pertanyaan: string;
+  gambar_url?: string | null;
+  opsi?: any[];
+  kunci_jawaban?: any;
+  bobot?: number;
+  recalculateScores?: boolean;
+}): Promise<CbtActionResult<any>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    await requirePermission("cbt.exam.manage", { sekolah_id: user.sekolah_id });
+    const { isSuperAdmin, guruId } = await resolveTeacherContext(
+      user.id,
+      user.peran_dasar,
+      user.sekolah_id
+    );
+
+    const result = await cbtService.updateActiveExamQuestion(
+      input,
+      user.sekolah_id,
+      guruId,
+      isSuperAdmin
+    );
+
+    await recordAuditEvent({
+      sekolah_id: user.sekolah_id,
+      aktor_id: user.id,
+      aktor_role: user.peran_dasar,
+      aksi: "CBT_ACTIVE_EXAM_QUESTION_UPDATE",
+      tipe_sumber: "UjianCbt",
+      id_sumber: input.ujianId,
+      payload_sesudah: {
+        bankSoalId: input.bankSoalId,
+        nomorUrut: input.nomorUrut,
+        recalculated: Boolean(input.recalculateScores),
+      },
+    });
+
+    revalidatePath(`/cbt-ujian`);
+    revalidatePath(`/cbt-ujian/proctor/${input.ujianId}`);
+    revalidatePath(`/cbt/attempt`);
+
+    return { success: true, message: result.message };
   } catch (err) {
     return { success: false, message: getSafeErrorMessage(err) };
   }

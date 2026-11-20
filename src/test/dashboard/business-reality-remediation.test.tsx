@@ -77,15 +77,14 @@ describe("Stage 11.1B — Business Reality Remediation Tests", () => {
     expect(screen.queryByText("Belum Ada Agenda Terdekat")).not.toBeInTheDocument();
   });
 
-  it("4. AttentionQueueCard displays educational waiting state instead of fake optimal status", () => {
+  it("4. AttentionQueueCard displays smart priority quick actions when no students are at-risk", () => {
     render(<AttentionQueueCard items={[]} />);
 
-    expect(screen.getByText("Menunggu Aktivitas Pembelajaran")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Belum ada catatan tindak lanjut\. Data perhatian khusus siswa.*akan terakumulasi otomatis seiring berjalannya KBM\./
-      )
+      screen.getByText("Seluruh siswa dalam batas aman akademik & kehadiran.")
     ).toBeInTheDocument();
+    expect(screen.getByText("Mulai Sesi Mengajar")).toBeInTheDocument();
+    expect(screen.getByText("Input Nilai Harian")).toBeInTheDocument();
     expect(screen.queryByText("Semua Siswa Terpantau Optimal")).not.toBeInTheDocument();
   });
 

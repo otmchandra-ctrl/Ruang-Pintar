@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/shared/infrastructure/auth/auth-guard";
 import { requirePermission } from "@/shared/infrastructure/authorization/authz-guard";
 import { learningService } from "@/modules/learning/application/learning-service";
-import { LocalStorageAdapter } from "@/shared/infrastructure/storage/local-storage-adapter";
+import { storageService } from "@/shared/infrastructure/storage/storage-service";
 import { prisma } from "@/shared/infrastructure/database/prisma";
 import { generateUlid } from "@/shared/lib/ulid";
 
@@ -79,6 +79,7 @@ export async function createLingkupMateriAction(
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
     revalidatePath("/kelas-saya");
+    revalidatePath("/materi");
     return {
       success: true,
       message: `BAB '${created.judul}' berhasil ditambahkan.`,
@@ -117,6 +118,7 @@ export async function updateLingkupMateriAction(
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
     revalidatePath("/kelas-saya");
+    revalidatePath("/materi");
     return {
       success: true,
       message: `BAB '${updated.judul}' berhasil diperbarui.`,
@@ -140,6 +142,7 @@ export async function deleteLingkupMateriAction(
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
     revalidatePath("/kelas-saya");
+    revalidatePath("/materi");
     return {
       success: true,
       message: "BAB berhasil dihapus.",
@@ -281,7 +284,7 @@ export async function createMateriAction(
       typeof file.arrayBuffer === "function"
     ) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const storage = new LocalStorageAdapter();
+      const storage = storageService;
       const metadata = await storage.saveFile({
         sekolah_id: user.sekolah_id,
         nama_file_asli: file.name,
@@ -308,6 +311,7 @@ export async function createMateriAction(
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
     revalidatePath("/kelas-saya");
+    revalidatePath("/materi");
     return {
       success: true,
       message: `Materi '${created.judul}' berhasil diterbitkan.`,
@@ -339,7 +343,7 @@ export async function updateMateriAction(
       typeof file.arrayBuffer === "function"
     ) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const storage = new LocalStorageAdapter();
+      const storage = storageService;
       const metadata = await storage.saveFile({
         sekolah_id: user.sekolah_id,
         nama_file_asli: file.name,
@@ -367,6 +371,7 @@ export async function updateMateriAction(
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
     revalidatePath("/kelas-saya");
+    revalidatePath("/materi");
     return {
       success: true,
       message: `Materi '${updated.judul}' berhasil diperbarui.`,
@@ -390,6 +395,7 @@ export async function deleteMateriAction(
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
     revalidatePath("/kelas-saya");
+    revalidatePath("/materi");
     return {
       success: true,
       message: "Materi berhasil dihapus.",
@@ -715,7 +721,7 @@ export async function createMateriMultiRombelAction(
       typeof file.arrayBuffer === "function"
     ) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const storage = new LocalStorageAdapter();
+      const storage = storageService;
       const metadata = await storage.saveFile({
         sekolah_id: user.sekolah_id,
         nama_file_asli: file.name,

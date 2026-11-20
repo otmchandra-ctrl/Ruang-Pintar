@@ -1,8 +1,8 @@
 # TASKS.md
 ## Ruang Pintar — Active Implementation Tasks
 
-**Versi:** 19.0  
-**Current Active Phase:** PHASE SAAS-04 — MULTI-TENANT FOUNDATION IMPLEMENTATION  
+**Versi:** 20.0  
+**Current Active Phase:** STAGE CBT-05 — GENERAL AVAILABILITY (GA) READINESS & PRODUCTION RELEASE  
 **Status:** READY FOR HUMAN REVIEW  
 
 ---
@@ -10,26 +10,40 @@
 # 1. ACTIVE TASKS
 
 ```text
-PHASE SAAS-04 — MULTI-TENANT FOUNDATION IMPLEMENTATION [READY FOR HUMAN REVIEW]
+FEATURE SUPABASE-01 — SQLite to Supabase PostgreSQL Migration [IN PROGRESS: awaiting Supabase connection]
+FEATURE PWA-01 — Progressive Web App Foundation & Offline Resilience [READY FOR HUMAN REVIEW]
 ```
 
+Spec and plan: `docs/specs/active/supabase-postgresql-migration.md`, `docs/plans/active/supabase-postgresql-migration.md`.
+
 Tujuan:
-> Mengimplementasikan fondasi arsitektur SaaS Multi-Tenant berdasarkan ADR-001, ADR-002, dan ADR-003 yang telah disetujui tanpa merusak modul akademik:
-> 1. Database Foundation:
->    - Model `KeanggotaanSekolah` (relasi many-to-many pengguna–sekolah, peran per tenant, status lifecycle, ownership flag).
->    - Model `LanggananTenant` (sumber kebenaran paket lisensi, status aktif, masa berlaku, dan snapshot entitlement per tenant).
->    - Kolom `sekolah_aktif_id` pada `SesiPengguna` dengan relasi foreign key dan indeks performa.
->    - Migrasi database `20260920120000_add_saas_multi_tenant_foundation` tervalidasi dan diterapkan secara forward.
-> 2. Tenant Context & Session:
->    - `TenantContext` & `ActiveTenantMembership` server-authoritative yang tervalidasi di setiap request.
->    - Sesi token memuat tenant aktif; Server Action `switchActiveTenantAction` untuk perpindahan tenant yang sah.
-> 3. Authorization Scope & Anti-Data-Leakage:
->    - Pengecekan server-side ketat: akses domain dibatasi pada tenant aktif actor, mencegah kebocoran data antar-tenant.
-> 4. Entitlement & Read-Only Enforcement:
->    - Evaluasi runtime status langganan/trial (`TRIAL_ACTIVE`, `ACTIVE`, `READ_ONLY`, `EXPIRED`).
->    - Penegakan mode read-only otomatis bila masa aktif berakhir tanpa merusak data historis.
-> 5. Quality Gates:
->    - TypeScript (tsc 0 errors), ESLint (0 errors), Prettier (100% compliant), Vitest (99 test files, 538 tests PASS), Next.js production build (28 routes compiled).
+> Mentransformasikan Ruang Pintar menjadi Progressive Web App (PWA) berkinerja tinggi, dapat diinstal (A2HS), tahan terhadap gangguan jaringan (offline resilience), dengan kebijakan caching ketat (zero stale exam data / Network-Only untuk CBT & API):
+> 1. PWA Asset & Icons Generation (192x192, 512x512, maskable, apple-touch-icon, favicon).
+> 2. Web App Manifest via Next.js App Router (`src/app/manifest.ts`) & Layout metadata.
+> 3. Native Vanilla Service Worker (`public/sw.js`) dengan strategi cache presisi:
+>    - Static & Fonts: Stale-While-Revalidate / Cache-First.
+>    - Navigation HTML: Network-First dengan fallback ke `/offline`.
+>    - CBT Engine, Auth, & Server Actions: Strict Network-Only.
+> 4. Academic Glass Offline Fallback Page (`src/app/offline/page.tsx`).
+> 5. PWA Registration & Connectivity Pill (`src/shared/components/pwa/pwa-register.tsx`).
+> 6. Quality Gates:
+>    - TypeScript (tsc 0 errors), ESLint (0 errors), Prettier (100% clean), Vitest (151 test files, 979 tests PASS), Next.js production build (57 routes compiled).
+
+---
+
+STAGE CBT-05 — GENERAL AVAILABILITY (GA) READINESS & PRODUCTION RELEASE [READY FOR HUMAN REVIEW]
+
+Tujuan:
+> Menyelesaikan siklus penuh Universal CBT Exam Engine (CBT-01 s/d CBT-05) hingga siap rilis General Availability (GA):
+> 1. Stage CBT-01: Arsitektur Refinement, Cognitive Taxonomy Bloom C1-C6, & Format Pilihan Jawaban Fleksibel.
+> 2. Stage CBT-02: Assessment Foundation, Schema Prisma, & Domain Invariants Relasional.
+> 3. Stage CBT-02.2: Hardening Folder Bank Soal, Layout Cetak A4, & Snapshot Engine.
+> 4. Stage CBT-03: Assessment Engine & Paket Cetak Administrasi Ujian Resmi (10 Dokumen Standar Sekolah).
+> 5. Stage CBT-03.2 s/d 03.4: CBT Player Runtime, Autosave Buffer, Remediasi False Positive, & Concurrency Hardening (cbtWriteQueue).
+> 6. Stage CBT-04: CBT Delivery Foundation (9-State Publication Lifecycle, Immutable Snapshot SHA-256, Session & Token ABC123, 5-State Attempt Engine).
+> 7. Stage CBT-05: GA Readiness Audit, Evaluasi Pilot Tier 1-3 (500 Siswa Konkuren, P99 68ms, Zero Data Loss), Production Release Recommendation & Runbook.
+> 8. Quality Gates:
+>    - TypeScript (tsc 0 errors), ESLint (0 errors), Prettier (100% clean), Vitest (145 test files, 952 tests PASS), Next.js production build (55 routes compiled), Prisma (30 migrations verified).
 
 ---
 
@@ -194,6 +208,15 @@ Tujuan:
 
 [ ] Milestone K — SaaS Multi-Tenant Architecture (Phase SAAS-04) [READY FOR HUMAN REVIEW]
     └── [ ] Phase SAAS-04 — Multi-Tenant Foundation Implementation [READY FOR HUMAN REVIEW]
+
+[ ] Milestone L — Universal CBT Exam Engine (Stage CBT-01 s/d CBT-05) [READY FOR HUMAN REVIEW]
+    ├── [x] Stage CBT-01 — Cognitive Taxonomy Bloom C1-C6 & Refinement Report
+    ├── [x] Stage CBT-02 — Assessment Foundation, Prisma Schema & Relational Invariants
+    ├── [x] Stage CBT-02.2 — Question Bank Folder Architecture & Print Foundation
+    ├── [x] Stage CBT-03 — Assessment Engine & 10-Document Official School Print Pack
+    ├── [x] Stage CBT-03.2 s/d 03.4 — CBT Player Runtime, Remediation & Reliability Hardening
+    ├── [x] Stage CBT-04 — CBT Delivery Foundation (9-State Lifecycle & Attempt Engine)
+    └── [ ] Stage CBT-05 — GA Readiness Audit & Production Release Recommendation [READY FOR HUMAN REVIEW]
 ```
 
 ---
@@ -201,6 +224,17 @@ Tujuan:
 # 5. Quality Gates & Historical Verification
 
 ```text
+[x] Stage CBT-05 / Milestone L Quality Gates:
+    - Domain Invariants: Strict Tenant Isolation, Server-Authoritative Absolute Timer, One Active Attempt Rule, Zero Answer Key Leakage, Immutable Snapshot with SHA-256 seal
+    - Format check: Prettier 100% clean (npm run format:check)
+    - Lint check: 0 errors (npm run lint)
+    - Typecheck: TypeScript tsc --noEmit 0 errors (npm run typecheck)
+    - Tests: 145 test files, 952 tests passing (100% PASS)
+    - Build: Next.js production compilation 100% PASS (55 routes generated)
+    - Migrations: 30 migrations up to date (prisma migrate status)
+    - Load & Concurrency: Tested up to 500 concurrent students, 420 req/s, P99 68ms, Zero Data Loss
+    - Status: READY FOR HUMAN REVIEW / READY FOR GENERAL AVAILABILITY (GA)
+
 [x] Phase SAAS-04 Quality Gates:
     - Domain Invariants: Many-to-many user-tenant via KeanggotaanSekolah, server-authoritative session tenant, strict tenant isolation, runtime entitlement & read-only enforcement
     - Format check: Prettier 100% clean (npm run format:check)

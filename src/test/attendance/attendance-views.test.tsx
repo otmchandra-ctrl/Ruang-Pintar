@@ -280,13 +280,16 @@ describe("SessionAttendanceModal", () => {
       expect(screen.getByText("Andi Saputra")).toBeInTheDocument();
     });
 
-    // Find all 'Izin' buttons
-    const izinButtons = screen.getAllByRole("button", { name: "Izin" });
-    fireEvent.click(izinButtons[0]);
+    // Buka Bottom Sheet Editor dengan mengklik baris siswa Andi Saputra
+    fireEvent.click(screen.getByText("Andi Saputra"));
 
-    // An input for catatan/alasan should appear for Andi
+    // Pilih tombol 'Izin' di dalam Bottom Sheet
+    const izinButton = screen.getByRole("radio", { name: /Izin/i });
+    fireEvent.click(izinButton);
+
+    // Textarea catatan/alasan muncul di dalam Bottom Sheet
     await waitFor(() => {
-      expect(screen.getByPlaceholderText(/Alasan \/ no surat/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Tulis alasan/i)).toBeInTheDocument();
     });
   });
 

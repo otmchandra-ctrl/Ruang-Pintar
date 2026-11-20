@@ -23,6 +23,7 @@ export function PerformanceBarChart({
   averageScore,
   bestClass,
 }: PerformanceBarChartProps) {
+  const [hoveredId, setHoveredId] = React.useState<string | null>(null);
   const hasData = items.length > 0;
   const chartData = hasData ? items.slice(0, 6) : [];
 
@@ -30,7 +31,7 @@ export function PerformanceBarChart({
   const best = bestClass || (hasData ? chartData.find((d) => d.score === highestScore) : null);
 
   return (
-    <div className="rounded-[28px] bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 p-6 shadow-xs dark:shadow-[0_0_30px_-5px_rgba(37,99,235,0.16)] flex flex-col justify-between h-full">
+    <div className="rounded-[28px] bg-white/65 dark:bg-slate-900/65 backdrop-blur-[20px] border border-white/75 dark:border-white/15 p-6 shadow-[0_12px_36px_rgba(0,0,0,0.04)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.4)] flex flex-col justify-between h-full">
       {/* Header Row */}
       <div>
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -92,21 +93,45 @@ export function PerformanceBarChart({
 
       {/* Content Area: Bar Chart or Genuine Empty State */}
       {hasData ? (
-        <div className="pt-6 pb-2">
-          <div className="grid grid-cols-6 gap-2 sm:gap-3 items-end h-32 sm:h-36 px-1">
+        <div className="pt-6 pb-2 relative" onMouseLeave={() => setHoveredId(null)}>
+          <div className="grid grid-cols-6 gap-2 sm:gap-3 items-end h-32 sm:h-36 px-1 relative z-10">
             {chartData.map((c, idx) => {
               const isTop = c.score === highestScore;
+              const isHovered = hoveredId === c.id;
+              const isDimmed = hoveredId !== null && !isHovered;
               const heightPercent = Math.min(100, Math.max(15, c.score));
 
               return (
-                <div key={c.id} className="flex flex-col items-center h-full justify-end group">
+                <div
+                  key={c.id}
+                  onMouseEnter={() => setHoveredId(c.id)}
+                  className="flex flex-col items-center h-full justify-end group cursor-pointer transition-all duration-300"
+                >
                   {/* Score floating above bar */}
-                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-1.5">
+                  <span
+                    className={`font-mono transition-all duration-300 mb-1.5 text-center ${
+                      isHovered
+                        ? "text-blue-600 dark:text-blue-400 font-black text-xs sm:text-sm scale-110 drop-shadow-sm"
+                        : isDimmed
+                          ? "opacity-30 blur-[0.3px] text-[10px] sm:text-[11px] font-bold text-slate-400"
+                          : isTop
+                            ? "text-blue-600 dark:text-blue-400 font-extrabold text-[10px] sm:text-[11px]"
+                            : "text-slate-500 dark:text-slate-400 text-[10px] sm:text-[11px] font-bold"
+                    }`}
+                  >
                     {c.score.toFixed(1)}
                   </span>
 
                   {/* Pill Track Bar Container */}
-                  <div className="w-full max-w-[28px] sm:max-w-[34px] h-24 sm:h-28 rounded-full bg-slate-100 dark:bg-slate-800/80 p-1 flex flex-col justify-end overflow-hidden">
+                  <div
+                    className={`w-full max-w-[28px] sm:max-w-[34px] h-24 sm:h-28 rounded-full p-1 flex flex-col justify-end overflow-hidden transition-all duration-300 ${
+                      isHovered
+                        ? "bg-blue-100/80 dark:bg-blue-900/40 ring-2 ring-blue-500/50 scale-105 shadow-lg shadow-blue-500/25"
+                        : isDimmed
+                          ? "bg-slate-100/50 dark:bg-slate-800/40 opacity-40 blur-[0.5px] scale-95"
+                          : "bg-slate-100 dark:bg-slate-800/80"
+                    }`}
+                  >
                     <motion.div
                       initial={{ height: 0 }}
                       animate={{ height: `${heightPercent}%` }}
@@ -115,25 +140,35 @@ export function PerformanceBarChart({
                         delay: idx * 0.08,
                         ease: [0.16, 1, 0.3, 1],
                       }}
-                      className={`w-full rounded-full ${
-                        isTop
-                          ? "bg-gradient-to-t from-blue-600 to-indigo-500 shadow-sm shadow-blue-500/30"
-                          : "bg-blue-500/80 dark:bg-blue-600/70 group-hover:bg-blue-600"
+                      className={`w-full rounded-full transition-all duration-300 ${
+                        isHovered
+                          ? "bg-gradient-to-t from-blue-600 via-blue-500 to-cyan-400 shadow-md shadow-blue-500/40"
+                          : isDimmed
+                            ? "bg-gradient-to-t from-blue-300/60 to-blue-200/50 dark:from-blue-800/40 dark:to-blue-700/30"
+                            : isTop
+                              ? "bg-gradient-to-t from-blue-600 to-indigo-500 shadow-sm shadow-blue-500/30"
+                              : "bg-gradient-to-t from-blue-500 to-blue-400 dark:from-blue-600 dark:to-blue-500"
                       }`}
                     />
                   </div>
 
-                  {/* Class Label underneath */}
-                  <span
-                    title={c.name}
-                    className={`mt-2 text-[10px] sm:text-[11px] font-mono font-bold truncate max-w-full text-center ${
-                      isTop
-                        ? "text-blue-600 dark:text-blue-400 font-extrabold"
-                        : "text-slate-600 dark:text-slate-400"
-                    }`}
-                  >
-                    {c.name}
-                  </span>
+                  {/* Class Label underneath (Responsive, unclipped & clean wrap) */}
+                  <div className="mt-2 w-full flex items-center justify-center min-h-[28px]">
+                    <span
+                      title={c.name}
+                      className={`text-[9px] sm:text-[10px] font-mono leading-[1.15] text-center max-w-full break-words transition-all duration-300 ${
+                        isHovered
+                          ? "text-blue-600 dark:text-blue-400 font-black scale-105"
+                          : isDimmed
+                            ? "opacity-40 text-slate-400"
+                            : isTop
+                              ? "text-blue-600 dark:text-blue-400 font-extrabold"
+                              : "text-slate-600 dark:text-slate-400 font-bold"
+                      }`}
+                    >
+                      {c.name}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -157,7 +192,7 @@ export function PerformanceBarChart({
             href="/penilaian"
             className="px-3.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-[#2563EB] dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/80 text-xs font-mono font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs"
           >
-            <span>+ Input Penilaian</span>
+            <span>Input Penilaian</span>
             <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>

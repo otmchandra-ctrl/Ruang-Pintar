@@ -23,6 +23,7 @@
 *.db-wal
 *.db-shm
 *.bak
+/generated/sqlite-client/
 
 # Environment files
 .env
@@ -61,4 +62,11 @@ Thumbs.db
 *.exe
 /scratch/
 /tmp/
+/.next-supabase-migration-check/
 
+
+
+# Tunnel scripts
+start-tunnel.bat
+tunnel.bat
+setup-remote-pc.bat

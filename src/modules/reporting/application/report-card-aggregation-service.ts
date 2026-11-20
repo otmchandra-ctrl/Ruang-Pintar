@@ -128,7 +128,24 @@ export class ReportCardAggregationService {
         gradedSubjectCount++;
       }
 
-      const kktp = 75; // Standar KKTP Kurikulum Merdeka
+      // KKTP kontekstual: ambil dari asesmen penugasan atau kelompok mapel
+      let kktp = 75;
+      const firstAsesmenKktp = assignedGrades.find((g) => (g.asesmen as any)?.kkm_kktp)
+        ?.asesmen as any;
+      if (firstAsesmenKktp?.kkm_kktp) {
+        kktp = firstAsesmenKktp.kkm_kktp;
+      } else if (
+        (mapel as any).kelompok === "KEJURUAN" ||
+        mapel.kode === "KKA" ||
+        mapel.kode === "INF"
+      ) {
+        kktp = 80;
+      } else if (mapel.kode === "MAT" || mapel.nama.toLowerCase().includes("matematika")) {
+        kktp = 75;
+      } else {
+        kktp = 75;
+      }
+
       const isTuntas = nilaiAkhir !== null ? nilaiAkhir >= kktp : false;
 
       let predikat: "A" | "B" | "C" | "D" | "-" = "-";
@@ -139,12 +156,15 @@ export class ReportCardAggregationService {
         else predikat = "D";
       }
 
-      // Rumusan Narasi Capaian Pembelajaran (TP / Materi)
-      let deskripsiCapaianTertinggi = "Menunjukkan penguasaan capaian pembelajaran dengan baik.";
-      let deskripsiPerluPeningkatan = "Perlu mempertahankan konsistensi belajar pada materi pokok.";
+      // Rumusan Narasi Capaian Pembelajaran (TP / Materi) Kurikulum Merdeka
+      let deskripsiCapaianTertinggi = "";
+      let deskripsiPerluPeningkatan = "-";
 
       const validGrades = assignedGrades.filter((g) => g.nilai_angka !== null);
-      if (validGrades.length > 0) {
+      if (validGrades.length === 0 || nilaiAkhir === null) {
+        deskripsiCapaianTertinggi = `Belum ada data asesmen yang dinilai untuk mata pelajaran ${mapel.nama} pada periode ini.`;
+        deskripsiPerluPeningkatan = "-";
+      } else {
         const sorted = [...validGrades].sort((a, b) => (b.nilai_angka || 0) - (a.nilai_angka || 0));
 
         const highest = sorted[0];
@@ -152,18 +172,34 @@ export class ReportCardAggregationService {
           highest.asesmen.tujuan_pembelajaran?.deskripsi ||
           highest.asesmen.lingkup_materi?.judul ||
           highest.asesmen.judul;
+        const highestScore = highest.nilai_angka || 0;
 
-        deskripsiCapaianTertinggi = `Menunjukkan pemahaman sangat optimal dalam menguasai ${highestTopic}.`;
+        if (highestScore >= 90) {
+          deskripsiCapaianTertinggi = `Menunjukkan pemahaman sangat istimewa dan optimal dalam menguasai ${highestTopic}.`;
+        } else if (highestScore >= kktp) {
+          deskripsiCapaianTertinggi = `Menunjukkan pemahaman yang baik dan tuntas dalam menguasai ${highestTopic}.`;
+        } else {
+          deskripsiCapaianTertinggi = `Mencapai kompetensi dasar pada ${highestTopic}, namun belum memenuhi ketuntasan minimal (KKTP: ${kktp}).`;
+        }
 
         if (sorted.length > 1) {
           const lowest = sorted[sorted.length - 1];
-          if ((lowest.nilai_angka || 0) < 80) {
-            const lowestTopic =
-              lowest.asesmen.tujuan_pembelajaran?.deskripsi ||
-              lowest.asesmen.lingkup_materi?.judul ||
-              lowest.asesmen.judul;
-            deskripsiPerluPeningkatan = `Perlu bimbingan dan pendampingan lebih lanjut dalam penguatan ${lowestTopic}.`;
+          const lowestScore = lowest.nilai_angka || 0;
+          const lowestTopic =
+            lowest.asesmen.tujuan_pembelajaran?.deskripsi ||
+            lowest.asesmen.lingkup_materi?.judul ||
+            lowest.asesmen.judul;
+
+          if (lowestScore < kktp) {
+            deskripsiPerluPeningkatan = `Perlu bimbingan dan remedial intensif dalam penguatan materi ${lowestTopic}.`;
+          } else {
+            deskripsiPerluPeningkatan = `Mampu mempertahankan penguasaan kompetensi yang baik pada seluruh materi ${mapel.nama}.`;
           }
+        } else {
+          deskripsiPerluPeningkatan =
+            nilaiAkhir >= kktp
+              ? `Mampu mempertahankan konsistensi belajar pada materi pokok ${mapel.nama}.`
+              : `Perlu pendampingan remedial dan penguatan konsep untuk mencapai ketuntasan materi ${mapel.nama}.`;
         }
       }
 

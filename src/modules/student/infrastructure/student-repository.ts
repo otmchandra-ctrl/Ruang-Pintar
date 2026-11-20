@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
+import { containsText } from "@/shared/infrastructure/database/query-filters";
 import { generateUlid } from "@/shared/lib/ulid";
 import {
   CreateStudentEnrollmentInput,
@@ -69,10 +70,10 @@ export class StudentRepository {
     if (filter.search) {
       const q = filter.search.trim();
       where.OR = [
-        { nama_lengkap: { contains: q } },
-        { nis: { contains: q } },
-        { nisn: { contains: q } },
-        { nik: { contains: q } },
+        { nama_lengkap: containsText(q) },
+        { nis: containsText(q) },
+        { nisn: containsText(q) },
+        { nik: containsText(q) },
       ];
     }
 
@@ -451,9 +452,9 @@ export class StudentRepository {
       const q = filter.search.trim();
       where.siswa = {
         OR: [
-          { nama_lengkap: { contains: q } },
-          { nis: { contains: q } },
-          { nisn: { contains: q } },
+          { nama_lengkap: containsText(q) },
+          { nis: containsText(q) },
+          { nisn: containsText(q) },
         ],
       };
     }
@@ -735,9 +736,9 @@ export class StudentRepository {
         ...((where.keikutsertaan as object) || {}),
         siswa: {
           OR: [
-            { nama_lengkap: { contains: q } },
-            { nis: { contains: q } },
-            { nisn: { contains: q } },
+            { nama_lengkap: containsText(q) },
+            { nis: containsText(q) },
+            { nisn: containsText(q) },
           ],
         },
       };

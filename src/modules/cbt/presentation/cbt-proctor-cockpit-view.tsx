@@ -39,8 +39,10 @@ import {
   X,
   FileCheck,
   Camera,
+  FileEdit,
 } from "lucide-react";
 import { PaperLjmScannerModal } from "./paper-ljm-scanner-modal";
+import { ActiveExamQuestionModal } from "./active-exam-question-modal";
 import {
   getExamAttemptsAction,
   unlockAttemptAction,
@@ -138,6 +140,7 @@ export function CbtProctorCockpitView({
     useState<ProctorStudentAttempt | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPaperScannerModal, setShowPaperScannerModal] = useState(false);
+  const [showEditQuestionsModal, setShowEditQuestionsModal] = useState(false);
 
   // Gradebook Transfer State
   const [namaAsesmen, setNamaAsesmen] = useState(initialExam.judul);
@@ -449,6 +452,16 @@ export function CbtProctorCockpitView({
                 </button>
               </div>
             )}
+
+            {/* Koreksi / Edit Soal Ujian Aktif Button */}
+            <button
+              type="button"
+              onClick={() => setShowEditQuestionsModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition active:scale-[0.98]"
+            >
+              <FileEdit className="h-4 w-4" />
+              <span>Koreksi / Edit Soal Aktif</span>
+            </button>
 
             {/* Koreksi LJM Kertas / Susulan Button */}
             <button
@@ -1255,6 +1268,17 @@ export function CbtProctorCockpitView({
           refreshData(false);
         }}
         onError={(msg) => showToast(msg, "error")}
+      />
+
+      {/* Modal Koreksi & Edit Soal Ujian Aktif */}
+      <ActiveExamQuestionModal
+        ujianId={exam.id}
+        isOpen={showEditQuestionsModal}
+        onClose={() => setShowEditQuestionsModal(false)}
+        onQuestionUpdated={() => {
+          showToast("Soal ujian aktif berhasil diperbarui & disinkronkan ke snapshot.", "success");
+          refreshData(false);
+        }}
       />
     </div>
   );

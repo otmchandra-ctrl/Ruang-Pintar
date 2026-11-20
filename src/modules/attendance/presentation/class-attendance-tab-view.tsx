@@ -15,7 +15,6 @@ import {
   Calendar,
   PlayCircle,
   AlertCircle,
-  Sparkles,
   ArrowRight,
   UserCheck,
   TrendingUp,
@@ -100,8 +99,12 @@ export function ClassAttendanceTabView({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white">{total_sesi_terjadwal}</div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Sesi KBM pada penugasan ini</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+              {total_sesi_terjadwal}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Sesi KBM pada penugasan ini
+            </p>
           </div>
         </div>
 
@@ -116,8 +119,12 @@ export function ClassAttendanceTabView({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{total_presensi_diambil}</div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Sesi dengan data absensi siswa</p>
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+              {total_presensi_diambil}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Sesi dengan data absensi siswa
+            </p>
           </div>
         </div>
 
@@ -132,8 +139,12 @@ export function ClassAttendanceTabView({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{total_sesi_selesai}</div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Pertemuan yang telah ditutup</p>
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+              {total_sesi_selesai}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Pertemuan yang telah ditutup
+            </p>
           </div>
         </div>
 
@@ -148,8 +159,12 @@ export function ClassAttendanceTabView({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-[#2563EB] dark:text-blue-400">{rata_rata_kehadiran}%</div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Rasio kehadiran seluruh pertemuan</p>
+            <div className="text-2xl font-bold text-[#2563EB] dark:text-blue-400">
+              {rata_rata_kehadiran}%
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Rasio kehadiran seluruh pertemuan
+            </p>
           </div>
         </div>
       </div>
@@ -248,7 +263,9 @@ export function ClassAttendanceTabView({
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900/75 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Riwayat Presensi Sesi Kelas</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Riwayat Presensi Sesi Kelas
+              </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Catatan kehadiran siswa per kejadian sesi kelas aktual
               </p>
@@ -259,7 +276,9 @@ export function ClassAttendanceTabView({
           {history.length === 0 ? (
             <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900/75 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3">
               <Users className="h-10 w-10 text-slate-300 dark:text-slate-600 mx-auto" />
-              <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">Belum Ada Sesi Kelas Terbuka</h4>
+              <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                Belum Ada Sesi Kelas Terbuka
+              </h4>
               <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
                 Mulai sesi pembelajaran baru atau buka sesi dari jadwal hari ini untuk mulai
                 melakukan presensi kehadiran siswa.

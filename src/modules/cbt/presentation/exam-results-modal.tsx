@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useTransition, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   X,
@@ -153,7 +154,7 @@ export function ExamResultsModal({
     });
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   const filteredAttempts = (data?.attempts || []).filter((att) =>
     att.siswa.nama_lengkap.toLowerCase().includes(search.toLowerCase())
@@ -185,9 +186,9 @@ export function ExamResultsModal({
 
   const tuntasRate = totalSelesai > 0 ? Math.round((tuntasCount / totalSelesai) * 100) : 0;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl max-h-[calc(100vh-2rem)] sm:max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-3">
@@ -500,6 +501,7 @@ export function ExamResultsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

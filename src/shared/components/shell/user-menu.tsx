@@ -112,7 +112,7 @@ export function UserMenu({ user }: UserMenuProps) {
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label="Menu Pengguna"
-        className="flex items-center gap-2 sm:gap-2.5 p-1 sm:p-1.5 sm:pl-2 sm:pr-2.5 rounded-2xl hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 cursor-pointer shrink-0"
+        className="flex items-center gap-2 sm:gap-2.5 min-h-[44px] p-1 sm:p-1.5 sm:pl-2 sm:pr-2.5 rounded-2xl hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 cursor-pointer shrink-0"
       >
         <div className="flex h-8 w-8 sm:h-8.5 sm:w-8.5 items-center justify-center rounded-full bg-gradient-to-tr from-[#1D4ED8] to-[#3B82F6] text-white text-xs font-extrabold shadow-xs overflow-hidden shrink-0 ring-1 ring-slate-200 dark:ring-slate-700">
           {user.foto_url ? (

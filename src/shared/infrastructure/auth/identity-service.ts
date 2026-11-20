@@ -102,16 +102,25 @@ export class IdentityService {
     oldPassword: string,
     newPassword: string,
     ipAddress?: string,
-    userAgent?: string
+    userAgent?: string,
+    options?: { requireOldPassword?: boolean }
   ): Promise<{ success: boolean; error?: string }> {
     const user = await prisma.pengguna.findUnique({ where: { id: userId } });
     if (!user) {
       return { success: false, error: "Akun pengguna tidak ditemukan." };
     }
 
-    const isOldPasswordValid = await verifyPassword(oldPassword, user.password_hash);
-    if (!isOldPasswordValid) {
-      return { success: false, error: "Kata sandi saat ini tidak cocok." };
+    const requireOldPassword = options?.requireOldPassword ?? !user.harus_ganti_password;
+
+    if (requireOldPassword) {
+      if (!oldPassword) {
+        return { success: false, error: "Kata sandi saat ini wajib diisi." };
+      }
+
+      const isOldPasswordValid = await verifyPassword(oldPassword, user.password_hash);
+      if (!isOldPasswordValid) {
+        return { success: false, error: "Kata sandi saat ini tidak cocok." };
+      }
     }
 
     const policy = validatePasswordPolicy(newPassword);
@@ -136,6 +145,9 @@ export class IdentityService {
       aksi: "AUTH_PASSWORD_CHANGED",
       tipe_sumber: "PENGGUNA",
       id_sumber: user.id,
+      payload_sesudah: {
+        is_mandatory_change: !requireOldPassword,
+      },
       ip_address: ipAddress ?? null,
       user_agent: userAgent ?? null,
     });

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useTransition } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Award,
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
-  Sparkles,
   RotateCcw,
   Save,
   Send,
@@ -182,38 +182,49 @@ export function InputGradesModal({
       ? (grades.reduce((acc, curr) => acc + (curr.nilai_angka || 0), 0) / totalDinilai).toFixed(1)
       : "-";
 
-  return (
+  if (!isOpen || typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="input-grades-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
     >
-      <div className="w-full max-w-4xl rounded-3xl bg-white border border-slate-200/80 shadow-2xl overflow-hidden flex flex-col h-[90vh]">
+      <div className="w-full max-w-4xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[88vh]">
         {/* Header Modal */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+            <div className="h-10 w-10 rounded-2xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
               <Award className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 id="input-grades-title" className="text-base font-bold text-slate-800">
+                <h2
+                  id="input-grades-title"
+                  className="text-base font-bold text-slate-800 dark:text-slate-100"
+                >
                   {asesmen?.judul || "Lembar Penilaian Siswa"}
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                   {asesmen?.kategori}
                 </span>
                 {asesmen?.is_published && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
                     PUBLISHED
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500">
-                KKTP: <span className="font-bold text-slate-700">{kktp}</span> • Bobot:{" "}
-                <span className="font-bold text-slate-700">{asesmen?.bobot || 1}</span> •{" "}
-                {asesmen?.tp_kode ? `${asesmen.tp_kode}: ` : ""}
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                KKTP: <span className="font-bold text-slate-700 dark:text-slate-200">{kktp}</span> •
+                Bobot:{" "}
+                <span className="font-bold text-slate-700 dark:text-slate-200">
+                  {asesmen?.bobot || 1}
+                </span>{" "}
+                • {asesmen?.tp_kode ? `${asesmen.tp_kode}: ` : ""}
                 {asesmen?.tp_deskripsi || "Penilaian Sesi Pembelajaran"}
               </p>
             </div>
@@ -222,27 +233,27 @@ export function InputGradesModal({
             type="button"
             onClick={handleClose}
             aria-label="Tutup"
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Quick Toolbar & Live Stats */}
-        <div className="px-6 py-2.5 bg-slate-50/40 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="px-6 py-2.5 bg-slate-50/40 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={fillKktpToEmpty}
-              className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:text-[#2563EB] font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-300 hover:text-[#2563EB] dark:hover:text-blue-400 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />
               Isi KKTP ({kktp}) ke yang Belum Dinilai
             </button>
             <button
               type="button"
               onClick={() => setIsResetConfirmOpen(true)}
-              className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-rose-300 hover:text-rose-600 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-rose-300 hover:text-rose-600 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <RotateCcw className="h-3.5 w-3.5 text-rose-500" />
               Kosongkan Nilai
@@ -378,10 +389,11 @@ export function InputGradesModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-[11px] text-slate-500">
-            * Invariant: <span className="font-semibold">Missing Grade ≠ Zero Grade</span>. Kolom
-            kosong berarti belum dinilai (bukan nilai nol).
+        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            * Catatan: Kolom yang kosong berstatus{" "}
+            <span className="font-semibold text-slate-700 dark:text-slate-200">belum dinilai</span>{" "}
+            (bukan nilai 0).
           </p>
 
           <div className="flex items-center gap-2">
@@ -389,7 +401,7 @@ export function InputGradesModal({
               type="button"
               onClick={handleClose}
               disabled={isPending}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
             >
               Batal
             </button>
@@ -398,7 +410,7 @@ export function InputGradesModal({
               type="button"
               onClick={() => handleSave(false)}
               disabled={isPending || isLoadingData}
-              className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:scale-98 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-98 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
               {isPending ? "Menyimpan..." : "Simpan Draf"}
@@ -425,16 +437,19 @@ export function InputGradesModal({
           aria-labelledby="reset-grades-title"
           className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
         >
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-rose-100 p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-rose-100 dark:border-rose-950 p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-200">
             <div className="flex items-start gap-4">
-              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 shrink-0">
+              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900 text-rose-600 dark:text-rose-400 shrink-0">
                 <AlertTriangle className="h-6 w-6" />
               </div>
               <div className="space-y-1 text-left flex-1">
-                <h3 id="reset-grades-title" className="text-base font-bold text-slate-900">
+                <h3
+                  id="reset-grades-title"
+                  className="text-base font-bold text-slate-900 dark:text-slate-100"
+                >
                   Kosongkan Seluruh Nilai
                 </h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                   Apakah Anda yakin ingin mengosongkan seluruh isian nilai siswa pada lembar asesmen
                   ini? Perubahan belum tersimpan permanen sebelum Anda menekan Simpan.
                 </p>
@@ -445,7 +460,7 @@ export function InputGradesModal({
               <button
                 type="button"
                 onClick={() => setIsResetConfirmOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -461,6 +476,7 @@ export function InputGradesModal({
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

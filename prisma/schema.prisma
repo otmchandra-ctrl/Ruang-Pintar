@@ -85,7 +85,14 @@ model Sekolah {
   langganan_tenant          LanggananTenant[]
   preferensi_onboarding_guru PreferensiOnboardingGuru[]
   rapor_siswa               RaporSiswa[]
+  folder_bank_soal          FolderBankSoal[]
   sesi_tenant_aktif         SesiPengguna[] @relation("SesiTenantAktif")
+  capaian_pembelajaran      CapaianPembelajaran[]
+  kriteria_ketercapaian_tp  KriteriaKetercapaianTp[]
+  kisi_kisi_asesmen         KisiKisiAsesmen[]
+  item_kisi_kisi            ItemKisiKisi[]
+  exam_sessions             ExamSession[]
+  assessment_attempts       AssessmentAttempt[]
 
   @@map("sekolah")
 }
@@ -461,9 +468,10 @@ model Fase {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  sekolah       Sekolah        @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
-  tingkat_kelas TingkatKelas[]
-  rombel        Rombel[]
+  sekolah              Sekolah               @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  tingkat_kelas        TingkatKelas[]
+  rombel               Rombel[]
+  capaian_pembelajaran CapaianPembelajaran[]
 
   @@unique([sekolah_id, kode])
   @@map("fase")
@@ -610,6 +618,7 @@ model Siswa {
   pengajuan_wali      PengajuanWali[]
   catatan_monitoring  CatatanMonitoring[]
   rapor_siswa         RaporSiswa[]
+  assessment_attempts AssessmentAttempt[]
 
   @@unique([sekolah_id, nis])
   @@index([sekolah_id, status_akademik])
@@ -663,6 +672,7 @@ model PenempatanRombel {
   nilai_siswa         NilaiSiswa[]
   sesi_ujian_siswa    SesiUjianSiswa[]
   rapor_siswa         RaporSiswa[]
+  assessment_attempts AssessmentAttempt[]
 
   @@index([rombel_id, status])
   @@index([keikutsertaan_id, status])
@@ -705,6 +715,7 @@ model Guru {
   tugas_dibuat              DefinisiTugas[]
   administrasi_pembelajaran AdministrasiPembelajaran[]
   bank_soal                 BankSoal[]
+  folder_bank_soal          FolderBankSoal[]
 
   @@index([sekolah_id, status_aktif])
   @@index([sekolah_id, status_lifecycle])
@@ -731,8 +742,9 @@ model MataPelajaran {
   jadwal_pelajaran    JadwalPelajaran[]
   sesi_kelas_aktual   SesiKelasAktual[]
   materi_pembelajaran MateriPembelajaran[]
-  definisi_tugas      DefinisiTugas[]
-  bank_soal           BankSoal[]
+  definisi_tugas       DefinisiTugas[]
+  bank_soal            BankSoal[]
+  capaian_pembelajaran CapaianPembelajaran[]
 
   @@unique([sekolah_id, kode])
   @@index([sekolah_id, status_aktif])
@@ -979,24 +991,29 @@ model LingkupMateri {
 
 /// M11 — Learning: Tujuan Pembelajaran (TP) per Lingkup Materi / BAB
 model TujuanPembelajaran {
-  id                String   @id
-  sekolah_id        String
-  lingkup_materi_id String
-  kode              String? // e.g. "TP 1.1", "TP 1.2"
-  deskripsi         String
-  urutan            Int      @default(1)
-  status            String   @default("AKTIF") // AKTIF | NONAKTIF
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  id                      String   @id
+  sekolah_id              String
+  lingkup_materi_id       String
+  capaian_pembelajaran_id String?
+  kode                    String? // e.g. "TP 1.1", "TP 1.2"
+  deskripsi               String
+  urutan                  Int      @default(1)
+  status                  String   @default("AKTIF") // AKTIF | NONAKTIF
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
 
-  sekolah        Sekolah                          @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
-  lingkup_materi LingkupMateri                    @relation(fields: [lingkup_materi_id], references: [id], onDelete: Cascade)
-  administrasi        AdministrasiTujuanPembelajaran[]
-  definisi_asesmen    DefinisiAsesmen[]
-  bank_soal           BankSoal[]
+  sekolah              Sekolah                          @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  lingkup_materi       LingkupMateri                    @relation(fields: [lingkup_materi_id], references: [id], onDelete: Cascade)
+  capaian_pembelajaran CapaianPembelajaran?             @relation(fields: [capaian_pembelajaran_id], references: [id], onDelete: SetNull)
+  kriteria_ketercapaian KriteriaKetercapaianTp?
+  administrasi         AdministrasiTujuanPembelajaran[]
+  definisi_asesmen     DefinisiAsesmen[]
+  bank_soal            BankSoal[]
+  item_kisi_kisi       ItemKisiKisi[]
 
   @@index([lingkup_materi_id, urutan])
   @@index([sekolah_id, status])
+  @@index([capaian_pembelajaran_id])
   @@map("tujuan_pembelajaran")
 }
 
@@ -1220,6 +1237,7 @@ model DefinisiAsesmen {
   nilai_siswa         NilaiSiswa[]
   publikasi           PublikasiNilaiAsesmen[]
   ujian_cbt           UjianCbt[]
+  kisi_kisi           KisiKisiAsesmen?
 
   @@index([penugasan_mengajar_id, tanggal_pelaksanaan])
   @@index([tp_id])
@@ -1287,27 +1305,37 @@ model BankSoal {
   mata_pelajaran_id      String
   lingkup_materi_id      String?
   tujuan_pembelajaran_id String?
+  capaian_pembelajaran_id String?
+  folder_id              String?   // Folder organisasi (opsional, NULL = root/tanpa folder)
   kode                   String    // e.g. "SOAL-INF-001"
   judul                  String
   tipe_soal              String    @default("PILIHAN_GANDA") // PILIHAN_GANDA | PILIHAN_GANDA_KOMPLEKS | BENAR_SALAH | ISIAN_SINGKAT | ESAI
   tingkat_kesulitan      String    @default("SEDANG") // MUDAH | SEDANG | SULIT
+  scope_kepemilikan      String    @default("PERSONAL") // PERSONAL | SEKOLAH
+  level_kognitif         String    @default("L2") // L1 | L2 | L3
   versi_aktif            Int       @default(1)
   status                 String    @default("AKTIF") // AKTIF | ARSIP
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
-  sekolah             Sekolah             @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
-  guru                Guru                @relation(fields: [guru_id], references: [id], onDelete: Restrict)
-  mata_pelajaran      MataPelajaran       @relation(fields: [mata_pelajaran_id], references: [id], onDelete: Restrict)
-  lingkup_materi      LingkupMateri?      @relation(fields: [lingkup_materi_id], references: [id], onDelete: SetNull)
-  tujuan_pembelajaran TujuanPembelajaran? @relation(fields: [tujuan_pembelajaran_id], references: [id], onDelete: SetNull)
-  versi_soal          VersiSoal[]
+  sekolah              Sekolah               @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  guru                 Guru                  @relation(fields: [guru_id], references: [id], onDelete: Restrict)
+  mata_pelajaran       MataPelajaran         @relation(fields: [mata_pelajaran_id], references: [id], onDelete: Restrict)
+  lingkup_materi       LingkupMateri?        @relation(fields: [lingkup_materi_id], references: [id], onDelete: SetNull)
+  tujuan_pembelajaran  TujuanPembelajaran?   @relation(fields: [tujuan_pembelajaran_id], references: [id], onDelete: SetNull)
+  capaian_pembelajaran CapaianPembelajaran?  @relation(fields: [capaian_pembelajaran_id], references: [id], onDelete: SetNull)
+  folder               FolderBankSoal?       @relation(fields: [folder_id], references: [id], onDelete: SetNull)
+  versi_soal           VersiSoal[]
+  item_kisi_kisi       ItemKisiKisi[]
 
   @@unique([sekolah_id, kode])
   @@index([sekolah_id, mata_pelajaran_id, status])
+  @@index([sekolah_id, scope_kepemilikan, mata_pelajaran_id])
   @@index([guru_id])
   @@index([lingkup_materi_id])
   @@index([tujuan_pembelajaran_id])
+  @@index([capaian_pembelajaran_id])
+  @@index([folder_id])
   @@map("bank_soal")
 }
 
@@ -1327,8 +1355,9 @@ model VersiSoal {
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
-  sekolah   Sekolah  @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
-  bank_soal BankSoal @relation(fields: [bank_soal_id], references: [id], onDelete: Cascade)
+  sekolah        Sekolah        @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  bank_soal      BankSoal       @relation(fields: [bank_soal_id], references: [id], onDelete: Cascade)
+  item_kisi_kisi ItemKisiKisi[]
 
   @@unique([bank_soal_id, nomor_versi])
   @@index([sekolah_id])
@@ -1363,9 +1392,11 @@ model UjianCbt {
   sekolah            Sekolah           @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
   penugasan_mengajar PenugasanMengajar @relation(fields: [penugasan_mengajar_id], references: [id], onDelete: Cascade)
   asesmen            DefinisiAsesmen?  @relation(fields: [asesmen_id], references: [id], onDelete: SetNull)
-  snapshot_ujian     SnapshotUjian[]
-  sesi_ujian_siswa   SesiUjianSiswa[]
-  hasil_ujian_cbt    HasilUjianCbt[]
+  snapshot_ujian      SnapshotUjian[]
+  sesi_ujian_siswa    SesiUjianSiswa[]
+  hasil_ujian_cbt     HasilUjianCbt[]
+  exam_sessions       ExamSession[]
+  assessment_attempts AssessmentAttempt[]
 
   @@index([sekolah_id, penugasan_mengajar_id, status])
   @@index([penugasan_mengajar_id])
@@ -1375,26 +1406,95 @@ model UjianCbt {
 
 /// M14 — CBT: Immutable Exam Snapshot (Source of truth ujian saat attempt dimulai)
 model SnapshotUjian {
-  id              String    @id
-  sekolah_id      String
-  ujian_cbt_id    String
-  nomor_snapshot  Int       @default(1)
-  total_soal      Int
-  total_bobot     Float
-  durasi_menit    Int
-  konfigurasi     String    // JSON: settings (acak_soal, acak_opsi, kktp, dll)
-  manifest_soal   String    // JSON: array item soal (TANPA KUNCI JAWABAN! Aman dikirim ke client)
-  kunci_penilaian String    // JSON: array kunci jawaban + bobot (SECRET! SERVER BOUNDARY ONLY)
-  dibekukan_oleh  String
-  created_at      DateTime  @default(now())
+  id                  String              @id
+  sekolah_id          String
+  ujian_cbt_id        String
+  nomor_snapshot      Int                 @default(1)
+  total_soal          Int
+  total_bobot         Float
+  durasi_menit        Int
+  konfigurasi         String              // JSON: settings (acak_soal, acak_opsi, kktp, dll)
+  manifest_soal       String              // JSON: array item soal (TANPA KUNCI JAWABAN! Aman dikirim ke client)
+  kunci_penilaian     String              // JSON: array kunci jawaban + bobot (SECRET! SERVER BOUNDARY ONLY)
+  metadata_ujian      String?             // JSON: metadata ujian (judul, deskripsi, mapel, guru, rombel, dll)
+  hash_integritas     String?             // SHA-256 hash komputasi integritas snapshot
+  dibekukan_oleh      String
+  created_at          DateTime            @default(now())
 
-  sekolah          Sekolah          @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
-  ujian_cbt        UjianCbt         @relation(fields: [ujian_cbt_id], references: [id], onDelete: Cascade)
-  sesi_ujian_siswa SesiUjianSiswa[]
+  sekolah             Sekolah             @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  ujian_cbt           UjianCbt            @relation(fields: [ujian_cbt_id], references: [id], onDelete: Cascade)
+  sesi_ujian_siswa    SesiUjianSiswa[]
+  assessment_attempts AssessmentAttempt[]
 
   @@unique([ujian_cbt_id, nomor_snapshot])
   @@index([sekolah_id])
   @@map("snapshot_ujian")
+}
+
+/// M14 — CBT: Sesi Pelaksanaan Ujian (Delivery Time Window, Room & Token)
+model ExamSession {
+  id               String    @id
+  sekolah_id       String
+  ujian_cbt_id     String
+  kode_sesi        String    // e.g. "SESI-01"
+  nama_sesi        String    // e.g. "Sesi 1 Pagi"
+  waktu_mulai      DateTime
+  waktu_selesai    DateTime
+  token            String?   // ABC123 (6 karakter alphanumeric kapital)
+  token_aktif      Boolean   @default(true)
+  token_expired_at DateTime?
+  status           String    @default("TERJADWAL") // TERJADWAL | DIBUKA | DITUTUP | SELESAI
+  ruang_ujian      String?
+  pengawas_nama    String?
+  catatan          String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  sekolah          Sekolah             @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  ujian_cbt        UjianCbt            @relation(fields: [ujian_cbt_id], references: [id], onDelete: Cascade)
+  attempts         AssessmentAttempt[]
+
+  @@unique([ujian_cbt_id, kode_sesi])
+  @@index([sekolah_id, status])
+  @@index([ujian_cbt_id])
+  @@map("exam_session")
+}
+
+/// M14 — CBT: Assessment Attempt Foundation (Lifecycle: NOT_STARTED | IN_PROGRESS | SUBMITTED | AUTO_SUBMITTED | ABANDONED)
+model AssessmentAttempt {
+  id                   String    @id
+  sekolah_id           String
+  ujian_cbt_id         String
+  exam_session_id      String?
+  snapshot_id          String
+  siswa_id             String
+  penempatan_rombel_id String?
+  attempt_ke           Int       @default(1)
+  waktu_mulai          DateTime?
+  batas_waktu_server   DateTime? // Server-authoritative timer deadline
+  waktu_selesai        DateTime?
+  status               String    @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | SUBMITTED | AUTO_SUBMITTED | ABANDONED
+  urutan_soal_peserta  String?   // JSON Array id soal sesuai permutasi acak peserta
+  ip_address           String?
+  user_agent           String?
+  token_sesi_aktif     String?   // Token unik sesi perangkat aktif (Single Device Lock)
+  catatan              String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  sekolah           Sekolah           @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  ujian_cbt         UjianCbt          @relation(fields: [ujian_cbt_id], references: [id], onDelete: Cascade)
+  exam_session      ExamSession?      @relation(fields: [exam_session_id], references: [id], onDelete: SetNull)
+  snapshot          SnapshotUjian     @relation(fields: [snapshot_id], references: [id], onDelete: Restrict)
+  siswa             Siswa             @relation(fields: [siswa_id], references: [id], onDelete: Restrict)
+  penempatan_rombel PenempatanRombel? @relation(fields: [penempatan_rombel_id], references: [id], onDelete: SetNull)
+
+  @@unique([ujian_cbt_id, siswa_id, attempt_ke])
+  @@index([siswa_id, status])
+  @@index([ujian_cbt_id, status])
+  @@index([exam_session_id])
+  @@index([sekolah_id, status])
+  @@map("assessment_attempt")
 }
 
 /// M14 — CBT: Sesi Pengerjaan Siswa / Exam Attempt (One active attempt, server-authoritative timer)
@@ -1413,6 +1513,7 @@ model SesiUjianSiswa {
   urutan_soal_peserta  String?   // JSON Array string id soal sesuai permutasi acak peserta ini
   ip_address           String?
   user_agent           String?
+  token_sesi_aktif     String?   // Token unik sesi perangkat aktif (Single Device Lock)
   created_at           DateTime  @default(now())
   updated_at           DateTime  @updatedAt
 
@@ -1894,3 +1995,132 @@ model RaporSiswa {
   @@map("rapor_siswa")
 }
 
+
+/// M14 — CBT: Folder Organisasi Bank Soal (Hierarkis ala Google Drive, maks 3 level)
+model FolderBankSoal {
+  id             String    @id
+  sekolah_id     String
+  guru_id        String
+  parent_id      String?            // NULL = folder root level
+  nama           String             // e.g. "UTS Semester 1 Kelas IX"
+  deskripsi      String?
+  warna          String?   @default("#3B82F6") // Tag warna folder
+  urutan         Int       @default(0)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  sekolah        Sekolah          @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  guru           Guru             @relation(fields: [guru_id], references: [id], onDelete: Restrict)
+  parent         FolderBankSoal?  @relation("SubFolders", fields: [parent_id], references: [id], onDelete: Cascade)
+  sub_folders    FolderBankSoal[] @relation("SubFolders")
+  bank_soal      BankSoal[]
+
+  @@unique([sekolah_id, guru_id, parent_id, nama])
+  @@index([sekolah_id, guru_id])
+  @@index([parent_id])
+  @@map("folder_bank_soal")
+}
+
+/// M06/M11 — Kurikulum Merdeka: Capaian Pembelajaran (CP) per Fase & Mata Pelajaran
+model CapaianPembelajaran {
+  id                String   @id
+  sekolah_id        String
+  mata_pelajaran_id String
+  fase_id           String
+  kode              String   // e.g. "CP-INF-FASE-E"
+  elemen            String?  // e.g. "Berpikir Komputasional", "Algoritma & Pemrograman"
+  deskripsi         String   // Teks narasi capaian kompetensi fase resmi
+  urutan            Int      @default(1)
+  status            String   @default("AKTIF") // AKTIF | NONAKTIF | ARSIP
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  sekolah             Sekolah               @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  mata_pelajaran      MataPelajaran         @relation(fields: [mata_pelajaran_id], references: [id], onDelete: Restrict)
+  fase                Fase                  @relation(fields: [fase_id], references: [id], onDelete: Restrict)
+  tujuan_pembelajaran TujuanPembelajaran[]
+  bank_soal           BankSoal[]
+
+  @@unique([sekolah_id, mata_pelajaran_id, fase_id, kode])
+  @@index([sekolah_id, mata_pelajaran_id, status])
+  @@map("capaian_pembelajaran")
+}
+
+/// M11/M13 — Kurikulum Merdeka: Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)
+model KriteriaKetercapaianTp {
+  id                     String   @id
+  sekolah_id             String
+  tujuan_pembelajaran_id String   @unique
+  tipe_kktp              String   @default("SKALA_INTERVAL") // SKALA_INTERVAL | RUBRIK_DESKRIPTIF | DAFTAR_KRITERIA
+  ambang_tuntas          Float    @default(75.0) // Nilai minimum tuntas (e.g. 75.0)
+  interval_json          String?  // JSON Array: interval skor, predikat, dan deskripsi tindak lanjut
+  rubrik_json            String?  // JSON Array: kriteria rubrik kualitatif
+  deskripsi              String?
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  sekolah             Sekolah            @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  tujuan_pembelajaran TujuanPembelajaran @relation(fields: [tujuan_pembelajaran_id], references: [id], onDelete: Cascade)
+
+  @@index([sekolah_id])
+  @@map("kriteria_ketercapaian_tp")
+}
+
+/// M13 — Assessment: Matriks Kisi-Kisi / Blueprint Asesmen Resmi
+model KisiKisiAsesmen {
+  id                  String   @id
+  sekolah_id          String
+  definisi_asesmen_id String   @unique
+  judul               String
+  tahun_ajaran        String   // e.g. "2026/2027"
+  semester            String   // GANJIL | GENAP
+  alokasi_waktu_menit Int      @default(90)
+  total_butir_soal    Int      @default(0)
+  status              String   @default("DRAFT") // DRAFT | REVIEW | FINAL | ARSIP
+  catatan_supervisi   String?
+  snapshot_hash       String?  // SHA-256 verification hash
+  tanggal_dibekukan   DateTime?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  sekolah          Sekolah         @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  definisi_asesmen DefinisiAsesmen @relation(fields: [definisi_asesmen_id], references: [id], onDelete: Cascade)
+  items            ItemKisiKisi[]
+
+  @@index([sekolah_id, status])
+  @@map("kisi_kisi_asesmen")
+}
+
+/// M13 — Assessment: Rincian Butir Item Matriks Kisi-Kisi Asesmen
+model ItemKisiKisi {
+  id                     String   @id
+  sekolah_id             String
+  kisi_kisi_id           String
+  tujuan_pembelajaran_id String
+  nomor_urut             Int
+  indikator_soal         String
+  level_kognitif         String   @default("L2") // L1 (Pemahaman), L2 (Aplikasi), L3 (Penalaran/HOTS)
+  bentuk_soal            String   @default("PILIHAN_GANDA") // PILIHAN_GANDA | ESAI | etc.
+  bobot_skor             Float    @default(1.0)
+  bank_soal_id           String?
+  versi_soal_id          String?
+  snapshot_pertanyaan    String?  // Frozen snapshot content
+  snapshot_opsi          String?  // JSON
+  snapshot_kunci         String?  // JSON
+  snapshot_pembahasan    String?
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  sekolah             Sekolah            @relation(fields: [sekolah_id], references: [id], onDelete: Restrict)
+  kisi_kisi           KisiKisiAsesmen    @relation(fields: [kisi_kisi_id], references: [id], onDelete: Cascade)
+  tujuan_pembelajaran TujuanPembelajaran @relation(fields: [tujuan_pembelajaran_id], references: [id], onDelete: Restrict)
+  bank_soal           BankSoal?          @relation(fields: [bank_soal_id], references: [id], onDelete: SetNull)
+  versi_soal          VersiSoal?         @relation(fields: [versi_soal_id], references: [id], onDelete: SetNull)
+
+  @@unique([kisi_kisi_id, nomor_urut])
+  @@index([sekolah_id, kisi_kisi_id])
+  @@index([tujuan_pembelajaran_id])
+  @@index([bank_soal_id])
+  @@index([versi_soal_id])
+  @@map("item_kisi_kisi")
+}

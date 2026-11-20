@@ -1,0 +1,51 @@
+# Rekap Akun & Password Siswa Kelas X TO 3
+## Ruang Pintar — SMK Otomindo
+**Tanggal Dibuat:** 15/10/2026, 06.41.35 WIB  
+**Total Siswa:** 37 Siswa  
+**Format Password:** `xto3#<4_digit>@<2_huruf>` (Huruf kecil, angka, dan simbol)
+
+> **Catatan Penggunaan:**
+> - Bagikan kredensial berikut kepada siswa untuk login CBT di URL aplikasi / portal Ruang Pintar.
+> - Password menggunakan huruf kecil seluruhnya agar siswa mudah mengetik di HP tanpa kendala tombol Shift/Caps Lock.
+> - Setiap siswa memiliki kata sandi unik demi keamanan dan integritas nilai ujian.
+> - Status `harus_ganti_password` telah diset ke `false` sehingga siswa langsung diarahkan ke beranda ujian tanpa kendala formulir reset sandi.
+
+| No | Nama Lengkap Siswa | NIS | Username | Password Baru |
+| :---: | :--- | :---: | :---: | :---: |
+| 1 | Ahmad Fatoni | 1001 | `xto3-01` | `xto3#1752@bv` |
+| 2 | Alif Adhitya Dirgantara | 1002 | `xto3-02` | `xto3#3459@zv` |
+| 3 | Andika Rizky Ramadhan | 1003 | `xto3-03` | `xto3#6503@wx` |
+| 4 | Ayzicho Aulia Supriyanto | 1004 | `xto3-04` | `xto3#9207@wx` |
+| 5 | Bayu Adji Setiawan | 1005 | `xto3-05` | `xto3#3860@ht` |
+| 6 | David Rama Dhani | 1006 | `xto3-06` | `xto3#8471@wz` |
+| 7 | Dzakky Dwi Putra | 1007 | `xto3-07` | `xto3#5581@pg` |
+| 8 | Fachry Azka Fauzan | 1008 | `xto3-08` | `xto3#4411@cc` |
+| 9 | Farel Ardiyansyah | 1009 | `xto3-09` | `xto3#9067@wx` |
+| 10 | Faris Rafka Alkahfi | 1010 | `xto3-10` | `xto3#6912@ce` |
+| 11 | Fathir Faturrahman | 1011 | `xto3-11` | `xto3#7408@rk` |
+| 12 | Galih Linggar Ramadhan | 1012 | `xto3-12` | `xto3#2950@ec` |
+| 13 | Galuh Sadewo | 1013 | `xto3-13` | `xto3#2215@jf` |
+| 14 | Herdy Zuan Key | 1014 | `xto3-14` | `xto3#1230@kj` |
+| 15 | Ibrahim | 1015 | `xto3-15` | `xto3#9843@uq` |
+| 16 | M Firza Tulloh | 1016 | `xto3-16` | `xto3#4457@cs` |
+| 17 | Maritza Hamizan Mahkrus | 1017 | `xto3-17` | `xto3#4918@np` |
+| 18 | Maulana Ibrahim | 1018 | `xto3-18` | `xto3#1321@ba` |
+| 19 | Maulana Malik Ibrahim | 1019 | `xto3-19` | `xto3#7413@qc` |
+| 20 | Mohamad Alfazani | 1020 | `xto3-20` | `xto3#7474@mf` |
+| 21 | Muhammad Arsya Wijaya | 1021 | `xto3-21` | `xto3#1442@jp` |
+| 22 | Muhammad Alfa Rizky Aditya | 1022 | `xto3-22` | `xto3#8337@qd` |
+| 23 | Muhammad Fahri Amruhu Fathur | 1023 | `xto3-23` | `xto3#7426@xf` |
+| 24 | Muhammad Kahfi Fadlyansyah | 1024 | `xto3-24` | `xto3#1063@ch` |
+| 25 | Muhammad Rafa Al Farizi | 1025 | `xto3-25` | `xto3#3016@je` |
+| 26 | Muhammad Razka Aryadi | 1026 | `xto3-26` | `xto3#4077@vt` |
+| 27 | Muhammad Safaat | 1027 | `xto3-27` | `xto3#7270@ep` |
+| 28 | Naufal Halil Pradipta | 1028 | `xto3-28` | `xto3#4915@mh` |
+| 29 | Putra Ramadhan | 1029 | `xto3-29` | `xto3#1651@hh` |
+| 30 | Raffi Aldiansyah | 1030 | `xto3-30` | `xto3#3290@yv` |
+| 31 | Ridho Pratama | 1031 | `xto3-31` | `xto3#5438@wm` |
+| 32 | Rizky Jaka jaladara | 1032 | `xto3-32` | `xto3#6780@an` |
+| 33 | Satrio Wicaksono | 1033 | `xto3-33` | `xto3#8188@hh` |
+| 34 | Tedy Maulana | 1034 | `xto3-34` | `xto3#1747@gq` |
+| 35 | Yoghi Fauzan Azima | 1035 | `xto3-35` | `xto3#3978@tv` |
+| 36 | Yudha Rhafa Hidayat | 1036 | `xto3-36` | `xto3#6950@as` |
+| 37 | Zulkifli Amin | 1037 | `xto3-37` | `xto3#7333@fh` |

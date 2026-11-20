@@ -92,6 +92,33 @@ describe("Identity Service (M02) — User Account Lifecycle", () => {
     expect(updatedUser!.harus_ganti_password).toBe(false);
   });
 
+  it("changes user password without old password when harus_ganti_password is true (Mandatory Reset)", async () => {
+    const user = await identityService.findUserByUsername(testUsername);
+    expect(user).not.toBeNull();
+
+    // Set user to require password change (as if provisioned by admin)
+    await prisma.pengguna.update({
+      where: { id: user!.id },
+      data: { harus_ganti_password: true },
+    });
+
+    // Mandatory change without old password
+    const mandatoryResult = await identityService.changePassword(
+      user!.id,
+      "", // empty old password
+      "MandatoryNewPass789"
+    );
+    expect(mandatoryResult.success).toBe(true);
+
+    const updatedUser = await identityService.findUserById(user!.id);
+    expect(updatedUser!.harus_ganti_password).toBe(false);
+
+    // Verify the new password can now be used with verifyPassword
+    const { verifyPassword } = await import("@/shared/lib/password");
+    const isMatch = await verifyPassword("MandatoryNewPass789", updatedUser!.password_hash);
+    expect(isMatch).toBe(true);
+  });
+
   it("updates user account status", async () => {
     const user = await identityService.findUserByUsername(testUsername);
     const updated = await identityService.setUserAccountStatus(user!.id, "NONAKTIF");

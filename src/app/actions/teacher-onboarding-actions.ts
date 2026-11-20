@@ -9,6 +9,7 @@ import {
 import { studentImportService } from "@/modules/student/application/student-import-service";
 import { SubjectService } from "@/modules/teacher/application/subject-service";
 import { prisma } from "@/shared/infrastructure/database/prisma";
+import { containsText } from "@/shared/infrastructure/database/query-filters";
 import {
   TeacherGradeChoice,
   teacherOnboardingService,
@@ -352,7 +353,7 @@ export async function searchRegisteredSchoolsAction(query: string): Promise<
     const schools = await prisma.sekolah.findMany({
       where: {
         status_aktif: true,
-        OR: [{ nama: { contains: term } }, { npsn: { contains: term } }],
+        OR: [{ nama: containsText(term) }, { npsn: containsText(term) }],
       },
       select: {
         id: true,

@@ -21,11 +21,22 @@ export function GantiPasswordForm({
     event.preventDefault();
     setErrorMessage(null);
     const formData = new FormData(event.currentTarget);
+    const oldPassword = formData.get("oldPassword")?.toString() ?? "";
     const newPassword = formData.get("newPassword")?.toString() ?? "";
     const confirmPassword = formData.get("confirmPassword")?.toString() ?? "";
 
+    if (hasSession && !isMandatory && !oldPassword) {
+      setErrorMessage("Kata sandi saat ini wajib diisi.");
+      return;
+    }
+
     if (newPassword.length < 8) {
       setErrorMessage("Kata sandi baru minimal 8 karakter.");
+      return;
+    }
+
+    if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setErrorMessage("Kata sandi harus mengandung kombinasi huruf dan angka.");
       return;
     }
 
@@ -145,7 +156,9 @@ export function GantiPasswordForm({
         <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 flex items-start gap-2.5">
           <ShieldCheck className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
           <p className="text-[11px] text-slate-600 leading-relaxed">
-            Setelah berhasil memperbarui kata sandi, Anda akan dialihkan kembali ke halaman masuk.
+            {hasSession
+              ? "Setelah berhasil memperbarui kata sandi, Anda akan dialihkan ke dashboard sistem."
+              : "Setelah berhasil memperbarui kata sandi, Anda akan dialihkan kembali ke halaman masuk."}
           </p>
         </div>
       </div>

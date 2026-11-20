@@ -55,7 +55,7 @@ export function ThemeSwitcher() {
           type="button"
           aria-label="Pilih Mode Tampilan (Siang, Malam, Jam Device)"
           title="Pilih Mode Tampilan (Siang, Malam, Jam Device)"
-          className="relative flex items-center justify-center text-slate-500 hover:text-[#2563EB] hover:bg-slate-200/60 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 cursor-pointer"
+          className="relative flex items-center justify-center min-h-[44px] min-w-[44px] text-slate-500 hover:text-[#2563EB] hover:bg-slate-200/60 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 cursor-pointer"
         >
           <Sun className="h-5 w-5 text-amber-500" />
         </button>
@@ -71,7 +71,7 @@ export function ThemeSwitcher() {
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Pilih Mode Tampilan (Siang, Malam, Jam Device)"
         title="Pilih Mode Tampilan (Siang, Malam, Jam Device)"
-        className="relative flex items-center justify-center text-slate-500 hover:text-[#2563EB] hover:bg-slate-200/60 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 cursor-pointer"
+        className="relative flex items-center justify-center min-h-[44px] min-w-[44px] text-slate-500 hover:text-[#2563EB] hover:bg-slate-200/60 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 p-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 cursor-pointer"
       >
         {theme === "light" && <Sun className="h-5 w-5 text-amber-500" />}
         {theme === "dark" && <Moon className="h-5 w-5 text-indigo-400" />}
@@ -87,9 +87,9 @@ export function ThemeSwitcher() {
         )}
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu (Safe Mobile Fixed Boundary & Desktop Popover) */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 shadow-2xl p-1.5 z-50 animate-in fade-in-0 zoom-in-95 duration-150">
+        <div className="fixed sm:absolute right-4 sm:right-0 top-[5.25rem] sm:top-full mt-0 sm:mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-64 origin-top-right rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 shadow-2xl p-1.5 z-50 animate-in fade-in-0 zoom-in-95 duration-150">
           <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
             <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
               Mode Tampilan

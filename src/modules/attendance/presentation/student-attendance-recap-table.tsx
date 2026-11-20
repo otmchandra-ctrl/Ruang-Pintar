@@ -173,7 +173,9 @@ export function StudentAttendanceRecapTable({
           <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
             {recap.total_siswa} Siswa
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500">Rombel: {recap.rombel_nama}</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500">
+            Rombel: {recap.rombel_nama}
+          </p>
         </div>
 
         {/* Total Sesi Tercatat */}
@@ -224,7 +226,9 @@ export function StudentAttendanceRecapTable({
           <div className="text-xl sm:text-2xl font-black text-rose-700 dark:text-rose-400">
             {recap.jumlah_perlu_perhatian} Siswa
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500">Kehadiran &lt; 75% atau Alpha &ge; 3</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500">
+            Kehadiran &lt; 75% atau Alpha &ge; 3
+          </p>
         </div>
       </div>
 
@@ -329,7 +333,10 @@ export function StudentAttendanceRecapTable({
                 >
                   S
                 </th>
-                <th className="py-3 px-2 text-center text-sky-700 dark:text-sky-300 bg-sky-50/40 dark:bg-sky-950/40 w-12" title="Izin">
+                <th
+                  className="py-3 px-2 text-center text-sky-700 dark:text-sky-300 bg-sky-50/40 dark:bg-sky-950/40 w-12"
+                  title="Izin"
+                >
                   I
                 </th>
                 <th
@@ -459,7 +466,11 @@ export function StudentAttendanceRecapTable({
 
                       {/* Terlambat (T) */}
                       <td className="py-3 px-2 text-center font-mono font-bold text-orange-700 dark:text-orange-400 bg-orange-50/20 dark:bg-orange-950/20">
-                        {s.terlambat > 0 ? s.terlambat : <span className="text-slate-300 dark:text-slate-600">0</span>}
+                        {s.terlambat > 0 ? (
+                          s.terlambat
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600">0</span>
+                        )}
                       </td>
 
                       {/* Total Sesi */}
@@ -526,7 +537,9 @@ export function StudentAttendanceRecapTable({
                   <td className="py-3 px-2 text-center text-amber-700 dark:text-amber-400 font-mono">
                     {totalSakitCases}
                   </td>
-                  <td className="py-3 px-2 text-center text-sky-700 dark:text-sky-400 font-mono">{totalIzinCases}</td>
+                  <td className="py-3 px-2 text-center text-sky-700 dark:text-sky-400 font-mono">
+                    {totalIzinCases}
+                  </td>
                   <td className="py-3 px-2 text-center text-rose-700 dark:text-rose-400 font-mono">
                     {totalAlphaCases}
                   </td>

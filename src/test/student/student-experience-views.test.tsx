@@ -241,16 +241,16 @@ describe("Student Experience Presentation Views (Academic Glass UI v1.2)", () =>
     expect(screen.getByText("X RPL • Semester Ganjil")).toBeDefined();
 
     // Stat cards
-    expect(screen.getByText("100%")).toBeDefined();
+    expect(screen.getAllByText("100%").length).toBeGreaterThan(0);
     expect(screen.getByText("88.5")).toBeDefined();
 
     // Jadwal hari ini
     expect(screen.getAllByText("Dasar Rekayasa Perangkat Lunak").length).toBeGreaterThan(0);
     expect(screen.getByText("07:00")).toBeDefined();
 
-    // CBT section
-    expect(screen.getByText("PTS Dasar Rekayasa Perangkat Lunak")).toBeDefined();
-    expect(screen.getByText("Mulai Ujian Online →")).toBeDefined();
+    // CBT section (tampil di Live Spotlight Banner atas dan di kartu CBT samping)
+    expect(screen.getAllByText("PTS Dasar Rekayasa Perangkat Lunak").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Mulai Ujian Online/i).length).toBeGreaterThan(0);
   });
 
   it("merender StudentLearningView dan beralih antar Tab Tugas, Materi, dan Presensi", () => {
@@ -323,5 +323,34 @@ describe("Student Experience Presentation Views (Academic Glass UI v1.2)", () =>
     expect(screen.getByText(": Rian Pratama")).toBeDefined();
     expect(screen.getByText("Drs. H. Mulyadi, M.Pd.")).toBeDefined();
     expect(screen.getByText(/Prestasi ananda sangat memuaskan/i)).toBeDefined();
+  });
+
+  it("merender honest empty state dan TIDAK mengarang nilai ketika siswa belum memiliki asesmen terpublikasi", async () => {
+    const unassessedDashboardData: StudentDashboardData = {
+      ...mockDashboardData,
+      nilaiTerbaru: [],
+      statCards: {
+        ...mockDashboardData.statCards,
+        nilaiRataRata: null,
+      },
+    };
+
+    const Component = await StudentDashboard({
+      user: mockUser,
+      initialData: unassessedDashboardData,
+    });
+
+    render(Component);
+
+    // Verifikasi: Honest empty state aktif
+    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+    expect(screen.getByText("Belum Ada Penilaian")).toBeDefined();
+    expect(screen.getByText("Belum Ada Data Penilaian")).toBeDefined();
+
+    // Verifikasi: Tidak ada data rekaan / fabrikasi nilai
+    expect(screen.queryByText("Pemrograman Bergerak")).toBeNull();
+    expect(screen.queryByText("86.5")).toBeNull();
+    expect(screen.queryByText("85.0")).toBeNull();
+    expect(screen.queryByText("82.5")).toBeNull();
   });
 });

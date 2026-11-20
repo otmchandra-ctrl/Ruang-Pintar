@@ -43,19 +43,19 @@ export function TeacherKpiGrid({
           <InteractiveCard
             hoverY={-3}
             hoverScale={1.02}
-            className="h-full p-4 rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-xs hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors flex flex-col justify-between cursor-pointer"
+            className="h-full p-4 rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-[16px] border border-white/75 dark:border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.25)] hover:shadow-md hover:border-white/90 dark:hover:border-white/30 transition-all flex flex-col justify-between cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                 {isOwnerTenant ? "Total Kelas" : "Rombel Diajar"}
               </span>
-              <div className="p-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 group-hover:scale-110 transition-transform">
-                <BookOpen className="h-4 w-4" />
-              </div>
             </div>
             <div className="mt-2.5">
-              <div className="font-mono text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                <AnimatedCounter value={totalRombel} decimals={0} suffix=" Rombel" />
+              <div className="font-mono text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                <AnimatedCounter value={totalRombel} decimals={0} />
+              </div>
+              <div className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">
+                Rombel
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 {activeAssignmentsCount} Penugasan • {uniqueMapelsCount} Mapel
@@ -70,19 +70,19 @@ export function TeacherKpiGrid({
         <InteractiveCard
           hoverY={-3}
           hoverScale={1.02}
-          className="h-full p-4 rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-xs flex flex-col justify-between"
+          className="h-full p-4 rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-[16px] border border-white/75 dark:border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.25)] flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          <div>
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
               {isOwnerTenant ? "Siswa Workspace" : "Siswa Binaan"}
             </span>
-            <div className="p-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-              <Users className="h-4 w-4" />
-            </div>
           </div>
           <div className="mt-2.5">
-            <div className="font-mono text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+            <div className="font-mono text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
               <AnimatedCounter value={totalSiswaBinaan} decimals={0} />
+            </div>
+            <div className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">
+              Siswa
             </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
               Total Siswa Aktif
@@ -97,19 +97,19 @@ export function TeacherKpiGrid({
           <InteractiveCard
             hoverY={-3}
             hoverScale={1.02}
-            className="h-full p-4 rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-xs hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors flex flex-col justify-between cursor-pointer"
+            className="h-full p-4 rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-[16px] border border-white/75 dark:border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.25)] hover:shadow-md hover:border-white/90 dark:hover:border-white/30 transition-all flex flex-col justify-between cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                 Beban KBM
               </span>
-              <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
-                <Clock className="h-4 w-4" />
-              </div>
             </div>
             <div className="mt-2.5">
-              <div className="font-mono text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 tracking-tight">
-                <AnimatedCounter value={totalJamMinggu} decimals={0} suffix=" JP" />
+              <div className="font-mono text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                <AnimatedCounter value={totalJamMinggu} decimals={0} />
+              </div>
+              <div className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">
+                JP / Minggu
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Jam per Minggu
@@ -125,19 +125,19 @@ export function TeacherKpiGrid({
           <InteractiveCard
             hoverY={-3}
             hoverScale={1.02}
-            className="h-full p-4 rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-xs hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors flex flex-col justify-between cursor-pointer"
+            className="h-full p-4 rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-[16px] border border-white/75 dark:border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.25)] hover:shadow-md hover:border-white/90 dark:hover:border-white/30 transition-all flex flex-col justify-between cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                 Koreksi Tugas
               </span>
-              <div className="p-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
-                <ClipboardCheck className="h-4 w-4" />
-              </div>
             </div>
             <div className="mt-2.5">
-              <div className="font-mono text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              <div className="font-mono text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
                 <AnimatedCounter value={totalTugasPerluDiperiksa} decimals={0} />
+              </div>
+              <div className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">
+                Tugas
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 {totalTugasPerluDiperiksa > 0 ? "Menunggu Penilaian" : "Semua Terkoreksi"}
@@ -153,19 +153,19 @@ export function TeacherKpiGrid({
           <InteractiveCard
             hoverY={-3}
             hoverScale={1.02}
-            className="h-full p-4 rounded-2xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-xs hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors flex flex-col justify-between cursor-pointer"
+            className="h-full p-4 rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-[16px] border border-white/75 dark:border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.25)] hover:shadow-md hover:border-white/90 dark:hover:border-white/30 transition-all flex flex-col justify-between cursor-pointer"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                 CBT Aktif
               </span>
-              <div className="p-1.5 rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
             </div>
             <div className="mt-2.5">
-              <div className="font-mono text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              <div className="font-mono text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
                 <AnimatedCounter value={totalCbtAktif} decimals={0} />
+              </div>
+              <div className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300 mt-1">
+                Ujian CBT
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 {totalCbtAktif > 0 ? "Ujian Berlangsung" : "Tidak Ada Ujian Aktif"}

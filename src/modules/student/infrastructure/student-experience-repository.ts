@@ -169,7 +169,7 @@ export class StudentExperienceRepository {
     const currentMinutes = now.getMinutes();
     const currentTimeStr = `${String(currentHours).padStart(2, "0")}:${String(currentMinutes).padStart(2, "0")}`;
 
-    return entries.map((entry) => {
+    const rawList: StudentTodayScheduleItem[] = entries.map((entry) => {
       let status: "SELESAI" | "AKTIF" | "MENDATANG" = "MENDATANG";
       if (entry.slot_waktu.jam_selesai < currentTimeStr) {
         status = "SELESAI";
@@ -194,8 +194,43 @@ export class StudentExperienceRepository {
         ruangan: entry.ruangan,
         status,
         penugasanMengajarId: entry.penugasan_mengajar_id,
+        totalJp: 1,
+        slotRangeLabel: `Jam ke-${entry.slot_waktu.urutan}`,
       };
     });
+
+    // Gabungkan slot waktu berurutan untuk mata pelajaran & guru yang sama menjadi 1 kartu
+    const mergedList: StudentTodayScheduleItem[] = [];
+    for (const item of rawList) {
+      const prev = mergedList[mergedList.length - 1];
+      const isSameSubject = prev && prev.mataPelajaranNama === item.mataPelajaranNama;
+      const isSameTeacher = prev && prev.guruNama === item.guruNama;
+      const isSameRoom = prev && (prev.ruangan || "") === (item.ruangan || "");
+      const isConsecutive =
+        prev &&
+        (prev.jamSelesai === item.jamMulai || item.urutan === prev.urutan + (prev.totalJp || 1));
+
+      if (isSameSubject && isSameTeacher && isSameRoom && isConsecutive) {
+        prev.jamSelesai = item.jamSelesai;
+        prev.totalJp = (prev.totalJp || 1) + 1;
+        const startUrutan = prev.urutan;
+        const endUrutan = item.urutan;
+        prev.slotRangeLabel = `Jam ke-${startUrutan} – ${endUrutan}`;
+
+        // Evaluasi ulang status blok gabungan terhadap jam saat ini
+        if (prev.jamMulai <= currentTimeStr && prev.jamSelesai >= currentTimeStr) {
+          prev.status = "AKTIF";
+        } else if (prev.jamSelesai < currentTimeStr) {
+          prev.status = "SELESAI";
+        } else {
+          prev.status = "MENDATANG";
+        }
+      } else {
+        mergedList.push({ ...item });
+      }
+    }
+
+    return mergedList;
   }
 
   /**
@@ -566,7 +601,7 @@ export class StudentExperienceRepository {
     const publications = await prisma.publikasiNilaiAsesmen.findMany({
       where: {
         sekolah_id: schoolId,
-        status: "PUBLISHED",
+        status: { in: ["PUBLISHED", "TERBIT"] },
         target_audience: { in: ["SISWA", "SEMUA"] },
       },
       select: {
@@ -574,17 +609,32 @@ export class StudentExperienceRepository {
       },
     });
 
-    const publishedAsesmenIds = publications.map((p) => p.asesmen_id);
+    // Cari juga asesmen yang berstatus aktif/published di DefinisiAsesmen
+    const directPublishedDefs = await prisma.definisiAsesmen.findMany({
+      where: {
+        sekolah_id: schoolId,
+        status: { in: ["PUBLISHED", "DITERBITKAN"] },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const publishedAsesmenIds = Array.from(
+      new Set([...publications.map((p) => p.asesmen_id), ...directPublishedDefs.map((d) => d.id)])
+    );
+
     if (publishedAsesmenIds.length === 0) {
       return [];
     }
 
-    // 2. Ambil nilai siswa pada asesmen tersebut
+    // 2. Ambil nilai siswa pada asesmen tersebut (status PUBLISHED atau TERBIT)
     const grades = await prisma.nilaiSiswa.findMany({
       where: {
         sekolah_id: schoolId,
         siswa_id: siswaId,
         asesmen_id: { in: publishedAsesmenIds },
+        status: { in: ["PUBLISHED", "TERBIT"] },
       },
       include: {
         asesmen: {
@@ -668,6 +718,13 @@ export class StudentExperienceRepository {
                       include: {
                         mata_pelajaran: true,
                         guru: true,
+                        definisi_asesmen: {
+                          select: {
+                            kkm_kktp: true,
+                            judul: true,
+                          },
+                          take: 5,
+                        },
                       },
                     },
                     semester: true,
@@ -779,7 +836,38 @@ export class StudentExperienceRepository {
         gradedSubjectCount++;
       }
 
-      const kkmKktp = 75; // Baseline KKTP Kurikulum Merdeka
+      // KKTP kontekstual: ambil dari asesmen terpublikasi, definisi asesmen penugasan, atau kelompok mapel
+      let kkmKktp = 75;
+      if (mapelGrades.length > 0 && mapelGrades[0].kkmKktp) {
+        kkmKktp = mapelGrades[0].kkmKktp;
+      } else if (
+        penugasan.definisi_asesmen &&
+        penugasan.definisi_asesmen.length > 0 &&
+        penugasan.definisi_asesmen[0].kkm_kktp
+      ) {
+        kkmKktp = penugasan.definisi_asesmen[0].kkm_kktp;
+      } else {
+        if (
+          penugasan.mata_pelajaran.kelompok === "KEJURUAN" ||
+          penugasan.mata_pelajaran.kode === "KKA" ||
+          penugasan.mata_pelajaran.kode === "INF"
+        ) {
+          kkmKktp = 80;
+        } else if (
+          penugasan.mata_pelajaran.kode === "MAT" ||
+          penugasan.mata_pelajaran.nama.toLowerCase().includes("matematika")
+        ) {
+          kkmKktp = 72;
+        } else if (
+          penugasan.mata_pelajaran.kode === "BIG" ||
+          penugasan.mata_pelajaran.nama.toLowerCase().includes("inggris")
+        ) {
+          kkmKktp = 74;
+        } else {
+          kkmKktp = 75;
+        }
+      }
+
       const isTuntas = nilaiAkhir !== null ? nilaiAkhir >= kkmKktp : false;
 
       let predikat = "-";
@@ -790,11 +878,14 @@ export class StudentExperienceRepository {
         else predikat = "D";
       }
 
-      // Analisis Capaian Tertinggi & Perlu Peningkatan
-      let deskripsiCapaianTertinggi = "Menunjukkan penguasaan capaian pembelajaran dengan baik.";
-      let deskripsiPerluPeningkatan = "Perlu mempertahankan konsistensi belajar pada materi pokok.";
+      // Rumusan Narasi Capaian Pembelajaran (TP / Materi) Kurikulum Merdeka Berbasis Nilai Riil
+      let deskripsiCapaianTertinggi = "";
+      let deskripsiPerluPeningkatan = "-";
 
-      if (mapelGrades.length > 0) {
+      if (nilaiAkhir === null || mapelGrades.length === 0) {
+        deskripsiCapaianTertinggi = `Belum ada data asesmen yang dinilai untuk mata pelajaran ${mapelName} pada periode ini.`;
+        deskripsiPerluPeningkatan = "-";
+      } else {
         const sorted = [...mapelGrades]
           .filter((g) => g.nilaiAngka !== null)
           .sort((a, b) => (b.nilaiAngka || 0) - (a.nilaiAngka || 0));
@@ -802,15 +893,35 @@ export class StudentExperienceRepository {
         if (sorted.length > 0) {
           const highest = sorted[0];
           const topicName = highest.tpDeskripsi || highest.babJudul || highest.judulAsesmen;
-          deskripsiCapaianTertinggi = `Menunjukkan pemahaman sangat optimal dalam materi ${topicName}.`;
+          const highestScore = highest.nilaiAngka || 0;
+
+          if (highestScore >= 90) {
+            deskripsiCapaianTertinggi = `Menunjukkan pemahaman sangat istimewa dan optimal dalam menguasai materi ${topicName}.`;
+          } else if (highestScore >= kkmKktp) {
+            deskripsiCapaianTertinggi = `Menunjukkan pemahaman yang baik dan tuntas dalam menguasai materi ${topicName}.`;
+          } else {
+            deskripsiCapaianTertinggi = `Mencapai kompetensi dasar pada materi ${topicName}, namun belum memenuhi ketuntasan minimal (KKTP: ${kkmKktp}).`;
+          }
 
           if (sorted.length > 1) {
             const lowest = sorted[sorted.length - 1];
-            if ((lowest.nilaiAngka || 0) < 80) {
-              const lowTopic = lowest.tpDeskripsi || lowest.babJudul || lowest.judulAsesmen;
-              deskripsiPerluPeningkatan = `Perlu bimbingan dan peningkatan pemahaman dalam topik ${lowTopic}.`;
+            const lowestScore = lowest.nilaiAngka || 0;
+            const lowTopic = lowest.tpDeskripsi || lowest.babJudul || lowest.judulAsesmen;
+
+            if (lowestScore < kkmKktp) {
+              deskripsiPerluPeningkatan = `Perlu bimbingan dan remedial intensif pada materi ${lowTopic}.`;
+            } else {
+              deskripsiPerluPeningkatan = `Mampu mempertahankan penguasaan kompetensi yang baik pada seluruh materi ${mapelName}.`;
             }
+          } else {
+            deskripsiPerluPeningkatan =
+              nilaiAkhir >= kkmKktp
+                ? `Mampu mempertahankan konsistensi belajar pada materi pokok ${mapelName}.`
+                : `Perlu pendampingan remedial dan penguatan konsep untuk mencapai ketuntasan materi ${mapelName}.`;
           }
+        } else {
+          deskripsiCapaianTertinggi = `Menunjukkan penguasaan capaian pembelajaran ${mapelName} dengan baik.`;
+          deskripsiPerluPeningkatan = `Perlu mempertahankan konsistensi belajar pada materi pokok ${mapelName}.`;
         }
       }
 

@@ -36,7 +36,18 @@ describe("MobileBottomNav Component", () => {
 
   it("generates correct role-aware items for STUDENT and GUARDIAN", () => {
     const studentItems = getMobileBottomNavItems("STUDENT");
-    expect(studentItems.map((i) => i.label)).toEqual(["Beranda", "Jadwal", "Kalender"]);
+    expect(studentItems.map((i) => i.label)).toEqual([
+      "Beranda",
+      "CBT",
+      "Jadwal",
+      "Materi & Tugas",
+    ]);
+    expect(studentItems.map((i) => i.href)).toEqual([
+      "/dashboard",
+      "/cbt-ujian",
+      "/jadwal-saya",
+      "/tugas-siswa",
+    ]);
 
     const guardianItems = getMobileBottomNavItems("GUARDIAN");
     expect(guardianItems.map((i) => i.label)).toEqual(["Beranda", "Presensi", "Nilai"]);

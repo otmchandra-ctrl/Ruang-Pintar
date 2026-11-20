@@ -29,16 +29,47 @@ export interface PasanganMenjodohkan {
 export type TingkatKesulitan = "MUDAH" | "SEDANG" | "SULIT" | "HOTS";
 export type TingkatKesulitanCbt = TingkatKesulitan;
 
+/**
+ * M14 CBT — 9-State Publication Lifecycle
+ * DRAFT -> REVIEW -> FINAL -> SCHEDULED -> PUBLISHED -> ACTIVE -> SUBMITTED -> CLOSED -> ARCHIVED
+ */
+export type AssessmentPublicationStatus =
+  | "DRAFT"
+  | "REVIEW"
+  | "FINAL"
+  | "SCHEDULED"
+  | "PUBLISHED"
+  | "ACTIVE"
+  | "SUBMITTED"
+  | "CLOSED"
+  | "ARCHIVED";
+
 export type StatusUjianCbt =
-  "DRAFT" | "DITERBITKAN" | "DIPUBLIKASI" | "BERLANGSUNG" | "SELESAI" | "DIARSIPKAN" | "ARSIP";
+  | AssessmentPublicationStatus
+  | "DITERBITKAN"
+  | "DIPUBLIKASI"
+  | "BERLANGSUNG"
+  | "SELESAI"
+  | "DIARSIPKAN"
+  | "ARSIP";
+
+/**
+ * M14 CBT — 5-State Attempt Foundation
+ * NOT_STARTED -> IN_PROGRESS -> SUBMITTED / AUTO_SUBMITTED / ABANDONED
+ */
+export type AssessmentAttemptStatus =
+  "NOT_STARTED" | "IN_PROGRESS" | "SUBMITTED" | "AUTO_SUBMITTED" | "ABANDONED";
 
 export type StatusAttempt =
+  | AssessmentAttemptStatus
   | "SEDANG_MENGERJAKAN"
   | "DIKUMPULKAN"
   | "SELESAI"
   | "WAKTU_HABIS"
   | "TERLAMBAT"
   | "TERKUNCI_PELANGGARAN";
+
+export type ExamSessionStatus = "TERJADWAL" | "DIBUKA" | "DITUTUP" | "SELESAI";
 
 export type JenisEventIntegritas =
   | "TAB_SWITCH"
@@ -59,6 +90,9 @@ export interface OpsiJawabanSoal {
 
 export type OpsiJawaban = OpsiJawabanSoal;
 
+export type ScopeKepemilikanBankSoal = "PERSONAL" | "SEKOLAH";
+export type LevelKognitif = "L1" | "L2" | "L3"; // L1: Pemahaman, L2: Aplikasi, L3: Penalaran/HOTS
+
 export interface BankSoalDTO {
   id: string;
   sekolah_id: string;
@@ -67,11 +101,15 @@ export interface BankSoalDTO {
   mata_pelajaran_id: string;
   lingkup_materi_id: string | null;
   tujuan_pembelajaran_id: string | null;
+  capaian_pembelajaran_id?: string | null;
+  folder_id?: string | null;
   kode: string;
   judul: string;
   tipe_soal: TipeSoal;
   jenis_soal?: TipeSoal;
   tingkat_kesulitan: TingkatKesulitan;
+  scope_kepemilikan?: ScopeKepemilikanBankSoal;
+  level_kognitif?: LevelKognitif;
   versi_aktif: any;
   versi?: any[];
   status: string;
@@ -82,6 +120,7 @@ export interface BankSoalDTO {
   guru_nama?: string;
   tp_kode?: string | null;
   tp_deskripsi?: string | null;
+  cp_kode?: string | null;
   lingkup_materi_judul?: string | null;
   // Current active version details
   pertanyaan?: string;
@@ -185,6 +224,7 @@ export interface SesiUjianSiswaDTO {
   alasan_selesai?: string | null;
   ip_address?: string | null;
   user_agent?: string | null;
+  token_sesi_aktif?: string | null;
   created_at?: Date | string;
   updated_at?: Date | string;
 }
@@ -208,8 +248,95 @@ export interface SnapshotUjianDTO {
   total_soal: number;
   total_bobot: number;
   durasi_menit: number;
+  metadata_ujian?: string | null;
+  hash_integritas?: string | null;
   dibekukan_oleh: string;
   created_at: Date | string;
+}
+
+export interface ExamSnapshotDetailDTO extends SnapshotUjianDTO {
+  konfigurasi: Record<string, any>;
+  manifest_soal: ManifestItemSoal[];
+  metadata: Record<string, any>;
+}
+
+export interface ExamSessionDTO {
+  id: string;
+  sekolah_id: string;
+  ujian_cbt_id: string;
+  kode_sesi: string;
+  nama_sesi: string;
+  waktu_mulai: Date | string;
+  waktu_selesai: Date | string;
+  token: string | null;
+  token_aktif: boolean;
+  token_expired_at: Date | string | null;
+  status: ExamSessionStatus | string;
+  ruang_ujian: string | null;
+  pengawas_nama: string | null;
+  catatan: string | null;
+  ujian_judul?: string;
+  total_peserta?: number;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+export interface AssessmentAttemptDTO {
+  id: string;
+  sekolah_id: string;
+  ujian_cbt_id: string;
+  exam_session_id: string | null;
+  snapshot_id: string;
+  siswa_id: string;
+  penempatan_rombel_id: string | null;
+  attempt_ke: number;
+  waktu_mulai: Date | string | null;
+  batas_waktu_server: Date | string | null;
+  waktu_selesai: Date | string | null;
+  status: AssessmentAttemptStatus | string;
+  urutan_soal_peserta?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  catatan?: string | null;
+  siswa_nama?: string;
+  siswa_nis?: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+export interface ExamTokenDTO {
+  token: string;
+  session_id: string;
+  is_active: boolean;
+  expires_at: Date | string | null;
+  generated_at: Date | string;
+}
+
+export interface StudentEligibilityResultDTO {
+  isEligible: boolean;
+  reasons: string[];
+  details: {
+    isStudentActive: boolean;
+    isEnrolledInRombel: boolean;
+    isAssessmentAssigned: boolean;
+    isTenantValid: boolean;
+    isScheduleActive: boolean;
+    isSessionOpen: boolean;
+    hasRemainingAttempts: boolean;
+    attemptCount: number;
+    maxAttempts: number;
+    penempatanRombelId?: string;
+    sessionId?: string;
+  };
+}
+
+export interface PublicationTransitionResultDTO {
+  success: boolean;
+  previousStatus: AssessmentPublicationStatus | string;
+  newStatus: AssessmentPublicationStatus;
+  ujianId: string;
+  snapshotId?: string;
+  message?: string;
 }
 
 export interface CbtPlayerStateDTO {

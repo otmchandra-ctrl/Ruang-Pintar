@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Clock } from "lucide-react";
+import { Clock, ShieldCheck } from "lucide-react";
 import { getTeacherTrialStatusAction } from "@/app/actions/smart-onboarding-actions";
 import { TeacherTrialStatusDTO } from "@/modules/ai-assistant/domain/ai-types";
 
@@ -16,7 +16,19 @@ export function TeacherTrialPill() {
     });
   }, []);
 
-  if (!trialStatus || !trialStatus.is_trial) return null;
+  if (!trialStatus) return null;
+
+  if (!trialStatus.is_trial) {
+    return (
+      <div
+        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50/90 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-mono font-bold border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs"
+        title="Sekolah Anda telah terdaftar dan memiliki lisensi aktif penuh"
+      >
+        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+        <span>Lisensi Sekolah Aktif</span>
+      </div>
+    );
+  }
 
   const handleOpenUpgrade = () => {
     window.dispatchEvent(new CustomEvent("open-subscription-modal"));

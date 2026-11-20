@@ -32,7 +32,7 @@ export function ScheduleHeroBanner({
   totalRombels,
 }: ScheduleHeroBannerProps) {
   return (
-    <div className="relative rounded-3xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.3)] overflow-hidden">
+    <div className="hidden md:block relative rounded-3xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.3)] overflow-hidden">
       {/* Subtle Right-side Ambient Gradient */}
       <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-blue-50/70 dark:from-blue-950/30 to-transparent rounded-r-3xl pointer-events-none" />
 

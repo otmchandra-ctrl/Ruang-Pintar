@@ -25,7 +25,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
           tabIndex={-1}
           aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
           disabled={disabled}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 size-9 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 focus:outline-none transition-colors duration-160 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 focus:outline-none transition-colors duration-160 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
         >
           {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
         </button>

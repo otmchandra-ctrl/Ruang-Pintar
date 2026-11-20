@@ -59,23 +59,28 @@ export interface TujuanPembelajaranDTO {
   id: string;
   sekolah_id: string;
   lingkup_materi_id: string;
+  capaian_pembelajaran_id?: string | null;
   kode?: string | null;
   deskripsi: string;
   urutan: number;
   status: StatusTujuanPembelajaran;
   created_at: Date;
   updated_at: Date;
+  kriteria_ketercapaian?: KriteriaKetercapaianTpDTO | null;
+  capaian_pembelajaran?: CapaianPembelajaranDTO | null;
 }
 
 export interface CreateTujuanPembelajaranInput {
   sekolah_id: string;
   lingkup_materi_id: string;
+  capaian_pembelajaran_id?: string | null;
   kode?: string | null;
   deskripsi: string;
   urutan?: number;
 }
 
 export interface UpdateTujuanPembelajaranInput {
+  capaian_pembelajaran_id?: string | null;
   kode?: string | null;
   deskripsi?: string;
   urutan?: number;
@@ -291,4 +296,109 @@ export interface TeacherClassCardDTO {
   jam_mengajar?: string | null;
   jadwal_ringkas?: string | null;
   wali_kelas_nama?: string | null;
+}
+
+/**
+ * M11 — Kurikulum Merdeka: Capaian Pembelajaran (CP) per Fase & Mata Pelajaran
+ */
+export interface CapaianPembelajaranDTO {
+  id: string;
+  sekolah_id: string;
+  mata_pelajaran_id: string;
+  mata_pelajaran_nama?: string;
+  mata_pelajaran_kode?: string;
+  fase_id: string;
+  fase_nama?: string;
+  fase_kode?: string;
+  kode: string;
+  elemen?: string | null;
+  deskripsi: string;
+  urutan: number;
+  status: "AKTIF" | "NONAKTIF" | "ARSIP";
+  created_at: Date;
+  updated_at: Date;
+  tujuan_pembelajaran_count?: number;
+}
+
+export interface CreateCapaianPembelajaranInput {
+  sekolah_id: string;
+  mata_pelajaran_id: string;
+  fase_id: string;
+  kode: string;
+  elemen?: string | null;
+  deskripsi: string;
+  urutan?: number;
+}
+
+export interface UpdateCapaianPembelajaranInput {
+  kode?: string;
+  elemen?: string | null;
+  deskripsi?: string;
+  urutan?: number;
+  status?: "AKTIF" | "NONAKTIF" | "ARSIP";
+}
+
+/**
+ * M11/M13 — Kurikulum Merdeka: Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)
+ */
+export type TipeKktp = "SKALA_INTERVAL" | "RUBRIK_DESKRIPTIF" | "DAFTAR_KRITERIA";
+
+export interface IntervalKktpItem {
+  rentang_min: number;
+  rentang_max: number;
+  predikat: "PERLU_BIMBINGAN" | "CUKUP" | "BAIK" | "SANGAT_BAIK";
+  tindak_lanjut: string;
+}
+
+export interface KriteriaKetercapaianTpDTO {
+  id: string;
+  sekolah_id: string;
+  tujuan_pembelajaran_id: string;
+  tipe_kktp: TipeKktp;
+  ambang_tuntas: number; // default 75.0
+  interval_data: IntervalKktpItem[] | null;
+  rubrik_data: Record<string, unknown>[] | null;
+  deskripsi?: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface UpsertKktpInput {
+  sekolah_id: string;
+  tujuan_pembelajaran_id: string;
+  tipe_kktp?: TipeKktp;
+  ambang_tuntas?: number;
+  interval_data?: IntervalKktpItem[] | null;
+  rubrik_data?: Record<string, unknown>[] | null;
+  deskripsi?: string | null;
+}
+
+/**
+ * Curriculum Lineage Hierarchy Node (CP -> TP -> KKTP)
+ */
+export interface CurriculumLineageNodeDTO {
+  cp: CapaianPembelajaranDTO | null;
+  lingkup_materi: {
+    id: string;
+    kode?: string | null;
+    judul: string;
+    urutan: number;
+  };
+  tp: TujuanPembelajaranDTO;
+  kktp: KriteriaKetercapaianTpDTO | null;
+}
+
+/**
+ * Class Activity Feed Item DTO (Ringkasan Aktivitas Terpadu)
+ */
+export interface ClassActivityItemDTO {
+  id: string;
+  tipe: "MATERI" | "TUGAS_BARU" | "TUGAS_KUMPUL" | "PRESENSI" | "NILAI";
+  judul: string;
+  deskripsi: string;
+  pelaku_nama?: string | null;
+  pelaku_peran?: "GURU" | "SISWA" | "SISTEM";
+  waktu: Date | string;
+  target_tab?: "MATERI" | "TUGAS" | "CATATAN_KELAS" | "SISWA" | "RINGKASAN";
+  referensi_id?: string;
 }

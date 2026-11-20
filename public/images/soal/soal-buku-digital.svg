@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#EDF2F7" />
+    </linearGradient>
+    <linearGradient id="tabletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="bookPage" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F1F5F9" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.12" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="600" height="360" rx="16" fill="url(#bgGrad)" />
+
+  <!-- Container Box -->
+  <g transform="translate(100, 30)" filter="url(#shadow)">
+    <!-- Tablet Frame -->
+    <rect x="0" y="0" width="400" height="260" rx="20" fill="url(#tabletGrad)" stroke="#334155" stroke-width="2" />
+    <!-- Camera Dot -->
+    <circle cx="200" cy="12" r="3" fill="#64748B" />
+
+    <!-- Screen Display -->
+    <rect x="16" y="24" width="368" height="216" rx="12" fill="#E2E8F0" />
+
+    <!-- Open E-Book / Static Document -->
+    <!-- Left Page -->
+    <path d="M 30 40 L 195 40 L 195 210 L 30 210 Z" fill="url(#bookPage)" stroke="#CBD5E1" stroke-width="1.5" rx="4" />
+    <!-- Center Spine Shadow -->
+    <rect x="195" y="40" width="10" height="170" fill="#94A3B8" opacity="0.3" />
+    <!-- Right Page -->
+    <path d="M 205 40 L 370 40 L 370 210 L 205 210 Z" fill="url(#bookPage)" stroke="#CBD5E1" stroke-width="1.5" rx="4" />
+
+    <!-- Text Lines Left Page -->
+    <rect x="45" y="55" width="80" height="8" rx="2" fill="#3B82F6" />
+    <rect x="45" y="75" width="135" height="5" rx="2" fill="#94A3B8" />
+    <rect x="45" y="88" width="125" height="5" rx="2" fill="#94A3B8" />
+    <rect x="45" y="101" width="130" height="5" rx="2" fill="#94A3B8" />
+    <rect x="45" y="114" width="90" height="5" rx="2" fill="#94A3B8" />
+    <!-- Static Illustration Box on Left Page -->
+    <rect x="45" y="132" width="135" height="55" rx="4" fill="#E2E8F0" stroke="#CBD5E1" />
+    <circle cx="80" cy="160" r="14" fill="#93C5FD" />
+    <path d="M 105 175 L 125 150 L 145 175 Z" fill="#60A5FA" />
+    <text x="110" y="202" font-family="sans-serif" font-size="9" fill="#64748B" text-anchor="middle">Hal. 12</text>
+
+    <!-- Text Lines Right Page -->
+    <rect x="220" y="55" width="135" height="5" rx="2" fill="#94A3B8" />
+    <rect x="220" y="68" width="130" height="5" rx="2" fill="#94A3B8" />
+    <rect x="220" y="81" width="120" height="5" rx="2" fill="#94A3B8" />
+    <rect x="220" y="94" width="135" height="5" rx="2" fill="#94A3B8" />
+    <rect x="220" y="107" width="110" height="5" rx="2" fill="#94A3B8" />
+    <rect x="220" y="120" width="130" height="5" rx="2" fill="#94A3B8" />
+    <rect x="220" y="133" width="125" height="5" rx="2" fill="#94A3B8" />
+    <rect x="220" y="146" width="100" height="5" rx="2" fill="#94A3B8" />
+    <text x="285" y="202" font-family="sans-serif" font-size="9" fill="#64748B" text-anchor="middle">Hal. 13</text>
+
+    <!-- Sequential Reading Indicator -->
+    <g transform="translate(145, 218)">
+      <rect x="0" y="0" width="110" height="18" rx="9" fill="#1E293B" opacity="0.85" />
+      <text x="55" y="12" font-family="sans-serif" font-size="8.5" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Navigasi Linier: 12 → 13</text>
+    </g>
+  </g>
+
+  <!-- Banner Tag at Bottom -->
+  <g transform="translate(160, 312)">
+    <rect x="0" y="0" width="280" height="30" rx="15" fill="#3B82F6" opacity="0.12" stroke="#3B82F6" stroke-width="1.5" />
+    <text x="140" y="19" font-family="sans-serif" font-size="12" font-weight="bold" fill="#1D4ED8" text-anchor="middle">Ilustrasi: Buku Digital Linier (Baca Berurutan)</text>
+  </g>
+</svg>

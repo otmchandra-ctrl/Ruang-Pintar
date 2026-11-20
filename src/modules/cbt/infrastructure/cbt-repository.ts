@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
+import { containsText } from "@/shared/infrastructure/database/query-filters";
 import { generateUlid } from "@/shared/lib/ulid";
 import {
   BankSoalDTO,
@@ -23,6 +24,8 @@ import {
   BlueprintItemConfig,
   TipeSoal,
   TingkatKesulitan,
+  ScopeKepemilikanBankSoal,
+  LevelKognitif,
 } from "../domain/cbt-types";
 import {
   CbtNotFoundError,
@@ -32,6 +35,7 @@ import {
   CbtExamNotAvailableError,
   CbtTransferError,
   CbtAccessDeniedError,
+  CbtSessionInvalidatedError,
 } from "../domain/cbt-errors";
 import { withSqliteRetry } from "@/shared/infrastructure/database/sqlite-retry";
 import { cbtWriteQueue } from "./cbt-write-queue";
@@ -48,10 +52,14 @@ export class CbtRepository {
       mata_pelajaran_id: string;
       lingkup_materi_id?: string | null;
       tujuan_pembelajaran_id?: string | null;
+      capaian_pembelajaran_id?: string | null;
+      folder_id?: string | null;
       kode: string;
       judul: string;
       tipe_soal: TipeSoal;
       tingkat_kesulitan: TingkatKesulitan;
+      scope_kepemilikan?: "PERSONAL" | "SEKOLAH";
+      level_kognitif?: "L1" | "L2" | "L3";
       pertanyaan: string;
       gambar_url?: string | null;
       opsi_jawaban?: OpsiJawabanSoal[];
@@ -73,10 +81,14 @@ export class CbtRepository {
           mata_pelajaran_id: data.mata_pelajaran_id,
           lingkup_materi_id: data.lingkup_materi_id || null,
           tujuan_pembelajaran_id: data.tujuan_pembelajaran_id || null,
+          capaian_pembelajaran_id: data.capaian_pembelajaran_id || null,
+          folder_id: data.folder_id || null,
           kode: data.kode,
           judul: data.judul,
           tipe_soal: data.tipe_soal,
           tingkat_kesulitan: data.tingkat_kesulitan,
+          scope_kepemilikan: data.scope_kepemilikan || "PERSONAL",
+          level_kognitif: data.level_kognitif || "L2",
           versi_aktif: 1,
           status: "AKTIF",
         },
@@ -105,6 +117,8 @@ export class CbtRepository {
       ...bankSoal,
       tipe_soal: bankSoal.tipe_soal as TipeSoal,
       tingkat_kesulitan: bankSoal.tingkat_kesulitan as TingkatKesulitan,
+      scope_kepemilikan: bankSoal.scope_kepemilikan as any,
+      level_kognitif: bankSoal.level_kognitif as any,
       pertanyaan: versiSoal.pertanyaan,
       gambar_url: versiSoal.gambar_url,
       opsi_jawaban: versiSoal.opsi_jawaban ? JSON.parse(versiSoal.opsi_jawaban) : undefined,
@@ -148,6 +162,7 @@ export class CbtRepository {
       lingkup_materi_id?: string | null;
       tujuan_pembelajaran_id?: string | null;
       pertanyaan?: string;
+      gambar_url?: string | null;
       opsi_jawaban?: OpsiJawabanSoal[];
       kunci_jawaban?: string[];
       pembahasan?: string | null;
@@ -172,6 +187,7 @@ export class CbtRepository {
     const latestVersion = existing.versi_soal[0];
     const isContentChanged =
       (data.pertanyaan && data.pertanyaan !== latestVersion?.pertanyaan) ||
+      (data.gambar_url !== undefined && data.gambar_url !== latestVersion?.gambar_url) ||
       (data.opsi_jawaban && JSON.stringify(data.opsi_jawaban) !== latestVersion?.opsi_jawaban) ||
       (data.kunci_jawaban && JSON.stringify(data.kunci_jawaban) !== latestVersion?.kunci_jawaban) ||
       (data.bobot_default !== undefined && data.bobot_default !== latestVersion?.bobot_default) ||
@@ -191,6 +207,8 @@ export class CbtRepository {
             bank_soal_id: existing.id,
             nomor_versi: nextVersionNum,
             pertanyaan: data.pertanyaan ?? latestVersion?.pertanyaan ?? "",
+            gambar_url:
+              data.gambar_url !== undefined ? data.gambar_url : (latestVersion?.gambar_url ?? null),
             opsi_jawaban: data.opsi_jawaban
               ? JSON.stringify(data.opsi_jawaban)
               : (latestVersion?.opsi_jawaban ?? null),
@@ -226,7 +244,41 @@ export class CbtRepository {
         ...updatedBs,
         tipe_soal: updatedBs.tipe_soal as TipeSoal,
         tingkat_kesulitan: updatedBs.tingkat_kesulitan as TingkatKesulitan,
+        scope_kepemilikan: updatedBs.scope_kepemilikan as ScopeKepemilikanBankSoal,
+        level_kognitif: updatedBs.level_kognitif as LevelKognitif,
       };
+    });
+  }
+
+  async deleteQuestionPermanently(
+    bankSoalId: string,
+    sekolahId: string,
+    actorGuruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<void> {
+    const question = await prisma.bankSoal.findFirst({
+      where: { id: bankSoalId, sekolah_id: sekolahId },
+    });
+
+    if (!question) {
+      throw new CbtNotFoundError(`Butir soal ${bankSoalId} tidak ditemukan.`);
+    }
+
+    if (!isSuperAdmin && actorGuruId && question.guru_id !== actorGuruId) {
+      throw new CbtAccessDeniedError(
+        "Akses ditolak: Anda hanya berwenang menghapus soal milik Anda sendiri."
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Hapus seluruh versi soal terkait
+      await tx.versiSoal.deleteMany({
+        where: { bank_soal_id: bankSoalId },
+      });
+      // Hapus butir bank soal
+      await tx.bankSoal.delete({
+        where: { id: bankSoalId },
+      });
     });
   }
 
@@ -251,8 +303,8 @@ export class CbtRepository {
     if (filters?.tingkat_kesulitan) whereClause.tingkat_kesulitan = filters.tingkat_kesulitan;
     if (filters?.search) {
       whereClause.OR = [
-        { judul: { contains: filters.search } },
-        { kode: { contains: filters.search } },
+        { judul: containsText(filters.search) },
+        { kode: containsText(filters.search) },
       ];
     }
 
@@ -310,6 +362,7 @@ export class CbtRepository {
         mata_pelajaran: { select: { nama: true } },
         guru: { select: { nama_lengkap: true } },
         tujuan_pembelajaran: { select: { kode: true, deskripsi: true } },
+        capaian_pembelajaran: { select: { kode: true } },
         lingkup_materi: { select: { judul: true } },
         versi_soal: {
           orderBy: { nomor_versi: "desc" },
@@ -328,19 +381,273 @@ export class CbtRepository {
       mata_pelajaran_id: bs.mata_pelajaran_id,
       lingkup_materi_id: bs.lingkup_materi_id,
       tujuan_pembelajaran_id: bs.tujuan_pembelajaran_id,
+      capaian_pembelajaran_id: bs.capaian_pembelajaran_id,
+      folder_id: bs.folder_id,
       kode: bs.kode,
       judul: bs.judul,
       tipe_soal: bs.tipe_soal as TipeSoal,
       tingkat_kesulitan: bs.tingkat_kesulitan as TingkatKesulitan,
+      scope_kepemilikan: bs.scope_kepemilikan as any,
+      level_kognitif: bs.level_kognitif as any,
       versi_aktif: bs.versi_aktif,
       status: bs.status,
       created_at: bs.created_at,
       updated_at: bs.updated_at,
-      mata_pelajaran_nama: bs.mata_pelajaran.nama,
-      guru_nama: bs.guru.nama_lengkap,
+      mata_pelajaran_nama: bs.mata_pelajaran?.nama || "Mata Pelajaran",
+      guru_nama: bs.guru?.nama_lengkap || "Guru",
       tp_kode: bs.tujuan_pembelajaran?.kode || null,
       tp_deskripsi: bs.tujuan_pembelajaran?.deskripsi || null,
+      cp_kode: bs.capaian_pembelajaran?.kode || null,
       lingkup_materi_judul: bs.lingkup_materi?.judul || null,
+      pertanyaan: activeVs?.pertanyaan,
+      gambar_url: activeVs?.gambar_url || null,
+      opsi_jawaban: activeVs?.opsi_jawaban
+        ? (() => {
+            try {
+              return JSON.parse(activeVs.opsi_jawaban);
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined,
+      kunci_jawaban: activeVs?.kunci_jawaban
+        ? (() => {
+            try {
+              return JSON.parse(activeVs.kunci_jawaban);
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined,
+      pembahasan: activeVs?.pembahasan,
+      bobot_default: activeVs?.bobot_default,
+    };
+  }
+
+  async getPersonalQuestions(
+    sekolahId: string,
+    guruId: string,
+    filters?: {
+      mataPelajaranId?: string;
+      tipe_soal?: string;
+      tingkat_kesulitan?: string;
+      level_kognitif?: string;
+      search?: string;
+    }
+  ): Promise<BankSoalDTO[]> {
+    const whereClause: any = {
+      sekolah_id: sekolahId,
+      guru_id: guruId,
+      scope_kepemilikan: "PERSONAL",
+      status: "AKTIF",
+    };
+
+    if (filters?.mataPelajaranId) whereClause.mata_pelajaran_id = filters.mataPelajaranId;
+    if (filters?.tipe_soal) whereClause.tipe_soal = filters.tipe_soal;
+    if (filters?.tingkat_kesulitan) whereClause.tingkat_kesulitan = filters.tingkat_kesulitan;
+    if (filters?.level_kognitif) whereClause.level_kognitif = filters.level_kognitif;
+    if (filters?.search) {
+      whereClause.OR = [
+        { judul: containsText(filters.search) },
+        { kode: containsText(filters.search) },
+      ];
+    }
+
+    const items = await prisma.bankSoal.findMany({
+      where: whereClause,
+      include: {
+        mata_pelajaran: { select: { nama: true } },
+        guru: { select: { nama_lengkap: true } },
+        tujuan_pembelajaran: { select: { kode: true, deskripsi: true } },
+        capaian_pembelajaran: { select: { kode: true } },
+        lingkup_materi: { select: { judul: true } },
+        versi_soal: {
+          orderBy: { nomor_versi: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    return items.map((bs) => {
+      const activeVs = bs.versi_soal[0];
+      return {
+        id: bs.id,
+        sekolah_id: bs.sekolah_id,
+        guru_id: bs.guru_id,
+        mata_pelajaran_id: bs.mata_pelajaran_id,
+        lingkup_materi_id: bs.lingkup_materi_id,
+        tujuan_pembelajaran_id: bs.tujuan_pembelajaran_id,
+        capaian_pembelajaran_id: bs.capaian_pembelajaran_id,
+        folder_id: bs.folder_id,
+        kode: bs.kode,
+        judul: bs.judul,
+        tipe_soal: bs.tipe_soal as TipeSoal,
+        tingkat_kesulitan: bs.tingkat_kesulitan as TingkatKesulitan,
+        scope_kepemilikan: bs.scope_kepemilikan as any,
+        level_kognitif: bs.level_kognitif as any,
+        versi_aktif: bs.versi_aktif,
+        status: bs.status,
+        created_at: bs.created_at,
+        updated_at: bs.updated_at,
+        mata_pelajaran_nama: bs.mata_pelajaran.nama,
+        guru_nama: bs.guru.nama_lengkap,
+        tp_kode: bs.tujuan_pembelajaran?.kode || null,
+        tp_deskripsi: bs.tujuan_pembelajaran?.deskripsi || null,
+        cp_kode: bs.capaian_pembelajaran?.kode || null,
+        lingkup_materi_judul: bs.lingkup_materi?.judul || null,
+        pertanyaan: activeVs?.pertanyaan,
+        gambar_url: activeVs?.gambar_url || null,
+        opsi_jawaban: activeVs?.opsi_jawaban ? JSON.parse(activeVs.opsi_jawaban) : undefined,
+        kunci_jawaban: activeVs?.kunci_jawaban ? JSON.parse(activeVs.kunci_jawaban) : undefined,
+        pembahasan: activeVs?.pembahasan,
+        bobot_default: activeVs?.bobot_default,
+      };
+    });
+  }
+
+  async getSchoolQuestions(
+    sekolahId: string,
+    mataPelajaranId: string,
+    filters?: {
+      tipe_soal?: string;
+      tingkat_kesulitan?: string;
+      level_kognitif?: string;
+      search?: string;
+    }
+  ): Promise<BankSoalDTO[]> {
+    const whereClause: any = {
+      sekolah_id: sekolahId,
+      mata_pelajaran_id: mataPelajaranId,
+      scope_kepemilikan: "SEKOLAH",
+      status: "AKTIF",
+    };
+
+    if (filters?.tipe_soal) whereClause.tipe_soal = filters.tipe_soal;
+    if (filters?.tingkat_kesulitan) whereClause.tingkat_kesulitan = filters.tingkat_kesulitan;
+    if (filters?.level_kognitif) whereClause.level_kognitif = filters.level_kognitif;
+    if (filters?.search) {
+      whereClause.OR = [
+        { judul: containsText(filters.search) },
+        { kode: containsText(filters.search) },
+      ];
+    }
+
+    const items = await prisma.bankSoal.findMany({
+      where: whereClause,
+      include: {
+        mata_pelajaran: { select: { nama: true } },
+        guru: { select: { nama_lengkap: true } },
+        tujuan_pembelajaran: { select: { kode: true, deskripsi: true } },
+        capaian_pembelajaran: { select: { kode: true } },
+        lingkup_materi: { select: { judul: true } },
+        versi_soal: {
+          orderBy: { nomor_versi: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    return items.map((bs) => {
+      const activeVs = bs.versi_soal[0];
+      return {
+        id: bs.id,
+        sekolah_id: bs.sekolah_id,
+        guru_id: bs.guru_id,
+        mata_pelajaran_id: bs.mata_pelajaran_id,
+        lingkup_materi_id: bs.lingkup_materi_id,
+        tujuan_pembelajaran_id: bs.tujuan_pembelajaran_id,
+        capaian_pembelajaran_id: bs.capaian_pembelajaran_id,
+        folder_id: bs.folder_id,
+        kode: bs.kode,
+        judul: bs.judul,
+        tipe_soal: bs.tipe_soal as TipeSoal,
+        tingkat_kesulitan: bs.tingkat_kesulitan as TingkatKesulitan,
+        scope_kepemilikan: bs.scope_kepemilikan as any,
+        level_kognitif: bs.level_kognitif as any,
+        versi_aktif: bs.versi_aktif,
+        status: bs.status,
+        created_at: bs.created_at,
+        updated_at: bs.updated_at,
+        mata_pelajaran_nama: bs.mata_pelajaran.nama,
+        guru_nama: bs.guru.nama_lengkap,
+        tp_kode: bs.tujuan_pembelajaran?.kode || null,
+        tp_deskripsi: bs.tujuan_pembelajaran?.deskripsi || null,
+        cp_kode: bs.capaian_pembelajaran?.kode || null,
+        lingkup_materi_judul: bs.lingkup_materi?.judul || null,
+        pertanyaan: activeVs?.pertanyaan,
+        gambar_url: activeVs?.gambar_url || null,
+        opsi_jawaban: activeVs?.opsi_jawaban ? JSON.parse(activeVs.opsi_jawaban) : undefined,
+        kunci_jawaban: activeVs?.kunci_jawaban ? JSON.parse(activeVs.kunci_jawaban) : undefined,
+        pembahasan: activeVs?.pembahasan,
+        bobot_default: activeVs?.bobot_default,
+      };
+    });
+  }
+
+  async updateQuestionScope(
+    sekolahId: string,
+    bankSoalId: string,
+    actorGuruId: string,
+    targetScope: "PERSONAL" | "SEKOLAH",
+    levelKognitif?: "L1" | "L2" | "L3"
+  ): Promise<BankSoalDTO> {
+    const existing = await prisma.bankSoal.findFirst({
+      where: { id: bankSoalId, sekolah_id: sekolahId },
+    });
+    if (!existing) {
+      throw new CbtNotFoundError("Bank Soal", bankSoalId);
+    }
+    if (existing.guru_id !== actorGuruId) {
+      throw new CbtAccessDeniedError("Hanya pemilik soal yang dapat mengubah scope kepemilikan.");
+    }
+
+    const updated = await prisma.bankSoal.update({
+      where: { id: bankSoalId },
+      data: {
+        scope_kepemilikan: targetScope,
+        level_kognitif: levelKognitif || existing.level_kognitif,
+      },
+      include: {
+        mata_pelajaran: { select: { nama: true } },
+        guru: { select: { nama_lengkap: true } },
+        tujuan_pembelajaran: { select: { kode: true, deskripsi: true } },
+        capaian_pembelajaran: { select: { kode: true } },
+        lingkup_materi: { select: { judul: true } },
+        versi_soal: {
+          where: { nomor_versi: existing.versi_aktif },
+          take: 1,
+        },
+      },
+    });
+
+    const activeVs = updated.versi_soal[0];
+    return {
+      id: updated.id,
+      sekolah_id: updated.sekolah_id,
+      guru_id: updated.guru_id,
+      mata_pelajaran_id: updated.mata_pelajaran_id,
+      lingkup_materi_id: updated.lingkup_materi_id,
+      tujuan_pembelajaran_id: updated.tujuan_pembelajaran_id,
+      capaian_pembelajaran_id: updated.capaian_pembelajaran_id,
+      folder_id: updated.folder_id,
+      kode: updated.kode,
+      judul: updated.judul,
+      tipe_soal: updated.tipe_soal as TipeSoal,
+      tingkat_kesulitan: updated.tingkat_kesulitan as TingkatKesulitan,
+      scope_kepemilikan: updated.scope_kepemilikan as any,
+      level_kognitif: updated.level_kognitif as any,
+      versi_aktif: updated.versi_aktif,
+      status: updated.status,
+      created_at: updated.created_at,
+      updated_at: updated.updated_at,
+      mata_pelajaran_nama: updated.mata_pelajaran.nama,
+      guru_nama: updated.guru.nama_lengkap,
+      tp_kode: updated.tujuan_pembelajaran?.kode || null,
+      tp_deskripsi: updated.tujuan_pembelajaran?.deskripsi || null,
+      cp_kode: updated.capaian_pembelajaran?.kode || null,
+      lingkup_materi_judul: updated.lingkup_materi?.judul || null,
       pertanyaan: activeVs?.pertanyaan,
       gambar_url: activeVs?.gambar_url || null,
       opsi_jawaban: activeVs?.opsi_jawaban ? JSON.parse(activeVs.opsi_jawaban) : undefined,
@@ -348,6 +655,53 @@ export class CbtRepository {
       pembahasan: activeVs?.pembahasan,
       bobot_default: activeVs?.bobot_default,
     };
+  }
+
+  async cloneQuestionToPersonal(
+    sekolahId: string,
+    bankSoalId: string,
+    actorGuruId: string,
+    actorName: string
+  ): Promise<BankSoalDTO> {
+    const existing = await prisma.bankSoal.findFirst({
+      where: { id: bankSoalId, sekolah_id: sekolahId },
+      include: {
+        versi_soal: {
+          orderBy: { nomor_versi: "desc" },
+          take: 1,
+        },
+      },
+    });
+    if (!existing) {
+      throw new CbtNotFoundError("Bank Soal", bankSoalId);
+    }
+
+    const latestVs = existing.versi_soal[0];
+    const newKode = `${existing.kode}-CLONE-${Date.now().toString(36).toUpperCase()}`;
+
+    return this.createQuestion(
+      {
+        sekolah_id: sekolahId,
+        guru_id: actorGuruId,
+        mata_pelajaran_id: existing.mata_pelajaran_id,
+        lingkup_materi_id: existing.lingkup_materi_id,
+        tujuan_pembelajaran_id: existing.tujuan_pembelajaran_id,
+        capaian_pembelajaran_id: existing.capaian_pembelajaran_id,
+        kode: newKode,
+        judul: `(Salinan) ${existing.judul}`,
+        tipe_soal: existing.tipe_soal as TipeSoal,
+        tingkat_kesulitan: existing.tingkat_kesulitan as TingkatKesulitan,
+        scope_kepemilikan: "PERSONAL",
+        level_kognitif: (existing.level_kognitif as any) || "L2",
+        pertanyaan: latestVs?.pertanyaan || "",
+        gambar_url: latestVs?.gambar_url || null,
+        opsi_jawaban: latestVs?.opsi_jawaban ? JSON.parse(latestVs.opsi_jawaban) : undefined,
+        kunci_jawaban: latestVs?.kunci_jawaban ? JSON.parse(latestVs.kunci_jawaban) : undefined,
+        pembahasan: latestVs?.pembahasan || null,
+        bobot_default: latestVs?.bobot_default || 1.0,
+      },
+      actorName
+    );
   }
 
   // ============================================================================
@@ -669,7 +1023,17 @@ export class CbtRepository {
     );
 
     if (activeAttempt) {
-      return activeAttempt;
+      // HIGH-RISK-02: Single Device Lock — Perangkat baru yang me-resume men-generate token unik baru
+      const newSessionToken = generateUlid();
+      const updatedAttempt = await prisma.sesiUjianSiswa.update({
+        where: { id: activeAttempt.id },
+        data: {
+          token_sesi_aktif: newSessionToken,
+          ip_address: contextInfo?.ip || activeAttempt.ip_address,
+          user_agent: contextInfo?.userAgent || activeAttempt.user_agent,
+        },
+      });
+      return updatedAttempt;
     }
 
     // Validate exam token if required
@@ -704,6 +1068,7 @@ export class CbtRepository {
     const serverDeadline = new Date(now.getTime() + duration * 60 * 1000);
     const nextAttemptNum = existingAttempts.length + 1;
     const attemptId = generateUlid();
+    const initialSessionToken = generateUlid();
 
     const manifestItems: any[] = JSON.parse(snapshot.manifest_soal);
     let questionOrder = manifestItems.map((m) => m.soal_id);
@@ -726,6 +1091,7 @@ export class CbtRepository {
             waktu_mulai: now,
             batas_waktu_server: serverDeadline,
             status: "SEDANG_MENGERJAKAN",
+            token_sesi_aktif: initialSessionToken,
             urutan_soal_peserta: JSON.stringify(questionOrder),
             ip_address: contextInfo?.ip || null,
             user_agent: contextInfo?.userAgent || null,
@@ -851,7 +1217,7 @@ export class CbtRepository {
   // ============================================================================
 
   async saveAnswer(
-    input: SaveAnswerInput,
+    input: SaveAnswerInput & { session_token?: string | null },
     siswaId: string
   ): Promise<{ success: boolean; waktu_simpan: string }> {
     return cbtWriteQueue.enqueueAutosave(input.sesi_ujian_id, input.soal_id, async () => {
@@ -865,6 +1231,17 @@ export class CbtRepository {
 
       if (attempt.siswa_id !== siswaId) {
         throw new CbtAttemptClosedError("Akses ditolak: Anda tidak berhak mengubah sesi ini.");
+      }
+
+      // HIGH-RISK-02: Single Device Lock Validation
+      if (
+        attempt.token_sesi_aktif &&
+        input.session_token &&
+        attempt.token_sesi_aktif !== input.session_token
+      ) {
+        throw new CbtSessionInvalidatedError(
+          "Sesi ujian Anda telah dibuka di perangkat lain. Halaman ini telah dinonaktifkan."
+        );
       }
 
       if (attempt.status !== "SEDANG_MENGERJAKAN") {
@@ -918,11 +1295,120 @@ export class CbtRepository {
     });
   }
 
+  /**
+   * HIGH-RISK-01 & HIGH-RISK-02: Optimized Autosave Pipeline (Single Validation + Single Upsert)
+   * Mengeliminasi query redundan dan JSON parse snapshot di hot path autosave.
+   */
+  async saveAnswerOptimized(input: {
+    sesi_ujian_id: string;
+    siswa_id: string;
+    soal_id: string;
+    versi_soal_id?: string | null;
+    session_token?: string | null;
+    jawaban_pilihan?: string | null;
+    jawaban_teks?: string | null;
+    jawaban_kompleks?: string[] | null;
+    jawaban_menjodohkan?: Record<string, string> | null;
+    ragu_ragu?: boolean;
+  }): Promise<{ success: boolean; waktu_simpan: string }> {
+    return cbtWriteQueue.enqueueAutosave(input.sesi_ujian_id, input.soal_id, async () => {
+      // 1. Single minimal SELECT query
+      const attempt = await prisma.sesiUjianSiswa.findUnique({
+        where: { id: input.sesi_ujian_id },
+        select: {
+          id: true,
+          sekolah_id: true,
+          siswa_id: true,
+          status: true,
+          batas_waktu_server: true,
+          token_sesi_aktif: true,
+        },
+      });
+
+      if (!attempt) {
+        throw new CbtNotFoundError("Sesi Ujian", input.sesi_ujian_id);
+      }
+
+      if (attempt.siswa_id !== input.siswa_id) {
+        throw new CbtAttemptClosedError("Akses ditolak: Anda tidak berhak mengubah sesi ini.");
+      }
+
+      // Single Device Lock Enforcement
+      if (
+        attempt.token_sesi_aktif &&
+        input.session_token &&
+        attempt.token_sesi_aktif !== input.session_token
+      ) {
+        throw new CbtSessionInvalidatedError(
+          "Sesi ujian Anda telah dibuka di perangkat lain. Halaman ini telah dinonaktifkan."
+        );
+      }
+
+      if (attempt.status !== "SEDANG_MENGERJAKAN") {
+        throw new CbtAttemptClosedError("Sesi ujian sudah dikumpulkan atau terkunci.");
+      }
+
+      const now = new Date();
+      if (now.getTime() > attempt.batas_waktu_server.getTime()) {
+        await this.submitAttempt(attempt.id, "Batas waktu pengerjaan habis");
+        throw new CbtTimerExpiredError();
+      }
+
+      let serializedJawaban: string | null = null;
+      if (input.jawaban_pilihan) {
+        serializedJawaban = JSON.stringify([input.jawaban_pilihan]);
+      } else if (input.jawaban_kompleks && input.jawaban_kompleks.length > 0) {
+        serializedJawaban = JSON.stringify(input.jawaban_kompleks);
+      } else if (input.jawaban_teks !== undefined && input.jawaban_teks !== null) {
+        serializedJawaban = JSON.stringify([input.jawaban_teks]);
+      } else if (input.jawaban_menjodohkan && Object.keys(input.jawaban_menjodohkan).length > 0) {
+        serializedJawaban = JSON.stringify(input.jawaban_menjodohkan);
+      }
+
+      const answerId = generateUlid();
+
+      // 2. Single UPSERT query
+      const saved = await prisma.jawabanSiswa.upsert({
+        where: {
+          sesi_ujian_id_soal_id: {
+            sesi_ujian_id: input.sesi_ujian_id,
+            soal_id: input.soal_id,
+          },
+        },
+        update: {
+          versi_soal_id: input.versi_soal_id || undefined,
+          jawaban_peserta: serializedJawaban,
+          ragu_ragu: input.ragu_ragu !== undefined ? input.ragu_ragu : false,
+          waktu_simpan: now,
+        },
+        create: {
+          id: answerId,
+          sekolah_id: attempt.sekolah_id,
+          sesi_ujian_id: input.sesi_ujian_id,
+          soal_id: input.soal_id,
+          versi_soal_id: input.versi_soal_id || input.soal_id,
+          jawaban_peserta: serializedJawaban,
+          ragu_ragu: input.ragu_ragu || false,
+          waktu_simpan: now,
+        },
+      });
+
+      return {
+        success: true,
+        waktu_simpan: saved.waktu_simpan.toISOString(),
+      };
+    });
+  }
+
   // ============================================================================
   // 5. SERVER-SIDE SCORING & SUBMISSION
   // ============================================================================
 
-  async submitAttempt(attemptId: string, reason?: string): Promise<HasilUjianCbtDTO> {
+  async submitAttempt(
+    attemptId: string,
+    reason?: string,
+    forceRecalculate = false
+  ): Promise<HasilUjianCbtDTO> {
     return cbtWriteQueue.enqueueSubmission(attemptId, async () => {
       const attempt = await prisma.sesiUjianSiswa.findUnique({
         where: { id: attemptId },
@@ -938,8 +1424,8 @@ export class CbtRepository {
         throw new CbtNotFoundError("Sesi Ujian", attemptId);
       }
 
-      // Idempotent: If already submitted, return existing result immediately
-      if (attempt.status !== "SEDANG_MENGERJAKAN") {
+      // Idempotent: If already submitted, return existing result immediately (unless force recalculate requested)
+      if (attempt.status !== "SEDANG_MENGERJAKAN" && !forceRecalculate) {
         const existingResult = await prisma.hasilUjianCbt.findUnique({
           where: { sesi_ujian_id: attemptId },
         });
@@ -975,7 +1461,12 @@ export class CbtRepository {
 
       kunciPenilaianList.forEach((kunci) => {
         skorMaksimal += kunci.bobot;
-        const userAns = attempt.jawaban_siswa.find((j) => j.soal_id === kunci.soal_id);
+        const targetSoalId = kunci.soal_id || (kunci as any).bank_soal_id;
+        const userAns = attempt.jawaban_siswa.find(
+          (j) =>
+            (targetSoalId && j.soal_id === targetSoalId) ||
+            (kunci.versi_soal_id && j.versi_soal_id === kunci.versi_soal_id)
+        );
 
         if (!userAns || !userAns.jawaban_peserta) {
           totalKosong++;
@@ -1461,7 +1952,77 @@ export class CbtRepository {
   // ============================================================================
 
   async findBankSoal(sekolahId: string, guruId?: string, filter?: any): Promise<BankSoalDTO[]> {
-    return this.getQuestionsBySubject(sekolahId, filter?.mapelId, guruId ? { guruId } : undefined);
+    const mapelId = filter?.mapelId?.trim() || undefined;
+
+    // Jika mapelId tersedia, gunakan query per-mapel yang sudah ada
+    if (mapelId) {
+      return this.getQuestionsBySubject(
+        sekolahId,
+        mapelId,
+        guruId ? { guruId, ...filter } : filter
+      );
+    }
+
+    // Tanpa filter mapel: tampilkan SEMUA soal milik guru/sekolah
+    const whereClause: any = {
+      sekolah_id: sekolahId,
+      status: "AKTIF",
+    };
+
+    if (guruId) whereClause.guru_id = guruId;
+    if (filter?.jenisSoal) whereClause.tipe_soal = filter.jenisSoal;
+    if (filter?.search) {
+      whereClause.OR = [
+        { judul: containsText(filter.search) },
+        { kode: containsText(filter.search) },
+      ];
+    }
+
+    const items = await prisma.bankSoal.findMany({
+      where: whereClause,
+      include: {
+        mata_pelajaran: { select: { nama: true } },
+        guru: { select: { nama_lengkap: true } },
+        tujuan_pembelajaran: { select: { kode: true, deskripsi: true } },
+        lingkup_materi: { select: { judul: true } },
+        versi_soal: {
+          orderBy: { nomor_versi: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    return items.map((bs) => {
+      const activeVs = bs.versi_soal[0];
+      return {
+        id: bs.id,
+        sekolah_id: bs.sekolah_id,
+        guru_id: bs.guru_id,
+        mata_pelajaran_id: bs.mata_pelajaran_id,
+        lingkup_materi_id: bs.lingkup_materi_id,
+        tujuan_pembelajaran_id: bs.tujuan_pembelajaran_id,
+        kode: bs.kode,
+        judul: bs.judul,
+        tipe_soal: bs.tipe_soal as TipeSoal,
+        tingkat_kesulitan: bs.tingkat_kesulitan as TingkatKesulitan,
+        versi_aktif: bs.versi_aktif,
+        status: bs.status,
+        created_at: bs.created_at,
+        updated_at: bs.updated_at,
+        mata_pelajaran_nama: bs.mata_pelajaran.nama,
+        guru_nama: bs.guru.nama_lengkap,
+        tp_kode: bs.tujuan_pembelajaran?.kode || null,
+        tp_deskripsi: bs.tujuan_pembelajaran?.deskripsi || null,
+        lingkup_materi_judul: bs.lingkup_materi?.judul || null,
+        pertanyaan: activeVs?.pertanyaan,
+        gambar_url: activeVs?.gambar_url || null,
+        opsi_jawaban: activeVs?.opsi_jawaban ? JSON.parse(activeVs.opsi_jawaban) : undefined,
+        kunci_jawaban: activeVs?.kunci_jawaban ? JSON.parse(activeVs.kunci_jawaban) : undefined,
+        pembahasan: activeVs?.pembahasan,
+        bobot_default: activeVs?.bobot_default,
+      };
+    });
   }
 
   async findBankSoalById(id: string, sekolahId: string): Promise<BankSoalDTO | null> {
@@ -1510,14 +2071,20 @@ export class CbtRepository {
         mata_pelajaran_id: finalMapelId,
         lingkup_materi_id: input.lingkup_materi_id || null,
         tujuan_pembelajaran_id: input.tujuan_pembelajaran_id || null,
+        capaian_pembelajaran_id: input.capaian_pembelajaran_id || null,
+        folder_id: input.folder_id || null,
         kode: input.kode || `Q-${Date.now().toString(36).toUpperCase()}`,
         judul: input.judul || input.pertanyaan?.slice(0, 40) || "Soal CBT",
         tipe_soal: tipeSoal as any,
         tingkat_kesulitan:
           (input.tingkat_kesulitan === "HOTS" ? "SULIT" : input.tingkat_kesulitan) || "SEDANG",
+        scope_kepemilikan: input.scope_kepemilikan || "PERSONAL",
+        level_kognitif: input.level_kognitif || "L2",
         pertanyaan: input.pertanyaan,
+        gambar_url: input.gambar_url || null,
         opsi_jawaban: opsi,
         kunci_jawaban: kunci,
+        pembahasan: input.pembahasan || null,
         bobot_default: input.bobot_default || 1.0,
       },
       "Guru Pengampu"
@@ -1549,10 +2116,12 @@ export class CbtRepository {
       bankSoalId,
       {
         pertanyaan: input.pertanyaan,
+        gambar_url: input.gambar_url !== undefined ? input.gambar_url : null,
         opsi_jawaban: opsi,
         kunci_jawaban: kunci,
         bobot_default: input.bobot,
-        pembahasan: input.alasan_perubahan,
+        pembahasan: input.alasan_perubahan || input.pembahasan || null,
+        tingkat_kesulitan: input.tingkat_kesulitan,
       },
       "Guru Pengampu"
     );
@@ -1597,7 +2166,11 @@ export class CbtRepository {
         kkm_kktp: input.kktp || 75.0,
         acak_soal: Boolean(input.acak_soal),
         acak_opsi: Boolean(input.acak_opsi),
+        gunakan_token: Boolean(input.gunakan_token),
+        token_masuk: input.token_masuk || null,
         tampilkan_nilai: input.tampilkan_nilai !== false,
+        tampilkan_pembahasan: Boolean(input.tampilkan_pembahasan),
+        maksimal_attempt: Number(input.maksimal_attempt || 1),
         blueprint: bp,
       },
       guruId || ""
@@ -1730,8 +2303,11 @@ export class CbtRepository {
     const manifest: any[] = JSON.parse(session.snapshot.manifest_soal);
     const item =
       manifest.find((m) => m.nomor_urut === input.nomor_urut) || manifest[input.nomor_urut - 1];
-    const soalId = item?.soal_id || generateUlid();
-    const versiSoalId = item?.versi_soal_id || soalId;
+    const soalId = item?.soal_id || (item as any)?.bank_soal_id || input.soal_id;
+    if (!soalId) {
+      throw new Error(`Gagal memetakan butir soal nomor ${input.nomor_urut} ke ID bank soal.`);
+    }
+    const versiSoalId = item?.versi_soal_id || input.versi_soal_id || soalId;
 
     let jawabanPeserta: any = null;
     if (input.jawaban_pilihan) {
@@ -1747,6 +2323,7 @@ export class CbtRepository {
         sesi_ujian_id: input.sesi_ujian_siswa_id,
         soal_id: soalId,
         versi_soal_id: versiSoalId,
+        session_token: input.session_token,
         jawaban_peserta: jawabanPeserta ? JSON.stringify(jawabanPeserta) : null,
         ragu_ragu: input.ragu_ragu,
       },
@@ -1766,7 +2343,12 @@ export class CbtRepository {
     const manifest: any[] = session ? JSON.parse(session.snapshot.manifest_soal) : [];
 
     return answers.map((a) => {
-      const match = manifest.find((m) => m.soal_id === a.soal_id);
+      const match = manifest.find(
+        (m) =>
+          (m.soal_id && m.soal_id === a.soal_id) ||
+          ((m as any).bank_soal_id && (m as any).bank_soal_id === a.soal_id) ||
+          (m.versi_soal_id && m.versi_soal_id === a.versi_soal_id)
+      );
       let parsed = null;
       try {
         parsed = a.jawaban_peserta ? JSON.parse(a.jawaban_peserta) : null;
@@ -1857,8 +2439,15 @@ export class CbtRepository {
             rombel_id: true,
           },
         },
+        snapshot_ujian: {
+          orderBy: { nomor_snapshot: "desc" },
+          take: 1,
+          select: { total_soal: true },
+        },
       },
     });
+
+    const examTotalSoal = exam?.snapshot_ujian?.[0]?.total_soal || 0;
 
     const attempts = await prisma.sesiUjianSiswa.findMany({
       where: { ujian_cbt_id: ujianId },
@@ -1873,6 +2462,12 @@ export class CbtRepository {
             waktu_kejadian: true,
           },
           orderBy: { waktu_kejadian: "desc" },
+        },
+        jawaban_siswa: {
+          select: {
+            soal_id: true,
+            versi_soal_id: true,
+          },
         },
         _count: {
           select: { event_integritas_ujian: true, jawaban_siswa: true },
@@ -1922,6 +2517,12 @@ export class CbtRepository {
       processedSiswaIds.add(student.id);
       const a = attemptMap.get(student.id);
       if (a) {
+        const distinctCount = a.jawaban_siswa
+          ? new Set(a.jawaban_siswa.map((j: any) => j.soal_id || j.versi_soal_id)).size
+          : a._count.jawaban_siswa;
+        const validCount =
+          examTotalSoal > 0 ? Math.min(distinctCount, examTotalSoal) : distinctCount;
+
         result.push({
           ...a,
           siswa: a.siswa,
@@ -1935,7 +2536,7 @@ export class CbtRepository {
             : null,
           integrityEvents: a.event_integritas_ujian || [],
           integrityEventCount: a._count.event_integritas_ujian,
-          savedAnswersCount: a._count.jawaban_siswa,
+          savedAnswersCount: a.hasil ? a.hasil.total_dijawab : validCount,
         });
       } else {
         result.push({

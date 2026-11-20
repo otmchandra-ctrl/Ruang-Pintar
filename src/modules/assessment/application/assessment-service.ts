@@ -20,6 +20,8 @@ import {
   UpdateAssessmentSchema,
   BulkSaveGradesSchema,
   PublishAssessmentSchema,
+  UpsertKisiKisiSchema,
+  UpsertItemKisiKisiSchema,
 } from "../domain/assessment-validation";
 import {
   assessmentRepository,
@@ -33,6 +35,19 @@ import {
   DefinisiAsesmenDTO,
   NilaiSiswaDTO,
   ClassGradebookDTO,
+  KisiKisiAsesmenDTO,
+  ItemKisiKisiDTO,
+  UpsertKisiKisiInput,
+  UpsertItemKisiKisiInput,
+  KartuSoalPayloadDTO,
+  NaskahSoalPayloadDTO,
+  KunciJawabanPayloadDTO,
+  BeritaAcaraPayloadDTO,
+  DaftarHadirPayloadDTO,
+  AnalisisButirSoalPayloadDTO,
+  RekapNilaiAsesmenPayloadDTO,
+  BerkasPengesahanPayloadDTO,
+  CoverPaketAsesmenPayloadDTO,
 } from "../domain/assessment-types";
 
 export class AssessmentService {
@@ -389,6 +404,302 @@ export class AssessmentService {
    */
   async getTeacherOverview(sekolahId: string, guruId?: string | null, isSuperAdmin = false) {
     return this.repo.getTeacherGradebookOverview(sekolahId, guruId, isSuperAdmin);
+  }
+
+  // ==========================================
+  // ASSESSMENT BLUEPRINT (KISI-KISI)
+  // ==========================================
+
+  /**
+   * Ambil Kisi-Kisi Asesmen lengkap dengan butir item matriks
+   */
+  async getKisiKisi(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<KisiKisiAsesmenDTO | null> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.findKisiKisiByAsesmenId(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * Buat atau Perbarui Header Kisi-Kisi Asesmen
+   */
+  async upsertKisiKisi(
+    input: UpsertKisiKisiInput,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false,
+    userId = ""
+  ): Promise<KisiKisiAsesmenDTO> {
+    const parsed = UpsertKisiKisiSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new AssessmentValidationError(parsed.error.issues.map((e) => e.message).join(", "));
+    }
+
+    await this.getAssessmentDetail(input.definisi_asesmen_id, sekolahId, guruId, isSuperAdmin);
+
+    const result = await this.repo.upsertKisiKisi(sekolahId, parsed.data);
+
+    await recordAuditEvent({
+      sekolah_id: sekolahId,
+      aktor_id: userId || "SYSTEM",
+      aktor_role: isSuperAdmin ? "SUPER_ADMIN" : "TEACHER",
+      aksi: "UPSERT_KISI_KISI",
+      tipe_sumber: "KisiKisiAsesmen",
+      id_sumber: result.id,
+      payload_sesudah: {
+        definisi_asesmen_id: input.definisi_asesmen_id,
+        judul: input.judul,
+        status: input.status || "DRAFT",
+      },
+    });
+
+    return result;
+  }
+
+  /**
+   * Buat atau Perbarui Butir Matriks Item Kisi-Kisi
+   */
+  async upsertItemKisiKisi(
+    input: UpsertItemKisiKisiInput,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false,
+    userId = ""
+  ): Promise<ItemKisiKisiDTO> {
+    const parsed = UpsertItemKisiKisiSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new AssessmentValidationError(parsed.error.issues.map((e) => e.message).join(", "));
+    }
+
+    const kisiKisi = await prisma.kisiKisiAsesmen.findFirst({
+      where: { id: input.kisi_kisi_id, sekolah_id: sekolahId },
+    });
+    if (!kisiKisi) {
+      throw new AssessmentNotFoundError(`Kisi-kisi '${input.kisi_kisi_id}' tidak ditemukan.`);
+    }
+
+    await this.getAssessmentDetail(kisiKisi.definisi_asesmen_id, sekolahId, guruId, isSuperAdmin);
+
+    const result = await this.repo.upsertItemKisiKisi(sekolahId, parsed.data);
+
+    await recordAuditEvent({
+      sekolah_id: sekolahId,
+      aktor_id: userId || "SYSTEM",
+      aktor_role: isSuperAdmin ? "SUPER_ADMIN" : "TEACHER",
+      aksi: "UPSERT_ITEM_KISI_KISI",
+      tipe_sumber: "ItemKisiKisi",
+      id_sumber: result.id,
+      payload_sesudah: {
+        kisi_kisi_id: input.kisi_kisi_id,
+        nomor_urut: input.nomor_urut,
+        level_kognitif: input.level_kognitif,
+      },
+    });
+
+    return result;
+  }
+
+  /**
+   * Hapus Butir Item Kisi-Kisi
+   */
+  async deleteItemKisiKisi(
+    itemId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false,
+    userId = ""
+  ): Promise<void> {
+    const item = await prisma.itemKisiKisi.findFirst({
+      where: { id: itemId, sekolah_id: sekolahId },
+      include: { kisi_kisi: true },
+    });
+    if (!item) {
+      throw new AssessmentNotFoundError(`Item kisi-kisi '${itemId}' tidak ditemukan.`);
+    }
+
+    await this.getAssessmentDetail(
+      item.kisi_kisi.definisi_asesmen_id,
+      sekolahId,
+      guruId,
+      isSuperAdmin
+    );
+
+    await this.repo.deleteItemKisiKisi(sekolahId, itemId);
+
+    await recordAuditEvent({
+      sekolah_id: sekolahId,
+      aktor_id: userId || "SYSTEM",
+      aktor_role: isSuperAdmin ? "SUPER_ADMIN" : "TEACHER",
+      aksi: "DELETE_ITEM_KISI_KISI",
+      tipe_sumber: "ItemKisiKisi",
+      id_sumber: itemId,
+      payload_sebelum: {
+        kisi_kisi_id: item.kisi_kisi_id,
+        nomor_urut: item.nomor_urut,
+      },
+    });
+  }
+
+  // ==========================================
+  // ASSESSMENT ADMINISTRATION FOUNDATION
+  // ==========================================
+
+  /**
+   * Generate Dokumen Kartu Soal Resmi per Butir
+   */
+  async getKartuSoal(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<KartuSoalPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateKartuSoalPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * Generate Dokumen Naskah Soal 2 Kolom dengan Kop Resmi
+   */
+  async getNaskahSoal(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<NaskahSoalPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateNaskahSoalPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * Generate Dokumen Kunci Jawaban & Pedoman Penskoran Resmi (Akses Rahasia Pengampu/Admin)
+   */
+  async getKunciJawaban(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<KunciJawabanPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateKunciJawabanPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * Bekukan Snapshot Kisi-Kisi Asesmen (Hard-Pinning & Segel Hash SHA-256)
+   */
+  async freezeKisiKisi(
+    kisiKisiId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false,
+    userId = ""
+  ): Promise<KisiKisiAsesmenDTO> {
+    const kisiKisi = await prisma.kisiKisiAsesmen.findFirst({
+      where: { id: kisiKisiId, sekolah_id: sekolahId },
+    });
+    if (!kisiKisi) {
+      throw new AssessmentNotFoundError(`Kisi-kisi '${kisiKisiId}' tidak ditemukan.`);
+    }
+
+    await this.getAssessmentDetail(kisiKisi.definisi_asesmen_id, sekolahId, guruId, isSuperAdmin);
+
+    const frozen = await this.repo.freezeKisiKisiSnapshot(kisiKisiId, sekolahId);
+
+    await recordAuditEvent({
+      sekolah_id: sekolahId,
+      aktor_id: userId || "SYSTEM",
+      aktor_role: isSuperAdmin ? "SUPER_ADMIN" : "TEACHER",
+      aksi: "FREEZE_ASSESSMENT_SNAPSHOT",
+      tipe_sumber: "KisiKisiAsesmen",
+      id_sumber: kisiKisiId,
+      payload_sesudah: {
+        snapshot_hash: frozen.snapshot_hash,
+        status: frozen.status,
+        tanggal_dibekukan: frozen.tanggal_dibekukan,
+      },
+    });
+
+    return frozen;
+  }
+
+  /**
+   * Generate Dokumen Daftar Hadir Peserta Ujian Resmi
+   */
+  async getDaftarHadir(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<DaftarHadirPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateDaftarHadirPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * Generate Dokumen Berita Acara Pelaksanaan Ujian Resmi
+   */
+  async getBeritaAcara(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<BeritaAcaraPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateBeritaAcaraPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * CBT-03.1 — 1. Ambil Laporan Analisis Butir Soal Resmi
+   */
+  async getAnalisisButirSoal(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<AnalisisButirSoalPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateAnalisisButirSoalPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * CBT-03.1 — 2. Ambil Rekapitulasi Nilai Asesmen & Status Ketuntasan KKTP
+   */
+  async getRekapNilaiAsesmen(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<RekapNilaiAsesmenPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateRekapNilaiAsesmenPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * CBT-03.1 — 3. Ambil Berkas Pengesahan & Validasi Supervisi Asesmen
+   */
+  async getBerkasPengesahan(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<BerkasPengesahanPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateBerkasPengesahanPayload(definisiAsesmenId, sekolahId);
+  }
+
+  /**
+   * CBT-03.1 — 4. Ambil Halaman Sampul (Cover Page) Paket Asesmen
+   */
+  async getCoverPaket(
+    definisiAsesmenId: string,
+    sekolahId: string,
+    guruId?: string | null,
+    isSuperAdmin = false
+  ): Promise<CoverPaketAsesmenPayloadDTO> {
+    await this.getAssessmentDetail(definisiAsesmenId, sekolahId, guruId, isSuperAdmin);
+    return this.repo.generateCoverPaketPayload(definisiAsesmenId, sekolahId);
   }
 }
 

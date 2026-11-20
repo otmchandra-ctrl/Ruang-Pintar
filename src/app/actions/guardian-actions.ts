@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/shared/infrastructure/auth/auth-guard";
 import { GuardianService } from "@/modules/guardian/application/guardian-service";
-import { LocalStorageAdapter } from "@/shared/infrastructure/storage/local-storage-adapter";
+import { storageService } from "@/shared/infrastructure/storage/storage-service";
 import { getSessionCookieOptions } from "@/shared/lib/session";
 import { prisma } from "@/shared/infrastructure/database/prisma";
 import {
@@ -107,7 +107,7 @@ export async function submitPengajuanWaliAction(
         };
       }
 
-      const storage = new LocalStorageAdapter();
+      const storage = storageService;
       const buffer = Buffer.from(await file.arrayBuffer());
       const metadata = await storage.saveFile({
         sekolah_id: user.sekolah_id,

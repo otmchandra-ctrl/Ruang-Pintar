@@ -10,28 +10,45 @@ describe("Role-Aware Navigation Filtering (Phase 05)", () => {
     const allItemIds = nav.flatMap((g) => g.items.map((i) => i.id));
 
     expect(allItemIds).toContain("dashboard");
-    expect(allItemIds).toContain("teacher-schedule");
+    expect(allItemIds).toContain("teacher-workspace");
     expect(allItemIds).toContain("teacher-classes");
     expect(allItemIds).toContain("teacher-grades");
     expect(allItemIds).toContain("teacher-cbt");
+    expect(allItemIds).toContain("teacher-announcements");
+    expect(allItemIds).toContain("teacher-profile");
 
-    // Must NOT contain student, guardian, or admin items
+    // Must NOT contain student, guardian, admin, or institution broadcast items
     expect(allItemIds).not.toContain("student-schedule");
     expect(allItemIds).not.toContain("guardian-attendance");
     expect(allItemIds).not.toContain("system-configs");
   });
 
-  it("filters navigation correctly for STUDENT role", () => {
+  it("filters navigation correctly for STUDENT role with structured groups", () => {
     const nav = getFilteredNavigation("STUDENT");
     const allItemIds = nav.flatMap((g) => g.items.map((i) => i.id));
 
     expect(allItemIds).toContain("dashboard");
     expect(allItemIds).toContain("student-schedule");
     expect(allItemIds).toContain("student-learning");
+    expect(allItemIds).toContain("student-cbt");
     expect(allItemIds).toContain("student-grades");
+    expect(allItemIds).toContain("student-announcements");
+    expect(allItemIds).toContain("student-calendar");
 
-    expect(allItemIds).not.toContain("teacher-schedule");
+    expect(allItemIds).not.toContain("teacher-workspace");
     expect(allItemIds).not.toContain("system-configs");
+
+    // Verify group structures and titles
+    const groupTitles = nav.map((g) => g.title);
+    expect(groupTitles).toEqual(["Menu Utama", "Aktivitas Belajar", "Hasil & Informasi"]);
+
+    // Verify daily learning order: Jadwal -> Materi & Tugas -> CBT
+    const learningItems = nav.find((g) => g.id === "student-ops")?.items.map((i) => i.id);
+    expect(learningItems).toEqual(["student-schedule", "student-learning", "student-cbt"]);
+
+    // Verify outcomes & info order: Nilai -> Pengumuman -> Kalender
+    const infoItems = nav.find((g) => g.id === "student-info")?.items.map((i) => i.id);
+    expect(infoItems).toEqual(["student-grades", "student-announcements", "student-calendar"]);
   });
 
   it("filters navigation correctly for GUARDIAN role", () => {
@@ -42,7 +59,7 @@ describe("Role-Aware Navigation Filtering (Phase 05)", () => {
     expect(allItemIds).toContain("guardian-attendance");
     expect(allItemIds).toContain("guardian-grades");
 
-    expect(allItemIds).not.toContain("teacher-schedule");
+    expect(allItemIds).not.toContain("teacher-workspace");
     expect(allItemIds).not.toContain("student-schedule");
   });
 

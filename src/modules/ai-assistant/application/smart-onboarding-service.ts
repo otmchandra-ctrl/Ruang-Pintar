@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
+import { containsText } from "@/shared/infrastructure/database/query-filters";
 import { generateUlid } from "@/shared/lib/ulid";
 import { hashPassword } from "@/shared/lib/password";
 import {
@@ -42,7 +43,7 @@ export class SmartOnboardingService {
     const schools = await prisma.sekolah.findMany({
       where: {
         status_aktif: true,
-        OR: [{ nama: { contains: term } }, { npsn: { contains: term } }],
+        OR: [{ nama: containsText(term) }, { npsn: containsText(term) }],
       },
       select: { id: true, nama: true, jenjang: true, alamat: true, npsn: true },
       orderBy: { nama: "asc" },

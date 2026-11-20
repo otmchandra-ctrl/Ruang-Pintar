@@ -5,6 +5,10 @@ import { staffCapabilityService } from "@/shared/infrastructure/authorization/st
 import { prisma } from "@/shared/infrastructure/database/prisma";
 import { AcademicShell } from "@/shared/components/shell/academic-shell";
 import { CreateQuestionFullView } from "@/modules/cbt/presentation/create-question-full-view";
+import { cbtService } from "@/modules/cbt/application/cbt-service";
+import { BankSoalDTO } from "@/modules/cbt/domain/cbt-types";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Buat Soal untuk Saya — CBT Ruang Pintar",
@@ -15,7 +19,7 @@ export const metadata: Metadata = {
 export default async function BuatSoalPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ mapelId?: string }>;
+  searchParams?: Promise<{ mapelId?: string; editId?: string }>;
 }) {
   const user = await requireAuth();
 
@@ -79,8 +83,30 @@ export default async function BuatSoalPage({
     });
   }
 
-  const resolvedParams = searchParams ? await searchParams : undefined;
-  let initialMapelId = resolvedParams?.mapelId;
+  const params = searchParams ? await Promise.resolve(searchParams) : undefined;
+  const rawEditId = params?.editId;
+  const editId =
+    typeof rawEditId === "string" ? rawEditId : Array.isArray(rawEditId) ? rawEditId[0] : undefined;
+
+  const rawMapelId = params?.mapelId;
+  let initialMapelId =
+    typeof rawMapelId === "string"
+      ? rawMapelId
+      : Array.isArray(rawMapelId)
+        ? rawMapelId[0]
+        : undefined;
+
+  let initialQuestion: BankSoalDTO | null = null;
+  if (editId) {
+    try {
+      initialQuestion = await cbtService.getQuestionDetail(editId, user.sekolah_id);
+      if (initialQuestion?.mata_pelajaran_id) {
+        initialMapelId = initialQuestion.mata_pelajaran_id;
+      }
+    } catch (err) {
+      console.error("Gagal memuat soal edit di layar penuh:", err);
+    }
+  }
 
   if (!initialMapelId && mapelList.length > 0) {
     initialMapelId = mapelList[0].id;
@@ -95,13 +121,21 @@ export default async function BuatSoalPage({
         { label: "Dashboard", href: "/dashboard" },
         { label: "CBT Ujian Online", href: "/cbt-ujian" },
         { label: "Bank Soal", href: "/cbt-ujian" },
-        { label: "Buat Soal", href: "/cbt-ujian/bank-soal/buat", isCurrent: true },
+        {
+          label: initialQuestion ? "Edit Butir Soal" : "Buat Soal",
+          href: initialQuestion
+            ? `/cbt-ujian/bank-soal/buat?editId=${initialQuestion.id}`
+            : "/cbt-ujian/bank-soal/buat",
+          isCurrent: true,
+        },
       ]}
     >
       <CreateQuestionFullView
+        key={`${initialQuestion?.id || editId || "create-new-question"}-${initialMapelId || "default"}`}
         sekolahId={user.sekolah_id}
         mapelList={mapelList}
         initialMapelId={initialMapelId}
+        initialQuestion={initialQuestion}
       />
     </AcademicShell>
   );

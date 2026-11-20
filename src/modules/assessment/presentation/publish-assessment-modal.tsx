@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { X, Send, ShieldCheck, Users, Eye, AlertTriangle } from "lucide-react";
 import { publishAssessmentAction } from "@/app/actions/assessment-actions";
 import { PublicationAudience, DefinisiAsesmenDTO } from "../domain/assessment-types";
@@ -26,7 +27,7 @@ export function PublishAssessmentModal({
   const [targetAudience, setTargetAudience] = useState<PublicationAudience>("SEMUA");
   const [catatan, setCatatan] = useState("");
 
-  if (!isOpen || !asesmen) return null;
+  if (!isOpen || !asesmen || typeof document === "undefined") return null;
 
   const handlePublish = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,26 +50,32 @@ export function PublishAssessmentModal({
     });
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="publish-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200/80 shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[85vh] animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
               <Send className="h-5 w-5" />
             </div>
             <div>
-              <h2 id="publish-modal-title" className="text-base font-bold text-slate-800">
+              <h2
+                id="publish-modal-title"
+                className="text-base font-bold font-sans tracking-tight text-slate-800 dark:text-slate-100"
+              >
                 Publikasikan Nilai Asesmen
               </h2>
-              <p className="text-xs text-slate-500">
-                Assessment Definition ≠ Grade ≠ Grade Publication
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Rilis nilai resmi kepada siswa dan orang tua / wali
               </p>
             </div>
           </div>
@@ -76,7 +83,7 @@ export function PublishAssessmentModal({
             type="button"
             onClick={onClose}
             aria-label="Tutup"
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -177,12 +184,12 @@ export function PublishAssessmentModal({
           </div>
 
           {/* Footer */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
             >
               Batal
             </button>
@@ -197,6 +204,7 @@ export function PublishAssessmentModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -95,3 +95,30 @@ export const PublishAssessmentSchema = z.object({
   target_audience: z.enum(PUBLICATION_AUDIENCES).default("SEMUA"),
   catatan: z.string().max(500).nullish(),
 });
+
+export const UpsertKisiKisiSchema = z.object({
+  definisi_asesmen_id: z.string().min(1, "ID Definisi Asesmen wajib diisi"),
+  judul: z.string().trim().min(3, "Judul kisi-kisi minimal 3 karakter").max(200),
+  tahun_ajaran: z.string().trim().min(4, "Tahun ajaran wajib diisi"),
+  semester: z.string().trim().min(2, "Semester wajib diisi"),
+  alokasi_waktu_menit: z.coerce.number().int().min(10).max(360).default(90),
+  catatan_supervisi: z.string().trim().max(1000).nullish(),
+  status: z.enum(["DRAFT", "REVIEW", "FINAL", "ARSIP"]).default("DRAFT"),
+});
+
+export const UpsertItemKisiKisiSchema = z.object({
+  kisi_kisi_id: z.string().min(1, "ID Kisi-kisi wajib diisi"),
+  tujuan_pembelajaran_id: z.string().min(1, "ID TP wajib diisi"),
+  nomor_urut: z.coerce.number().int().min(1),
+  indikator_soal: z.string().trim().min(5, "Indikator soal minimal 5 karakter").max(500),
+  level_kognitif: z.enum(["L1", "L2", "L3"]).default("L2"),
+  bentuk_soal: z.string().trim().default("PILIHAN_GANDA"),
+  bobot_skor: z.coerce.number().min(0.1).default(1.0),
+  bank_soal_id: z.string().nullish(),
+  versi_soal_id: z.string().nullish(),
+});
+
+export const BulkUpsertItemsKisiKisiSchema = z.object({
+  kisi_kisi_id: z.string().min(1, "ID Kisi-kisi wajib diisi"),
+  items: z.array(UpsertItemKisiKisiSchema).min(1, "Minimal satu butir kisi-kisi"),
+});
