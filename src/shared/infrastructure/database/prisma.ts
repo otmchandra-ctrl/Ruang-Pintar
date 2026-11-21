@@ -38,10 +38,10 @@ function createPrismaClient(): PrismaClient {
   return client;
 }
 
-export const prisma: PrismaClient = global.__ruangPintarPrisma__ ?? createPrismaClient();
+export const prisma: PrismaClient = globalThis.__ruangPintarPrisma__ ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
-  global.__ruangPintarPrisma__ = prisma;
-}
+// In serverless environments (e.g. Vercel), caching on globalThis across all environments
+// allows warm lambdas to reuse the existing connection pool instead of re-instantiating PrismaClient.
+globalThis.__ruangPintarPrisma__ = prisma;
 
 export default prisma;

@@ -43,6 +43,11 @@ import { checkPermission } from "@/shared/infrastructure/authorization/authz-gua
 import { teacherOnboardingService } from "@/modules/teacher/application/teacher-onboarding-service";
 import { TeacherCompactHeader } from "../cockpit/teacher-compact-header";
 import { TeacherAttendanceCard } from "../cockpit/teacher-attendance-card";
+import {
+  getHariBelajarInTimezone,
+  getCurrentHHMMInTimezone,
+  getStartOfDayInTimezone,
+} from "@/shared/lib/date-utils";
 
 export interface TeacherDashboardProps {
   user: AuthenticatedUser;
@@ -102,16 +107,7 @@ export async function TeacherDashboard({
 
   const namaGelar = teacher?.nama_dengan_gelar || user.nama_lengkap;
 
-  const hariMap: Record<number, HariBelajar> = {
-    1: "SENIN",
-    2: "SELASA",
-    3: "RABU",
-    4: "KAMIS",
-    5: "JUMAT",
-    6: "SABTU",
-    0: "MINGGU",
-  };
-  const todayHari = hariMap[new Date().getDay()] || "SENIN";
+  const todayHari = getHariBelajarInTimezone(new Date(), "Asia/Jakarta");
 
   let teacherSchedules: ScheduleEntryDTO[] = [];
   let todaySchedules: ScheduleEntryDTO[] = [];
@@ -128,8 +124,7 @@ export async function TeacherDashboard({
   if (user.sekolah_id) {
     const sekolahId = user.sekolah_id;
     try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
+      const todayStart = getStartOfDayInTimezone(new Date(), "Asia/Jakarta");
 
       const [schedulesRes, sessionsRes, overviewsRes, eventsRes, announcementsRes, cbtCountRes] =
         await Promise.all([
@@ -261,7 +256,7 @@ export async function TeacherDashboard({
 
   if (mergedTodayBlocks.length > 0) {
     const now = new Date();
-    const currentHHMM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const currentHHMM = getCurrentHHMMInTimezone(now, "Asia/Jakarta");
 
     const ongoingBlock = mergedTodayBlocks.find(
       (b) => currentHHMM >= b.jam_mulai && currentHHMM <= b.jam_selesai

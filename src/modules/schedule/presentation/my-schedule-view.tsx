@@ -45,6 +45,7 @@ import { Toast, ToastType } from "@/shared/components/ui/toast";
 import { SessionAttendanceModal } from "@/modules/attendance/presentation/session-attendance-modal";
 import { MergedScheduleBlock, mergeConsecutiveScheduleEntries } from "../domain/schedule-merger";
 import { AnimatedCounter } from "@/shared/components/motion/animated-counter";
+import { getHariBelajarInTimezone } from "@/shared/lib/date-utils";
 
 export type { MergedScheduleBlock };
 export { mergeConsecutiveScheduleEntries };
@@ -87,16 +88,7 @@ export function MyScheduleView({
   }, []);
 
   // Map hari ini
-  const hariMap: Record<number, HariBelajar> = {
-    1: "SENIN",
-    2: "SELASA",
-    3: "RABU",
-    4: "KAMIS",
-    5: "JUMAT",
-    6: "SABTU",
-    0: "MINGGU",
-  };
-  const todayDayName = hariMap[new Date().getDay()] || "SENIN";
+  const todayDayName = getHariBelajarInTimezone(new Date(), "Asia/Jakarta");
 
   const isBlockLive = (block: MergedScheduleBlock) => {
     if (block.hari !== todayDayName || !currentTimeStr) return false;

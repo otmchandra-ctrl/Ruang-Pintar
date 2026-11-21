@@ -14,6 +14,7 @@
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
 import { generateUlid } from "@/shared/lib/ulid";
+import { getHariBelajarInTimezone } from "@/shared/lib/date-utils";
 import {
   StudentProfileContext,
   StudentTodayScheduleItem,
@@ -130,9 +131,7 @@ export class StudentExperienceRepository {
    * Mengambil jadwal pelajaran siswa hari ini.
    */
   async getTodaySchedule(rombelId: string, schoolId: string): Promise<StudentTodayScheduleItem[]> {
-    const daysMap = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
-    const todayIndex = new Date().getDay();
-    const todayName = daysMap[todayIndex];
+    const todayName = getHariBelajarInTimezone(new Date(), "Asia/Jakarta");
 
     const activeVersion = await prisma.versiJadwal.findFirst({
       where: {

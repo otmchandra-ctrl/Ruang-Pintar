@@ -4,6 +4,7 @@
 
 import { prisma } from "@/shared/infrastructure/database/prisma";
 import { generateUlid } from "@/shared/lib/ulid";
+import { getHariBelajarInTimezone } from "@/shared/lib/date-utils";
 import {
   CreateAdministrasiInput,
   CreateLingkupMateriInput,
@@ -114,7 +115,7 @@ export class LearningRepository {
       SABTU: "Sabtu",
       MINGGU: "Minggu",
     };
-    const todayName = hariMap[new Date().getDay()] || "SENIN";
+    const todayName = getHariBelajarInTimezone(new Date(), "Asia/Jakarta");
 
     return assignments.map((a) => {
       const todaySchedule = a.jadwal_pelajaran.find((j) => j.hari === todayName);

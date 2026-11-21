@@ -100,7 +100,8 @@ export async function loginAction(
       err?.code?.startsWith("P10") ||
       err?.code?.startsWith("P20");
 
-    let userFriendlyError = "Terjadi kesalahan internal pada server. Silakan coba lagi beberapa saat lagi.";
+    let userFriendlyError =
+      "Terjadi kesalahan internal pada server. Silakan coba lagi beberapa saat lagi.";
     if (isDbConfigError) {
       userFriendlyError =
         "Basis data belum terkonfigurasi. Pastikan variabel DATABASE_URL telah didaftarkan di Vercel.";

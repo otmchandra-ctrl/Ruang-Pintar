@@ -164,6 +164,7 @@ export function Sidebar({
                   <div key={item.id} className="relative group">
                     <Link
                       href={item.href}
+                      prefetch={false}
                       className={`flex items-center transition-all duration-150 min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
                         isActive
                           ? isCollapsed
