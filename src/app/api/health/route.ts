@@ -6,6 +6,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const dbUrlPresent = Boolean(process.env.DATABASE_URL);
   const directUrlPresent = Boolean(process.env.DIRECT_URL);
+  const storageConfigured = Boolean(
+    process.env.SUPABASE_URL &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    process.env.SUPABASE_STORAGE_BUCKET
+  );
   const dbUrlPrefix = process.env.DATABASE_URL
     ? process.env.DATABASE_URL.split("://")[0] + "://"
     : "not_set";
@@ -34,6 +39,8 @@ export async function GET() {
         database_url_configured: dbUrlPresent,
         database_url_protocol: dbUrlPrefix,
         direct_url_configured: directUrlPresent,
+        storage_configured: storageConfigured,
+        storage_bucket: process.env.SUPABASE_STORAGE_BUCKET || "not_set",
       },
       database: {
         status: dbStatus,
