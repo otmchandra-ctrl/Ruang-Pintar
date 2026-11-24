@@ -71,14 +71,35 @@ function createClient(): PrismaClient {
   return globalThis.__ruangPintarPrisma__;
 }
 
-export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
-    const client = createClient();
-    const val = (client as any)[prop];
+const defaultTarget = createClient();
+
+export const prisma: PrismaClient = new Proxy(defaultTarget, {
+  get(target, prop, receiver) {
+    if (Object.prototype.hasOwnProperty.call(target, prop)) {
+      return Reflect.get(target, prop, receiver);
+    }
+    const client = resolveD1Binding() ? createClient() : target;
+    const val = Reflect.get(client, prop, receiver);
     if (typeof val === "function") {
       return val.bind(client);
     }
     return val;
+  },
+  set(target, prop, value, receiver) {
+    return Reflect.set(target, prop, value, receiver);
+  },
+  defineProperty(target, prop, descriptor) {
+    return Reflect.defineProperty(target, prop, descriptor);
+  },
+  has(target, prop) {
+    const client = resolveD1Binding() ? createClient() : target;
+    return Reflect.has(client, prop);
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    return (
+      Reflect.getOwnPropertyDescriptor(target, prop) ||
+      Reflect.getOwnPropertyDescriptor(createClient(), prop)
+    );
   },
 });
 
