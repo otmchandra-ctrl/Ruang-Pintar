@@ -26,7 +26,7 @@ export default async function ProfilPage() {
     redirect("/dashboard");
   }
 
-  const [schoolProfile, staffCapabilities, userDb] = await Promise.all([
+  const [schoolProfile, staffCapabilities, userDb, schoolData] = await Promise.all([
     schoolProfileService.getProfile(user.sekolah_id),
     user.peran_dasar === "SCHOOL_STAFF" || user.peran_dasar === "TEACHER"
       ? staffCapabilityService.getUserCapabilities(user.id)
@@ -39,13 +39,23 @@ export default async function ProfilPage() {
         email: true,
         nama_lengkap: true,
         peran_dasar: true,
+        tipe_lisensi: true,
         status_akun: true,
         created_at: true,
         terakhir_login_pada: true,
         foto_url: true,
       },
     }),
+    prisma.sekolah.findUnique({
+      where: { id: user.sekolah_id },
+      select: { tipe_lisensi: true },
+    }),
   ]);
+
+  const canEditName =
+    userDb?.tipe_lisensi === "FREEMIUM" ||
+    schoolData?.tipe_lisensi === "FREEMIUM" ||
+    user.peran_dasar === "SUPER_ADMIN";
 
   let teacherProfile: any = null;
 
@@ -114,6 +124,7 @@ export default async function ProfilPage() {
             foto_url: userDb?.foto_url || teacherProfile?.foto_url || null,
           }}
           schoolName={schoolName}
+          canEditName={canEditName}
           teacherProfile={teacherProfile}
         />
       </div>

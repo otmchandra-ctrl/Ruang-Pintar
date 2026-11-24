@@ -41,6 +41,7 @@ export interface ProfileViewProps {
     foto_url?: string | null;
   };
   schoolName: string;
+  canEditName?: boolean;
   teacherProfile?: {
     id: string;
     nip: string | null;
@@ -63,7 +64,7 @@ export interface ProfileViewProps {
   } | null;
 }
 
-export function ProfileView({ user, schoolName, teacherProfile }: ProfileViewProps) {
+export function ProfileView({ user, schoolName, teacherProfile, canEditName = false }: ProfileViewProps) {
   const [activeTab, setActiveTab] = useState<"KONTAK" | "AKADEMIK">("KONTAK");
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{
@@ -76,16 +77,25 @@ export function ProfileView({ user, schoolName, teacherProfile }: ProfileViewPro
   const [photo, setPhoto] = useState<string | null>(
     user.foto_url || teacherProfile?.foto_url || null
   );
+  const [namaLengkap, setNamaLengkap] = useState(user.nama_lengkap);
+  const [gelarDepan, setGelarDepan] = useState(teacherProfile?.gelar_depan || "");
+  const [gelarBelakang, setGelarBelakang] = useState(teacherProfile?.gelar_belakang || "");
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email || "");
   const [telepon, setTelepon] = useState(teacherProfile?.telepon || "");
   const [alamat, setAlamat] = useState(teacherProfile?.alamat || "");
 
-  // Sync state if user.foto_url changes from server revalidation
+  // Sync state if user.foto_url or user.nama_lengkap changes from server revalidation
   const [prevPhotoProp, setPrevPhotoProp] = useState(user.foto_url);
   if (user.foto_url !== prevPhotoProp) {
     setPrevPhotoProp(user.foto_url);
     setPhoto(user.foto_url || teacherProfile?.foto_url || null);
+  }
+
+  const [prevNameProp, setPrevNameProp] = useState(user.nama_lengkap);
+  if (user.nama_lengkap !== prevNameProp) {
+    setPrevNameProp(user.nama_lengkap);
+    setNamaLengkap(user.nama_lengkap);
   }
 
   // Client-side image compression & optimization helper
@@ -441,23 +451,80 @@ export function ProfileView({ user, schoolName, teacherProfile }: ProfileViewPro
                   className="sr-only"
                 />
 
-                {/* Read-Only Official Name */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Nama Lengkap Resmi
-                    </label>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                      <Lock className="h-3 w-3" />
-                      Terproteksi (Dikelola TU)
-                    </span>
+                {/* Official Name Section */}
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Nama Lengkap {canEditName && <span className="text-rose-500">*</span>}
+                      </label>
+                      {canEditName ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-md">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Dapat Diubah (Guru Mandiri / Akun Pribadi)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                          <Lock className="h-3 w-3" />
+                          Terproteksi (Dikelola TU)
+                        </span>
+                      )}
+                    </div>
+                    {canEditName ? (
+                      <input
+                        type="text"
+                        name="nama_lengkap"
+                        required
+                        minLength={2}
+                        maxLength={100}
+                        value={namaLengkap}
+                        onChange={(e) => setNamaLengkap(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
+                        placeholder="Nama lengkap Anda tanpa gelar"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        disabled
+                        value={formattedTeacherName}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/40 text-xs font-semibold text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                      />
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    disabled
-                    value={formattedTeacherName}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/40 text-xs font-semibold text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                  />
+
+                  {/* If teacher and canEditName, allow editing Gelar Depan & Gelar Belakang */}
+                  {canEditName && user.peran_dasar === "TEACHER" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Gelar Depan (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          name="gelar_depan"
+                          maxLength={30}
+                          value={gelarDepan}
+                          onChange={(e) => setGelarDepan(e.target.value)}
+                          placeholder="Contoh: Dra., Dr., Ir."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Gelar Belakang (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          name="gelar_belakang"
+                          maxLength={50}
+                          value={gelarBelakang}
+                          onChange={(e) => setGelarBelakang(e.target.value)}
+                          placeholder="Contoh: S.Pd., M.Kom., Gr."
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

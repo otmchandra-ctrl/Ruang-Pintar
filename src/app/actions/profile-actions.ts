@@ -28,6 +28,10 @@ export async function updateProfileSelfAction(
     const fotoUrlRaw = formData.get("foto_url") as string | null;
     const foto_url = fotoUrlRaw === "" ? null : (fotoUrlRaw ?? undefined);
 
+    const namaLengkapRaw = (formData.get("nama_lengkap") as string)?.trim();
+    const gelarDepanRaw = (formData.get("gelar_depan") as string)?.trim();
+    const gelarBelakangRaw = (formData.get("gelar_belakang") as string)?.trim();
+
     if (!username) {
       return { success: false, message: "Username tidak boleh kosong." };
     }
@@ -42,6 +46,34 @@ export async function updateProfileSelfAction(
         success: false,
         message: "Username hanya boleh berisi huruf kecil, angka, garis bawah, titik, dan strip.",
       };
+    }
+
+    // Check if user is eligible to edit full name (Guru Mandiri / FREEMIUM or SUPER_ADMIN)
+    let canEditName = user.peran_dasar === "SUPER_ADMIN";
+    if (!canEditName) {
+      const penggunaData = await prisma.pengguna.findUnique({
+        where: { id: user.id },
+        select: { tipe_lisensi: true, sekolah_id: true },
+      });
+      if (penggunaData?.tipe_lisensi === "FREEMIUM") {
+        canEditName = true;
+      } else if (penggunaData?.sekolah_id) {
+        const sekolah = await prisma.sekolah.findUnique({
+          where: { id: penggunaData.sekolah_id },
+          select: { tipe_lisensi: true },
+        });
+        if (sekolah?.tipe_lisensi === "FREEMIUM") {
+          canEditName = true;
+        }
+      }
+    }
+
+    let finalNamaLengkap: string | undefined = undefined;
+    if (canEditName && namaLengkapRaw) {
+      if (namaLengkapRaw.length < 2 || namaLengkapRaw.length > 100) {
+        return { success: false, message: "Nama lengkap harus antara 2 hingga 100 karakter." };
+      }
+      finalNamaLengkap = namaLengkapRaw;
     }
 
     // Check username uniqueness if changed
@@ -78,11 +110,12 @@ export async function updateProfileSelfAction(
       data: {
         username,
         email,
+        ...(finalNamaLengkap ? { nama_lengkap: finalNamaLengkap } : {}),
         ...(foto_url !== undefined ? { foto_url } : {}),
       },
     });
 
-    // If user has a teacher domain profile, sync contact info & photo
+    // If user has a teacher domain profile, sync contact info, photo, and official title
     if (user.peran_dasar === "TEACHER") {
       const orConditions: Array<{ pengguna_id?: string; email?: string }> = [
         { pengguna_id: user.id },
@@ -106,6 +139,11 @@ export async function updateProfileSelfAction(
             email,
             telepon,
             alamat,
+            ...(finalNamaLengkap ? { nama_lengkap: finalNamaLengkap } : {}),
+            ...(canEditName ? {
+              gelar_depan: gelarDepanRaw || null,
+              gelar_belakang: gelarBelakangRaw || null,
+            } : {}),
             ...(foto_url !== undefined ? { foto_url } : {}),
           },
         });
