@@ -39,7 +39,6 @@ import {
 } from "lucide-react";
 import { BaseRole, CapabilityBundle } from "@/shared/infrastructure/authorization/types";
 import { getFilteredNavigation } from "./navigation-config";
-import { logoutAction } from "@/app/actions/auth-actions";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -287,22 +286,21 @@ export function Sidebar({
         </Link>
 
         {/* 3. Keluar */}
-        <button
-          type="button"
-          onClick={async () => {
-            await logoutAction();
-          }}
-          aria-label="Keluar"
-          title="Keluar"
-          className={`flex items-center gap-3 rounded-xl text-xs font-medium text-blue-100/80 hover:bg-rose-500/20 hover:text-rose-200 transition-colors min-h-[40px] cursor-pointer text-left w-full ${
-            isCollapsed
-              ? "justify-center p-2"
-              : "justify-center xl:justify-start p-2 xl:px-3 xl:py-2"
-          }`}
-        >
-          <LogOut className="h-4 w-4 text-blue-200/80 flex-shrink-0" />
-          {!isCollapsed && <span className="hidden xl:inline truncate flex-1">Keluar</span>}
-        </button>
+        <form action="/api/auth/logout" method="POST" className="w-full">
+          <button
+            type="submit"
+            aria-label="Keluar"
+            title="Keluar"
+            className={`flex items-center gap-3 rounded-xl text-xs font-medium text-blue-100/80 hover:bg-rose-500/20 hover:text-rose-200 transition-colors min-h-[40px] cursor-pointer text-left w-full ${
+              isCollapsed
+                ? "justify-center p-2"
+                : "justify-center xl:justify-start p-2 xl:px-3 xl:py-2"
+            }`}
+          >
+            <LogOut className="h-4 w-4 text-blue-200/80 flex-shrink-0" />
+            {!isCollapsed && <span className="hidden xl:inline truncate flex-1">Keluar</span>}
+          </button>
+        </form>
       </div>
     </aside>
   );

@@ -43,7 +43,6 @@ import {
   ParallaxTilt,
 } from "@/shared/components/motion/motion-elements";
 import { ProCheckoutButton } from "@/modules/billing/presentation/pro-checkout-button";
-import { logoutAction } from "@/app/actions/auth-actions";
 
 export interface ModernLandingViewProps {
   user: {
@@ -482,7 +481,7 @@ export function ModernLandingView({ user }: ModernLandingViewProps) {
                   <LayoutDashboard className="size-3.5 sm:size-4" />
                   <span>Dashboard Saya</span>
                 </Link>
-                <form action={logoutAction} className="hidden sm:inline-block">
+                <form action="/api/auth/logout" method="POST" className="hidden sm:inline-block">
                   <button
                     type="submit"
                     className="size-9 sm:size-10 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-rose-50 hover:border-rose-200 text-slate-600 dark:text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"

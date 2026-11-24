@@ -22,8 +22,9 @@ describe("Smoke Test — Project Baseline & Auth Views", () => {
     expect(screen.getAllByRole("link", { name: /coba gratis 30 hari/i })[0]).toBeInTheDocument();
   });
 
-  it("renders LoginPage visual elements and form correctly", () => {
-    render(<LoginPage />);
+  it("renders LoginPage visual elements and form correctly", async () => {
+    const Component = await LoginPage({});
+    render(Component);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Masuk ke Ruang Pintar");
     expect(screen.getByLabelText(/username/i, { selector: "input" })).toBeInTheDocument();
     expect(screen.getByLabelText("Kata sandi", { selector: "input" })).toBeInTheDocument();

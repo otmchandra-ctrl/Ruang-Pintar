@@ -58,25 +58,35 @@ export function PwaRegister() {
   }, [isOnline]);
 
   useEffect(() => {
-    // 1. Register Service Worker
+    // 1. Service Worker: Hanya didaftarkan di production/test, dilarang di development lokal
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      const registerServiceWorker = () => {
-        navigator.serviceWorker
-          .register("/sw.js", { scope: "/" })
-          .then((registration) => {
-            if (process.env.NODE_ENV !== "production") {
-              console.log("[PWA] Service Worker terdaftar dengan scope:", registration.scope);
+      if (process.env.NODE_ENV === "development") {
+        // Di mode development (npm run dev), unregister semua service worker aktif dan bersihkan cache
+        // agar Turbopack Fast Refresh / HMR tidak crash akibat chunk module lama yang tersimpan
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+        if ("caches" in window) {
+          caches.keys().then((keys) => {
+            for (const key of keys) {
+              caches.delete(key);
             }
-          })
-          .catch((error) => {
+          });
+        }
+      } else {
+        const registerServiceWorker = () => {
+          navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((error) => {
             console.warn("[PWA] Registrasi Service Worker gagal:", error);
           });
-      };
+        };
 
-      if (document.readyState === "complete") {
-        registerServiceWorker();
-      } else {
-        window.addEventListener("load", registerServiceWorker);
+        if (document.readyState === "complete") {
+          registerServiceWorker();
+        } else {
+          window.addEventListener("load", registerServiceWorker);
+        }
       }
     }
 

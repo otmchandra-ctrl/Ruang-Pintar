@@ -4,7 +4,6 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { User, Power, KeyRound, ChevronDown, Shield, X } from "lucide-react";
-import { logoutAction } from "@/app/actions/auth-actions";
 import { Badge } from "../ui/badge";
 import { AVATAR_LIST, AvatarSvgIllustration } from "@/app/onboarding/pilih-avatar/avatar-picker";
 
@@ -286,7 +285,7 @@ export function UserMenu({ user }: UserMenuProps) {
                 >
                   Batal
                 </button>
-                <form action={logoutAction} className="flex-1">
+                <form action="/api/auth/logout" method="POST" className="flex-1">
                   <button
                     type="submit"
                     className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-[13px] font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"

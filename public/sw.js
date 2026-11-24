@@ -37,6 +37,11 @@ function isNetworkOnly(request) {
 
   const url = new URL(request.url);
 
+  // Local development host bypass (localhost, 127.0.0.1, 0.0.0.0)
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "0.0.0.0") {
+    return true;
+  }
+
   // Check URL pathname against network-only rules
   for (const pattern of NETWORK_ONLY_PATTERNS) {
     if (pattern.test(url.pathname)) {
