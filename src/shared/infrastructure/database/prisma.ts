@@ -52,15 +52,15 @@ function resolveD1Binding(): any {
 function createClient(): PrismaClient {
   const d1 = resolveD1Binding();
   if (d1) {
-    if (!globalThis.__ruangPintarD1Prisma__) {
+    if (!(d1 as any).__d1_prisma_client__) {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { PrismaD1 } = require("@prisma/adapter-d1");
       const adapter = new PrismaD1(d1);
       const client = new PrismaClient({ adapter, log: ["error"] });
       (client as any)._custom_is_d1 = true;
-      globalThis.__ruangPintarD1Prisma__ = client;
+      (d1 as any).__d1_prisma_client__ = client;
     }
-    return globalThis.__ruangPintarD1Prisma__;
+    return (d1 as any).__d1_prisma_client__;
   }
 
   if (!globalThis.__ruangPintarPrisma__) {
