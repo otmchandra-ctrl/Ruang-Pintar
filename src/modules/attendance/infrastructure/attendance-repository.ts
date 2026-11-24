@@ -79,6 +79,8 @@ export class AttendanceRepository {
         nisn: siswa.nisn,
         nomor_absen: p.nomor_absen,
         foto_url: siswa.foto_url,
+        telepon_wali: siswa.telepon_wali || null,
+        nama_wali: siswa.nama_wali || null,
         penempatan_rombel_id: p.id,
         presensi_id: record ? record.id : null,
         status: (record ? record.status : "HADIR") as AttendanceStatus,

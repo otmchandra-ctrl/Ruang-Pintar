@@ -35,6 +35,7 @@ import {
   Copy,
   CheckCheck,
   Archive,
+  CreditCard,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
@@ -705,6 +706,20 @@ export function StudentDirectoryView({
               <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
             </button>
 
+            {/* Cetak Kartu Pelajar Button */}
+            <a
+              href={`/data-siswa/cetak-kartu${
+                rombelFilter !== "ALL" ? `?rombelId=${rombelFilter}` : ""
+              }`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs sm:text-sm shadow-2xs transition-colors cursor-pointer shrink-0"
+              title="Cetak Kartu Tanda Pelajar (KTS) standar A4"
+            >
+              <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="hidden sm:inline">Cetak Kartu</span>
+            </a>
+
             {/* Scan Foto AI Button */}
             {canManage && (
               <button
@@ -749,6 +764,17 @@ export function StudentDirectoryView({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href={`/data-siswa/cetak-kartu?ids=${Array.from(selectedIds).join(",")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
+              title="Cetak Kartu Tanda Pelajar siswa terpilih (A4)"
+            >
+              <CreditCard className="h-3.5 w-3.5" />
+              <span>Cetak Kartu ({selectedIds.size})</span>
+            </a>
+
             {canManage && (
               <>
                 <button

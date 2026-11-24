@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect, useTransition, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, Search, Loader2, FileText, ChevronRight } from "lucide-react";
+import { X, Check, Search, Loader2, FileText, ChevronRight, MessageCircle } from "lucide-react";
 import {
   getSessionAttendanceAction,
   saveSessionAttendanceAction,
@@ -25,6 +25,7 @@ import {
   AttendanceStatus,
   ClassSessionAttendanceDTO,
   SaveAttendanceItemInput,
+  StudentAttendanceItemDTO,
 } from "../domain/attendance-types";
 
 interface SessionAttendanceModalProps {
@@ -250,6 +251,90 @@ function SessionAttendanceModalContent({
     return sessionData.daftar_siswa.find((s) => s.siswa_id === editingStudentId) || null;
   }, [editingStudentId, sessionData]);
 
+  // Bagikan Rekap Presensi ke WhatsApp (Grup Kelas / Wali Murid)
+  const handleShareWhatsAppRecap = () => {
+    if (!sessionData) return;
+    const absentees = sessionData.daftar_siswa
+      .filter((s) => (items[s.siswa_id]?.status || "HADIR") !== "HADIR")
+      .map((s) => ({
+        nama: s.nama_lengkap,
+        status: items[s.siswa_id]?.status || "HADIR",
+        catatan: items[s.siswa_id]?.catatan || undefined,
+      }));
+
+    let msg = `📋 *LAPORAN PRESENSI KELAS*\n`;
+    msg += `─────────────────────────\n`;
+    msg += `🏫 Kelas: *${sessionData.rombel_nama}*\n`;
+    msg += `📚 Mapel: *${sessionData.mata_pelajaran_nama}*\n`;
+    msg += `📅 Tanggal: *${formattedDateFull}*\n`;
+    if (sessionData.guru_nama) msg += `👨‍🏫 Guru: *${sessionData.guru_nama}*\n`;
+    msg += `─────────────────────────\n`;
+    msg += `📊 *Ringkasan Kehadiran:*\n`;
+    msg += `• Total: *${totalSiswa} Siswa*\n`;
+    msg += `• Hadir: *${summaryCounts.HADIR}*\n`;
+    if (summaryCounts.SAKIT > 0) msg += `• Sakit: *${summaryCounts.SAKIT}*\n`;
+    if (summaryCounts.IZIN > 0) msg += `• Izin: *${summaryCounts.IZIN}*\n`;
+    if (summaryCounts.ALPHA > 0) msg += `• Alpha: *${summaryCounts.ALPHA}*\n`;
+    if (summaryCounts.DISPENSASI > 0) msg += `• Dispensasi: *${summaryCounts.DISPENSASI}*\n`;
+    if (summaryCounts.TERLAMBAT > 0) msg += `• Terlambat: *${summaryCounts.TERLAMBAT}*\n`;
+
+    if (absentees.length > 0) {
+      msg += `\n⚠️ *Daftar Siswa Tidak Hadir / Keterangan:*\n`;
+      absentees.forEach((a, i) => {
+        const note = a.catatan ? ` (${a.catatan})` : "";
+        msg += `${i + 1}. *${a.nama}* — ${a.status}${note}\n`;
+      });
+    } else {
+      msg += `\n✨ *Alhamdulillah, seluruh siswa hadir lengkap.*\n`;
+    }
+
+    msg += `\n_Dicatat resmi via Ruang Pintar_`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
+  };
+
+  // Kirim Pengingat WhatsApp Langsung ke Wali Siswa
+  const handleSendStudentWa = (
+    student: StudentAttendanceItemDTO,
+    overrideStatus?: AttendanceStatus,
+    overrideCatatan?: string
+  ) => {
+    if (!sessionData) return;
+    const st = overrideStatus || items[student.siswa_id]?.status || "HADIR";
+    const cat =
+      overrideCatatan !== undefined ? overrideCatatan : items[student.siswa_id]?.catatan || "";
+
+    const greeting = student.nama_wali ? `Bapak/Ibu ${student.nama_wali}` : "Bapak/Ibu Wali Murid";
+    let msg = `Assalamu'alaikum Wr. Wb. / Salam Sejahtera,\n`;
+    msg += `Yth. ${greeting} dari ananda *${student.nama_lengkap}*,\n\n`;
+    msg += `Menginformasikan bahwa pada pembelajaran hari ini:\n`;
+    msg += `📅 *${formattedDateFull}*\n`;
+    msg += `🏫 Kelas: *${sessionData.rombel_nama}*\n`;
+    msg += `📚 Mapel: *${sessionData.mata_pelajaran_nama}*\n`;
+    msg += `📌 Status Kehadiran: *${st}*${cat ? ` (${cat})` : ""}\n\n`;
+    msg += `Mohon konfirmasi atau hubungi guru jika terdapat kendala atau surat keterangan. Terima kasih atas kerja samanya.\n\n`;
+    msg += `Wassalamu'alaikum Wr. Wb.\n`;
+    if (sessionData.guru_nama) {
+      msg += `— *${sessionData.guru_nama}* (Guru Pengampu)`;
+    }
+
+    let url = "";
+    if (student.telepon_wali) {
+      let clean = student.telepon_wali.replace(/[^0-9]/g, "");
+      if (clean.startsWith("0")) {
+        clean = "62" + clean.slice(1);
+      } else if (!clean.startsWith("62") && clean.length >= 9) {
+        clean = "62" + clean;
+      }
+      url = `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+    } else {
+      url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    }
+
+    window.open(url, "_blank");
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full bg-white dark:bg-slate-900 flex flex-col overflow-hidden max-w-xl h-[92vh] sm:h-auto sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl">
@@ -298,9 +383,20 @@ function SessionAttendanceModalContent({
             {/* Tinggi ultra-kompak ~46px, density efisien                */}
             {/* ========================================================= */}
             <div className="px-4 py-2 bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 flex flex-col justify-center gap-1.5 shrink-0">
-              {/* Baris 1: Total Siswa */}
-              <div className="text-xs font-bold font-mono text-slate-800 dark:text-slate-100 leading-tight">
-                {totalSiswa} Siswa
+              {/* Baris 1: Total Siswa & Aksi WhatsApp */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold font-mono text-slate-800 dark:text-slate-100 leading-tight">
+                  {totalSiswa} Siswa
+                </div>
+                <button
+                  type="button"
+                  onClick={handleShareWhatsAppRecap}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition-all shadow-xs cursor-pointer active:scale-95"
+                  title="Bagikan Ringkasan Presensi ke Grup WhatsApp"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  <span>Kirim Rekap WA</span>
+                </button>
               </div>
 
               {/* Baris 2: [ Toggle Semua Hadir ] di samping H S I A */}
@@ -411,12 +507,19 @@ function SessionAttendanceModalContent({
                     const isAbsent = currentStatus !== "HADIR";
 
                     return (
-                      <button
+                      <div
                         key={s.siswa_id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleOpenEditor(s.siswa_id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleOpenEditor(s.siswa_id);
+                          }
+                        }}
                         aria-label={`Ubah presensi ${s.nama_lengkap}`}
-                        className={`w-full text-left h-[60px] px-3.5 py-2 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer group ${
+                        className={`w-full text-left h-[60px] px-3.5 py-2 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer group select-none ${
                           isAbsent
                             ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-300/80 dark:border-amber-700/50 hover:bg-amber-100/60 dark:hover:bg-amber-950/30"
                             : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
@@ -444,8 +547,27 @@ function SessionAttendanceModalContent({
                           </div>
                         </div>
 
-                        {/* Status Pill & Chevron */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        {/* Status Pill & WA & Chevron */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isAbsent && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSendStudentWa(s);
+                              }}
+                              className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
+                              title={
+                                s.telepon_wali
+                                  ? `Kirim WA ke Wali (${s.telepon_wali})`
+                                  : "Kirim WA ke Wali Murid"
+                              }
+                              aria-label={`Kirim WA ke Wali ${s.nama_lengkap}`}
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+
                           {currentStatus === "HADIR" && (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-mono font-semibold">
                               <span className="text-emerald-600 dark:text-emerald-400 font-bold">
@@ -487,7 +609,7 @@ function SessionAttendanceModalContent({
 
                           <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 group-hover:translate-x-0.5 transition-all" />
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -766,6 +888,29 @@ function SessionAttendanceModalContent({
                   className="w-full min-h-[50px] p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] resize-none"
                 />
               </div>
+
+              {/* NOTIFIKASI WALI VIA WHATSAPP (JIKA TIDAK HADIR) */}
+              {draftStatus !== "HADIR" && (
+                <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-emerald-900 dark:text-emerald-300">
+                      Hubungi Wali Murid
+                    </div>
+                    <div className="text-[11px] text-emerald-700 dark:text-emerald-400 truncate">
+                      {activeStudent.nama_wali ? `Wali: ${activeStudent.nama_wali}` : "Wali Murid"}{" "}
+                      • {activeStudent.telepon_wali || "Nomor belum tersimpan"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSendStudentWa(activeStudent, draftStatus, draftCatatan)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors cursor-pointer shrink-0 shadow-xs active:scale-95"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    <span>Kirim WA</span>
+                  </button>
+                </div>
+              )}
 
               {/* BOTTOM SHEET FOOTER: [Simpan] */}
               <div className="pt-2">

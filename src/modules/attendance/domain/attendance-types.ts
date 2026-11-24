@@ -22,6 +22,8 @@ export interface StudentAttendanceItemDTO {
   nisn: string | null;
   nomor_absen: number | null;
   foto_url: string | null;
+  telepon_wali?: string | null;
+  nama_wali?: string | null;
   penempatan_rombel_id: string | null;
   presensi_id: string | null;
   status: AttendanceStatus;
