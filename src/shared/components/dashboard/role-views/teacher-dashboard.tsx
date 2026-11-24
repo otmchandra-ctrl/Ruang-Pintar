@@ -11,6 +11,7 @@ import {
   Bell,
   ChevronRight,
   Users,
+  MonitorPlay,
 } from "lucide-react";
 import { AuthenticatedUser } from "@/shared/infrastructure/auth/auth-service";
 import { BaseRole } from "@/shared/infrastructure/authorization/types";
@@ -120,6 +121,21 @@ export async function TeacherDashboard({
   let presensiRecords: { status: string; sesi_kelas_id: string; rombel_id?: string }[] = [];
   let completedJournalsCount = 0;
   let totalCbtAktif = 0;
+  let activeCbtList: Array<{
+    id: string;
+    judul: string;
+    durasi_menit: number;
+    waktu_mulai: Date | null;
+    waktu_selesai: Date | null;
+    token_masuk: string | null;
+    status: string;
+    penugasan_mengajar: {
+      rombel: { nama: string };
+      mata_pelajaran: { nama: string };
+    };
+    sesi_ujian_siswa: Array<{ id: string; status: string }>;
+    snapshot_ujian: Array<{ total_soal: number }>;
+  }> = [];
 
   if (user.sekolah_id) {
     const sekolahId = user.sekolah_id;
@@ -161,16 +177,34 @@ export async function TeacherDashboard({
                 peran_dasar: user.peran_dasar as BaseRole,
               }),
           teacher
-            ? prisma.ujianCbt.count({
+            ? prisma.ujianCbt.findMany({
                 where: {
                   sekolah_id: sekolahId,
                   penugasan_mengajar: {
                     guru_id: teacher.id,
                   },
-                  status: { in: ["PUBLISHED", "DIPUBLIKASI", "DITERBITKAN"] },
+                  status: { in: ["PUBLISHED", "DIPUBLIKASI", "DITERBITKAN", "BERLANGSUNG", "ACTIVE"] },
                 },
+                include: {
+                  penugasan_mengajar: {
+                    include: {
+                      rombel: { select: { nama: true } },
+                      mata_pelajaran: { select: { nama: true } },
+                    },
+                  },
+                  sesi_ujian_siswa: {
+                    select: { id: true, status: true },
+                  },
+                  snapshot_ujian: {
+                    select: { total_soal: true },
+                    take: 1,
+                    orderBy: { nomor_snapshot: "desc" },
+                  },
+                },
+                orderBy: { created_at: "desc" },
+                take: 6,
               })
-            : Promise.resolve(0),
+            : Promise.resolve([]),
         ]);
 
       teacherSchedules = schedulesRes;
@@ -178,7 +212,8 @@ export async function TeacherDashboard({
       actualSessions = sessionsRes;
       announcements = announcementsRes;
       upcomingEvents = eventsRes;
-      totalCbtAktif = cbtCountRes;
+      totalCbtAktif = cbtCountRes.length;
+      activeCbtList = cbtCountRes;
 
       if (actualSessions.length > 0) {
         const sessionIds = actualSessions.map((s) => s.id);
@@ -415,6 +450,122 @@ export async function TeacherDashboard({
               totalTugasPerluDiperiksa={totalTugasPerluDiperiksa}
               totalCbtAktif={totalCbtAktif}
             />
+
+            {/* Active & Scheduled CBT Cockpit Card */}
+            {activeCbtList.length > 0 && (
+              <div className="rounded-[28px] bg-white/75 dark:bg-slate-900/75 backdrop-blur-[20px] border border-emerald-200/80 dark:border-emerald-900/40 p-5 sm:p-6 shadow-[0_8px_30px_rgba(16,185,129,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] space-y-4 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-32 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-2 relative z-10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-200/60 dark:border-emerald-900/40">
+                      <MonitorPlay className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">
+                          Agenda Ujian CBT Aktif & Terjadwal
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500 text-white shadow-xs">
+                          {activeCbtList.length} UJIAN
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Asesmen terkomputerisasi yang siap atau sedang dilaksanakan siswa binaan Anda
+                      </p>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/cbt-ujian"
+                    className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0"
+                  >
+                    <span>Buka CBT Hub</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 relative z-10">
+                  {activeCbtList.map((exam) => {
+                    const totalPeserta = exam.sesi_ujian_siswa.length;
+                    const totalSelesai = exam.sesi_ujian_siswa.filter(
+                      (s) => s.status === "DIKUMPULKAN" || s.status === "WAKTU_HABIS"
+                    ).length;
+                    const totalSedang = exam.sesi_ujian_siswa.filter(
+                      (s) => s.status === "SEDANG_MENGERJAKAN"
+                    ).length;
+                    const totalSoal = exam.snapshot_ujian[0]?.total_soal || 50;
+
+                    const now = new Date();
+                    const start = exam.waktu_mulai ? new Date(exam.waktu_mulai) : null;
+                    const isUpcoming = start && now < start;
+
+                    return (
+                      <div
+                        key={exam.id}
+                        className="rounded-2xl bg-white/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 p-4 flex flex-col justify-between space-y-3 shadow-2xs hover:border-emerald-300 dark:hover:border-emerald-700 transition"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60">
+                              Kelas {exam.penugasan_mengajar.rombel.nama}
+                            </span>
+                            {isUpcoming ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500 text-white">
+                                TERJADWAL
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500 text-white animate-pulse">
+                                LIVE
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <h4
+                              className="text-xs font-bold text-slate-900 dark:text-white line-clamp-2"
+                              title={exam.judul}
+                            >
+                              {exam.judul}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              {exam.penugasan_mengajar.mata_pelajaran.nama}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                            <span>{exam.durasi_menit} Menit</span>
+                            <span>•</span>
+                            <span>{totalSoal} Soal</span>
+                            {exam.token_masuk && (
+                              <>
+                                <span>•</span>
+                                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                  Token: {exam.token_masuk}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                            {totalSelesai} Selesai • {totalSedang} Live
+                          </span>
+                          <Link
+                            href={`/cbt-ujian/proctor/${exam.id}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white text-[11px] font-bold shadow-2xs transition active:scale-[0.98]"
+                          >
+                            <ShieldCheck className="h-3 w-3" />
+                            <span>Pantau Proctor</span>
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* C. Dual-Metric Cards (2 Columns: Performance Bar Chart + Attendance Donut Gauges) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-stretch">
