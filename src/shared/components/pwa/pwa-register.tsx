@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, useRef } from "react";
-import { Download, Wifi, WifiOff, X } from "lucide-react";
+import { Download, Wifi, WifiOff, X, Share, Smartphone } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -44,8 +44,30 @@ export function PwaRegister() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
 
   const prevOnlineRef = useRef(isOnline);
+
+  useEffect(() => {
+    // Check if app is already running in installed standalone mode
+    if (typeof window !== "undefined") {
+      const isStandalone =
+        (typeof window.matchMedia === "function" &&
+          window.matchMedia("(display-mode: standalone)").matches) ||
+        (navigator as any).standalone === true;
+      if (isStandalone) {
+        setIsInstalled(true);
+      }
+
+      const ua = navigator.userAgent || "";
+      const isIosDevice = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+      setIsIos(isIosDevice);
+
+      const inApp = /WhatsApp|FBAN|FBAV|Instagram|Line|Telegram/i.test(ua);
+      setIsInAppBrowser(inApp);
+    }
+  }, []);
 
   useEffect(() => {
     // If transitioning from offline -> online, show brief toast
@@ -154,7 +176,65 @@ export function PwaRegister() {
         </aside>
       )}
 
-      {/* 3. Subtle Academic Glass Install Prompt */}
+      {/* 3. In-App Browser Warning (WhatsApp / Social Media Webview) */}
+      {isInAppBrowser && !isBannerDismissed && (
+        <aside
+          role="region"
+          aria-label="Petunjuk Buka Browser Asli"
+          className="fixed right-4 bottom-4 z-50 flex max-w-sm items-center gap-3 rounded-2xl border border-amber-500/30 bg-slate-900/95 p-3.5 text-slate-100 shadow-2xl backdrop-blur-xl sm:bottom-6 sm:right-6 animate-in fade-in slide-in-from-bottom-4 duration-300"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+            <Smartphone className="h-5 w-5" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xs font-semibold text-white">Buka di Browser Asli</h2>
+            <p className="line-clamp-2 text-[11px] text-slate-400">
+              Ketuk menu ⋮ lalu pilih &quot;Buka di Chrome/Safari&quot; agar dapat memasang aplikasi ke HP Anda.
+            </p>
+          </div>
+
+          <button
+            onClick={handleDismissBanner}
+            type="button"
+            aria-label="Tutup petunjuk"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </aside>
+      )}
+
+      {/* 4. iOS Safari Add to Home Screen Hint */}
+      {isIos && !isInstalled && !isBannerDismissed && !isInAppBrowser && !installPrompt && (
+        <aside
+          role="region"
+          aria-label="Pemasangan Aplikasi di iPhone"
+          className="fixed right-4 bottom-4 z-50 flex max-w-sm items-center gap-3 rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-3.5 text-slate-100 shadow-2xl backdrop-blur-xl sm:bottom-6 sm:right-6 animate-in fade-in slide-in-from-bottom-4 duration-300"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+            <Share className="h-5 w-5" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xs font-semibold text-white">Pasang di iPhone / iPad</h2>
+            <p className="line-clamp-2 text-[11px] text-slate-400">
+              Ketuk tombol <strong>Bagikan (Share)</strong> di Safari, lalu pilih <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>.
+            </p>
+          </div>
+
+          <button
+            onClick={handleDismissBanner}
+            type="button"
+            aria-label="Tutup petunjuk"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </aside>
+      )}
+
+      {/* 5. Standard Browser PWA Install Prompt (Chrome / Edge / Android) */}
       {installPrompt && !isInstalled && !isBannerDismissed && (
         <aside
           role="region"
