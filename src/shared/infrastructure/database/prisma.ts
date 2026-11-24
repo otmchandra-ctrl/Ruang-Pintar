@@ -78,6 +78,17 @@ export const prisma: PrismaClient = new Proxy(defaultTarget, {
     const d1 = resolveD1Binding();
     if (d1) {
       const client = createClient();
+      if (prop === "$transaction") {
+        return async function (arg: any, options?: any) {
+          if (typeof arg === "function") {
+            // D1 does not support interactive transactions over HTTP/RPC.
+            // Safely execute the callback by passing the active D1 client.
+            return await arg(client);
+          }
+          // Batch array transactions are natively supported by D1
+          return await (client as any).$transaction(arg, options);
+        };
+      }
       const val = Reflect.get(client, prop, receiver);
       if (typeof val === "function") {
         return val.bind(client);
