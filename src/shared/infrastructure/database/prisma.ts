@@ -75,20 +75,35 @@ const defaultTarget = createClient();
 
 export const prisma: PrismaClient = new Proxy(defaultTarget, {
   get(target, prop, receiver) {
-    if (Object.prototype.hasOwnProperty.call(target, prop)) {
-      return Reflect.get(target, prop, receiver);
+    const d1 = resolveD1Binding();
+    if (d1) {
+      const client = createClient();
+      const val = Reflect.get(client, prop, receiver);
+      if (typeof val === "function") {
+        return val.bind(client);
+      }
+      return val;
     }
-    const client = resolveD1Binding() ? createClient() : target;
-    const val = Reflect.get(client, prop, receiver);
+    const val = Reflect.get(target, prop, receiver);
     if (typeof val === "function") {
-      return val.bind(client);
+      return val.bind(target);
     }
     return val;
   },
   set(target, prop, value, receiver) {
+    const d1 = resolveD1Binding();
+    if (d1) {
+      const client = createClient();
+      return Reflect.set(client, prop, value, receiver);
+    }
     return Reflect.set(target, prop, value, receiver);
   },
   defineProperty(target, prop, descriptor) {
+    const d1 = resolveD1Binding();
+    if (d1) {
+      const client = createClient();
+      return Reflect.defineProperty(client, prop, descriptor);
+    }
     return Reflect.defineProperty(target, prop, descriptor);
   },
   has(target, prop) {

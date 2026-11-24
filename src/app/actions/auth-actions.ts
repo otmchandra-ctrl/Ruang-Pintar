@@ -100,14 +100,15 @@ export async function loginAction(
       err?.code?.startsWith("P10") ||
       err?.code?.startsWith("P20");
 
-    let userFriendlyError =
-      "Terjadi kesalahan internal pada server. Silakan coba lagi beberapa saat lagi.";
+    let userFriendlyError = msg
+      ? `Terjadi kendala: ${msg.slice(0, 150)}`
+      : "Terjadi kesalahan internal pada server. Silakan coba lagi beberapa saat lagi.";
     if (isDbConfigError) {
       userFriendlyError =
-        "Basis data belum terkonfigurasi. Pastikan variabel DATABASE_URL telah didaftarkan di Vercel.";
+        "Basis data belum terkonfigurasi. Pastikan variabel database telah terdaftar.";
     } else if (isDbConnectionError) {
       userFriendlyError =
-        "Tidak dapat terhubung ke server basis data Supabase. Periksa status koneksi jaringan atau URL database.";
+        "Tidak dapat terhubung ke server basis data. Periksa status koneksi jaringan atau URL database.";
     }
 
     return {
