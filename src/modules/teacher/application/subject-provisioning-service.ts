@@ -8,7 +8,7 @@ interface SubjectTemplateEntry {
 }
 
 export const DEFAULT_SUBJECT_TEMPLATES: Record<
-  "SD" | "SMP" | "SMA" | "SMK",
+  "SD" | "SMP" | "SMA" | "SMK" | "UMUM",
   SubjectTemplateEntry[]
 > = {
   SD: [
@@ -51,6 +51,16 @@ export const DEFAULT_SUBJECT_TEMPLATES: Record<
     { kode: "BING", nama: "Bahasa Inggris", kelompok: "UMUM" },
     { kode: "INF", nama: "Informatika", kelompok: "UMUM" },
     { kode: "PKJ", nama: "Projek Kejuruan", kelompok: "KEJURUAN" },
+  ],
+  UMUM: [
+    { kode: "AGAMA", nama: "Pendidikan Agama", kelompok: "UMUM" },
+    { kode: "PPKN", nama: "PPKn", kelompok: "UMUM" },
+    { kode: "BIN", nama: "Bahasa Indonesia", kelompok: "UMUM" },
+    { kode: "MTK", nama: "Matematika", kelompok: "UMUM" },
+    { kode: "BING", nama: "Bahasa Inggris", kelompok: "UMUM" },
+    { kode: "INF", nama: "Informatika", kelompok: "UMUM" },
+    { kode: "SENI", nama: "Seni Budaya", kelompok: "UMUM" },
+    { kode: "PJOK", nama: "PJOK", kelompok: "UMUM" },
   ],
 };
 
