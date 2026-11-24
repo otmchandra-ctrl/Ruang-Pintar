@@ -33,6 +33,8 @@ const localOrigins = [
   "127.0.0.1:3001",
   "*.trycloudflare.com",
   "trycloudflare.com",
+  "*.workers.dev",
+  "workers.dev",
   "*.vercel.app",
   "vercel.app",
 ];
@@ -40,6 +42,7 @@ const localOrigins = [
 const nextConfig: NextConfig = {
   distDir: process.env.UX02_QA_DIST_DIR || ".next",
   reactStrictMode: true,
+  serverExternalPackages: ["@prisma/client", ".prisma/client"],
   allowedDevOrigins: localOrigins,
   experimental: {
     serverActions: {

@@ -11,6 +11,8 @@
 
 # Next.js build output
 /.next/
+/.open-next/
+/.wrangler/
 /out/
 /build
 /dist
