@@ -148,9 +148,10 @@ describe("Tenant Owner (Guru Mandiri) Authorization & Navigation (P0)", () => {
       const allHrefs = nav.flatMap((g) => g.items.map((i) => i.href));
 
       expect(allItemIds).toContain("teacher-students");
-      expect(allItemIds).toContain("teacher-subject-catalog");
       expect(allHrefs).toContain("/data-siswa");
-      expect(allHrefs).toContain("/mata-pelajaran");
+      // Menu Mata Pelajaran disembunyikan agar tampilan Guru Mandiri ringkas dan terfokus pada Kelas Saya
+      expect(allItemIds).not.toContain("teacher-subject-catalog");
+      expect(allHrefs).not.toContain("/mata-pelajaran");
 
       // Pastikan urutan Data Siswa tepat setelah Kelas Saya
       const teacherGroup = nav.find((g) => g.id === "teacher-ops");

@@ -81,16 +81,6 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         isPhaseDeferred: false,
       },
       {
-        id: "teacher-subject-catalog",
-        title: "Mata Pelajaran",
-        href: "/mata-pelajaran",
-        iconName: "BookOpen",
-        roles: ["TEACHER"],
-        requiredPermission: "academic.structure.view",
-        requiredOwner: true,
-        isPhaseDeferred: false,
-      },
-      {
         id: "teacher-materials",
         title: "Materi Pembelajaran",
         href: "/materi",
