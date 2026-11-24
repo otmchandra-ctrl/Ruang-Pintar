@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Search,
@@ -23,6 +24,7 @@ import {
   QrCode,
   Share2,
   X,
+  Camera,
 } from "lucide-react";
 import {
   StudentAcademicDirectoryItemDTO,
@@ -32,6 +34,9 @@ import { StudentAcademicHealthCard } from "./student-academic-health-card";
 import { StudentAcademicSideSheet, SideSheetTab } from "./student-academic-side-sheet";
 import { StudentChatConversationModal } from "./student-chat-conversation-modal";
 import { RombelJoinCodeCard } from "./rombel-join-code-card";
+import { SmartPhotoOnboardingModal } from "@/modules/ai-assistant/presentation/smart-photo-onboarding-modal";
+import { AiPreviewTableModal } from "@/modules/ai-assistant/presentation/ai-preview-table-modal";
+import { ClassExtractionResult } from "@/modules/ai-assistant/domain/ai-types";
 
 type DirectoryFilterType = "SEMUA" | "LAKI_LAKI" | "PEREMPUAN" | "PERLU_PERHATIAN" | "SERING_ALPHA";
 
@@ -71,6 +76,24 @@ export function ClassStudentDirectoryTabView({
 
   // State Modal Tambah Siswa / Kode Undangan
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const router = useRouter();
+
+  // AI Vision Scan states
+  const [isAiScanOpen, setIsAiScanOpen] = useState(false);
+  const [isAiPreviewOpen, setIsAiPreviewOpen] = useState(false);
+  const [extractionResult, setExtractionResult] = useState<ClassExtractionResult | null>(null);
+
+  const handleExtractionComplete = (res: ClassExtractionResult) => {
+    setIsAiScanOpen(false);
+    setExtractionResult(res);
+    setIsAiPreviewOpen(true);
+  };
+
+  const handleClassCreated = () => {
+    setIsAiPreviewOpen(false);
+    setExtractionResult(null);
+    router.refresh();
+  };
 
   // Filter & Search Logic
   const filteredStudents = useMemo(() => {
@@ -350,7 +373,30 @@ export function ClassStudentDirectoryTabView({
               </button>
             </div>
 
-            <RombelJoinCodeCard rombelId={rombelId} rombelNama={rombelNama} />
+            {/* Modal Actions: Scan AI Foto Absensi vs Kode Rombel */}
+            <div className="space-y-3.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddStudentOpen(false);
+                  setIsAiScanOpen(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+              >
+                <Camera className="h-4 w-4" />
+                <span>Pindai Foto Lembar Absensi (AI)</span>
+              </button>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                  atau undang via kode
+                </span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+              </div>
+
+              <RombelJoinCodeCard rombelId={rombelId} rombelNama={rombelNama} />
+            </div>
 
             <div className="text-center">
               <button
@@ -364,6 +410,20 @@ export function ClassStudentDirectoryTabView({
           </div>
         </div>
       )}
+
+      {/* AI Vision Photo Scanner & Preview Modals */}
+      <SmartPhotoOnboardingModal
+        isOpen={isAiScanOpen}
+        onClose={() => setIsAiScanOpen(false)}
+        onExtractionComplete={handleExtractionComplete}
+      />
+
+      <AiPreviewTableModal
+        isOpen={isAiPreviewOpen}
+        onClose={() => setIsAiPreviewOpen(false)}
+        onSuccess={handleClassCreated}
+        extractionData={extractionResult}
+      />
     </div>
   );
 }

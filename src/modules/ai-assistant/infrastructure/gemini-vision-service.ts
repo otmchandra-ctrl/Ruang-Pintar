@@ -45,10 +45,28 @@ const FALLBACK_STUDENT_NAMES = [
   { nama: "Zahra Amalia", gender: "P" },
 ] as const;
 
+function resolveGeminiApiKey(explicitKey?: string): string | undefined {
+  if (explicitKey?.trim()) return explicitKey.trim();
+  if (process.env.GEMINI_API_KEY?.trim()) return process.env.GEMINI_API_KEY.trim();
+
+  // OpenNext Cloudflare Workers runtime support
+  try {
+    const { getCloudflareContext } = require("@opennextjs/cloudflare");
+    const ctx = getCloudflareContext();
+    if (ctx?.env?.GEMINI_API_KEY?.trim()) {
+      return ctx.env.GEMINI_API_KEY.trim();
+    }
+  } catch {
+    // Not running under Cloudflare Workers / OpenNext
+  }
+
+  return undefined;
+}
+
 export async function extractStudentsFromClassPhoto(
   params: VisionExtractionParams
 ): Promise<ClassExtractionResult> {
-  const apiKey = params.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const apiKey = resolveGeminiApiKey(params.apiKey);
   const isVitest = process.env.VITEST === "true";
 
   // Jika live API diaktifkan dan API key tersedia

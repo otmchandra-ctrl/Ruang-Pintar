@@ -50,6 +50,9 @@ import {
 import { StudentIdentityDTO } from "../domain/student-types";
 import { StudentDetailModal } from "./student-detail-modal";
 import { Toast, ToastType } from "@/shared/components/ui/toast";
+import { SmartPhotoOnboardingModal } from "@/modules/ai-assistant/presentation/smart-photo-onboarding-modal";
+import { AiPreviewTableModal } from "@/modules/ai-assistant/presentation/ai-preview-table-modal";
+import { ClassExtractionResult } from "@/modules/ai-assistant/domain/ai-types";
 
 interface StudentDirectoryViewProps {
   initialStudents: StudentIdentityDTO[];
@@ -121,6 +124,27 @@ export function StudentDirectoryView({
     tempPass: string;
   } | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+
+  // AI Vision Scan states
+  const [aiScanOpen, setAiScanOpen] = useState(false);
+  const [aiPreviewOpen, setAiPreviewOpen] = useState(false);
+  const [extractionResult, setExtractionResult] = useState<ClassExtractionResult | null>(null);
+
+  const handleExtractionComplete = (res: ClassExtractionResult) => {
+    setAiScanOpen(false);
+    setExtractionResult(res);
+    setAiPreviewOpen(true);
+  };
+
+  const handleClassCreated = () => {
+    setAiPreviewOpen(false);
+    setExtractionResult(null);
+    setToast({
+      message: "Data siswa dan rombel berhasil diproses dari foto absensi!",
+      type: "success",
+    });
+    router.refresh();
+  };
 
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -680,6 +704,20 @@ export function StudentDirectoryView({
               <span>Export</span>
               <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
             </button>
+
+            {/* Scan Foto AI Button */}
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setAiScanOpen(true)}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer shrink-0"
+                title="Pindai foto lembar absensi kelas fisik untuk mengekstrak siswa otomatis via AI"
+              >
+                <Camera className="h-4 w-4" />
+                <span className="hidden sm:inline">Scan Absensi (AI)</span>
+                <span className="sm:hidden">Scan AI</span>
+              </button>
+            )}
 
             {/* + Tambah Siswa Primary Button */}
             {canManage && (
@@ -1944,6 +1982,20 @@ export function StudentDirectoryView({
         isOpen={Boolean(detailStudent)}
         onClose={() => setDetailStudent(null)}
         student={detailStudent}
+      />
+
+      {/* AI Vision Photo Scanner & Preview Modals */}
+      <SmartPhotoOnboardingModal
+        isOpen={aiScanOpen}
+        onClose={() => setAiScanOpen(false)}
+        onExtractionComplete={handleExtractionComplete}
+      />
+
+      <AiPreviewTableModal
+        isOpen={aiPreviewOpen}
+        onClose={() => setAiPreviewOpen(false)}
+        onSuccess={handleClassCreated}
+        extractionData={extractionResult}
       />
     </div>
   );

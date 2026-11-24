@@ -79,10 +79,10 @@ export default async function KelasSayaPage() {
   const entitlement = await getTenantEntitlement(user.sekolah_id);
   const isSubscribed = entitlement.status === "ACTIVE" || school?.tipe_lisensi === "SEKOLAH";
 
-  // Kontrol mutasi rombel (Ubah/Hapus) HANYA berlaku untuk Guru Mandiri perorangan (Solo Workspace).
-  // Guru di sekolah institusi formal/berlangganan DILARANG KERAS memutasi rombel sekolah.
+  // Kontrol mutasi rombel (Ubah/Hapus) berlaku untuk Guru Mandiri perorangan (Solo Workspace) atau Super Admin.
+  // Guru biasa di sekolah institusi formal (SEKOLAH) tidak diizinkan memutasi rombel sekolah secara sepihak.
   const isSoloTeacher =
-    !isSubscribed && school?.tipe_lisensi !== "SEKOLAH" && Boolean(user.is_owner_tenant);
+    school?.tipe_lisensi !== "SEKOLAH" && (Boolean(user.is_owner_tenant) || user.peran_dasar === "SUPER_ADMIN");
 
   return (
     <AcademicShell
