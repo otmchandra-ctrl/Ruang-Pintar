@@ -63,6 +63,7 @@ import {
   recordIntegrityEventAction,
   submitAttemptAction,
 } from "@/app/actions/cbt-actions";
+import * as cbtActions from "@/app/actions/cbt-actions";
 import { MathRenderer } from "@/shared/components/cbt/math-renderer";
 import { ImageStimulus } from "@/shared/components/cbt/image-stimulus";
 import { AudioStimulusPlayer } from "@/shared/components/cbt/audio-stimulus-player";
@@ -111,6 +112,7 @@ interface CbtPlayerViewProps {
     deskripsi: string | null;
     acak_soal: boolean;
   };
+  autosaveBatchDelayMs?: number;
 }
 
 export function CbtPlayerView({
@@ -119,6 +121,7 @@ export function CbtPlayerView({
   initialTimeRemainingSeconds,
   initialSavedAnswers,
   ujian,
+  autosaveBatchDelayMs = 8000,
 }: CbtPlayerViewProps) {
   const router = useRouter();
   const [session, setSession] = useState(initialSession);
@@ -149,10 +152,12 @@ export function CbtPlayerView({
   const sessionTokenRef = useRef<string | null>(initialSession.token_sesi_aktif || null);
   const [isSessionInvalidated, setIsSessionInvalidated] = useState(false);
 
-  // Pre-Submit Synchronization Barrier
+  // Pre-Submit Synchronization Barrier & Batch Autosave Queue
   const pendingSyncMap = useRef<Map<number, any>>(new Map());
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const lastInputBlurTimeRef = useRef<number>(0);
+  const batchFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFlushingRef = useRef<boolean>(false);
 
   // Safe Reload & Mount tracker: suppress false blur strikes during page reload / first 3s
   const isUnloadingRef = useRef<boolean>(false);
@@ -218,13 +223,128 @@ export function CbtPlayerView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [finalResult, setFinalResult] = useState<HasilUjianCbtDTO | null>(null);
 
+  // Batch Flush Engine: mengirim seluruh jawaban tertunda dalam 1 request transaksi
+  const flushPendingAutosaves = useCallback(async () => {
+    if (batchFlushTimerRef.current) {
+      clearTimeout(batchFlushTimerRef.current);
+      batchFlushTimerRef.current = null;
+    }
+
+    if (pendingSyncMap.current.size === 0 || isFlushingRef.current) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setSaveStatus("OFFLINE");
+      return;
+    }
+
+    isFlushingRef.current = true;
+    setSaveStatus("SAVING");
+
+    const entries = Array.from(pendingSyncMap.current.entries());
+    const batchable = entries.filter(([, payload]) => Boolean(payload.soal_id));
+    const legacy = entries.filter(([, payload]) => !payload.soal_id);
+
+    try {
+      let hasFailure = false;
+
+      if (batchable.length > 0) {
+        const hasBatchAction = Object.keys(cbtActions).includes("batchAutosaveAnswersAction");
+        const batchFn = hasBatchAction
+          ? ((cbtActions as Record<string, any>).batchAutosaveAnswersAction as
+              ((input: any) => Promise<any>) | undefined)
+          : undefined;
+        if (typeof batchFn === "function" && (autosaveBatchDelayMs > 0 || batchable.length > 1)) {
+          const res = await batchFn({
+            sesi_ujian_siswa_id: session.id,
+            session_token: sessionTokenRef.current,
+            items: batchable.map(([, payload]) => payload),
+          });
+          if (res.success) {
+            for (const [nomorUrut, sentPayload] of batchable) {
+              if (pendingSyncMap.current.get(nomorUrut) === sentPayload) {
+                pendingSyncMap.current.delete(nomorUrut);
+              }
+            }
+          } else {
+            if (res.message?.includes("perangkat lain")) {
+              setIsSessionInvalidated(true);
+              return;
+            }
+            hasFailure = true;
+          }
+        } else {
+          for (const [nomorUrut, sentPayload] of batchable) {
+            const res = await autosaveAnswerAction(sentPayload);
+            if (res.success) {
+              if (pendingSyncMap.current.get(nomorUrut) === sentPayload) {
+                pendingSyncMap.current.delete(nomorUrut);
+              }
+            } else {
+              if (res.message?.includes("perangkat lain")) {
+                setIsSessionInvalidated(true);
+                return;
+              }
+              hasFailure = true;
+            }
+          }
+        }
+      }
+
+      for (const [nomorUrut, sentPayload] of legacy) {
+        const res = await autosaveAnswerAction(sentPayload);
+        if (res.success) {
+          if (pendingSyncMap.current.get(nomorUrut) === sentPayload) {
+            pendingSyncMap.current.delete(nomorUrut);
+          }
+        } else {
+          if (res.message?.includes("perangkat lain")) {
+            setIsSessionInvalidated(true);
+            return;
+          }
+          hasFailure = true;
+        }
+      }
+
+      setPendingSyncCount(pendingSyncMap.current.size);
+      if (hasFailure) {
+        setSaveStatus("OFFLINE");
+      } else {
+        setSaveStatus(pendingSyncMap.current.size === 0 ? "SAVED" : "SAVING");
+      }
+    } catch (err: any) {
+      if (err?.message?.includes("perangkat lain")) {
+        setIsSessionInvalidated(true);
+        return;
+      }
+      setSaveStatus("OFFLINE");
+    } finally {
+      isFlushingRef.current = false;
+      // Jika ada jawaban baru yang masuk saat request berjalan, jadwalkan ulang
+      if (
+        pendingSyncMap.current.size > 0 &&
+        (typeof navigator === "undefined" || navigator.onLine)
+      ) {
+        batchFlushTimerRef.current = setTimeout(
+          () => {
+            void flushPendingAutosaves();
+          },
+          Math.max(0, autosaveBatchDelayMs)
+        );
+      }
+    }
+  }, [autosaveBatchDelayMs, session.id]);
+
   // Network connection listener
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const handleOnline = () => {
       setIsOnline(true);
-      setSaveStatus(pendingSyncMap.current.size > 0 ? "SAVING" : "SAVED");
+      if (pendingSyncMap.current.size > 0) {
+        setSaveStatus("SAVING");
+        void flushPendingAutosaves();
+      } else {
+        setSaveStatus("SAVED");
+      }
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -237,8 +357,11 @@ export function CbtPlayerView({
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      if (batchFlushTimerRef.current) {
+        clearTimeout(batchFlushTimerRef.current);
+      }
     };
-  }, []);
+  }, [flushPendingAutosaves]);
 
   // Anti-Cheat Strike State
   const [strikeCount, setStrikeCount] = useState(0);
@@ -280,6 +403,7 @@ export function CbtPlayerView({
     async (_reason: string) => {
       setIsSubmitting(true);
       try {
+        await flushPendingAutosaves();
         const res = await submitAttemptAction(session.id, sessionTokenRef.current);
         if (res.success && res.data) {
           setFinalResult(res.data);
@@ -295,7 +419,7 @@ export function CbtPlayerView({
         setIsSubmitting(false);
       }
     },
-    [router, session.id]
+    [flushPendingAutosaves, router, session.id]
   );
 
   useEffect(() => {
@@ -537,26 +661,17 @@ export function CbtPlayerView({
 
     setSaveStatus("SAVING");
 
-    try {
-      const res = await autosaveAnswerAction(payload);
-      if (res.success) {
-        pendingSyncMap.current.delete(nomorUrut);
-        setPendingSyncCount(pendingSyncMap.current.size);
-        setSaveStatus(pendingSyncMap.current.size === 0 ? "SAVED" : "SAVING");
-      } else {
-        if (res.message?.includes("perangkat lain")) {
-          setIsSessionInvalidated(true);
-          return;
-        }
-        setSaveStatus("OFFLINE");
-      }
-    } catch (err: any) {
-      if (err?.message?.includes("perangkat lain")) {
-        setIsSessionInvalidated(true);
-        return;
-      }
-      setSaveStatus("OFFLINE");
+    if (autosaveBatchDelayMs <= 0 || pendingSyncMap.current.size >= 5) {
+      void flushPendingAutosaves();
+      return;
     }
+
+    if (batchFlushTimerRef.current) {
+      clearTimeout(batchFlushTimerRef.current);
+    }
+    batchFlushTimerRef.current = setTimeout(() => {
+      void flushPendingAutosaves();
+    }, autosaveBatchDelayMs);
   };
 
   const handleSelectChoice = (label: string) => {
@@ -600,6 +715,7 @@ export function CbtPlayerView({
   const handleFinalSubmit = async () => {
     setIsSubmitting(true);
     try {
+      await flushPendingAutosaves();
       const res = await submitAttemptAction(session.id, sessionTokenRef.current);
       if (res.success && res.data) {
         setFinalResult(res.data);

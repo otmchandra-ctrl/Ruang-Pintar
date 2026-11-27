@@ -55,7 +55,9 @@ async function main() {
   sql += "PRAGMA foreign_keys = ON;\n";
 
   fs.writeFileSync("prisma/seed.d1.sql", sql, "utf8");
-  console.log(`Successfully generated prisma/seed.d1.sql (${(fs.statSync("prisma/seed.d1.sql").size / 1024).toFixed(1)} KB)`);
+  console.log(
+    `Successfully generated prisma/seed.d1.sql (${(fs.statSync("prisma/seed.d1.sql").size / 1024).toFixed(1)} KB)`
+  );
 }
 
 main()

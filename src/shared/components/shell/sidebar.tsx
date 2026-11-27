@@ -72,6 +72,7 @@ export interface SidebarProps {
   userRole: BaseRole;
   userCapabilities?: CapabilityBundle[];
   isOwner?: boolean;
+  hasActiveTenant?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   isSubscribed?: boolean;
@@ -91,6 +92,7 @@ export function Sidebar({
   userRole,
   userCapabilities = [],
   isOwner = false,
+  hasActiveTenant,
   isCollapsed,
   onToggleCollapse,
   isSubscribed = false,
@@ -98,7 +100,13 @@ export function Sidebar({
   user,
 }: SidebarProps) {
   const pathname = usePathname();
-  const navigationGroups = getFilteredNavigation(userRole, userCapabilities, isOwner);
+  const effectiveActiveTenant = hasActiveTenant ?? Boolean(user?.sekolah_id);
+  const navigationGroups = getFilteredNavigation(
+    userRole,
+    userCapabilities,
+    isOwner,
+    effectiveActiveTenant
+  );
 
   return (
     <aside

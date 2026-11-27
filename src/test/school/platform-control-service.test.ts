@@ -26,12 +26,18 @@ const { mockPrisma, mockIdentityService, mockRecordAuditEvent } = vi.hoisted(() 
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    raporSiswa: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    raporSiswa: {
+      count: vi.fn().mockResolvedValue(0),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     riwayatEksporLaporan: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     publikasiNilaiAsesmen: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     nilaiSiswa: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     definisiAsesmen: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    presensiSesiKelas: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    presensiSesiKelas: {
+      count: vi.fn().mockResolvedValue(0),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     administrasiTujuanPembelajaran: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     administrasiPembelajaran: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -49,7 +55,10 @@ const { mockPrisma, mockIdentityService, mockRecordAuditEvent } = vi.hoisted(() 
     tujuanPembelajaran: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     lingkupMateri: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     capaianPembelajaran: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    sesiKelasAktual: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    sesiKelasAktual: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     jadwalPelajaran: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     versiJadwal: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     slotWaktu: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -82,7 +91,10 @@ const { mockPrisma, mockIdentityService, mockRecordAuditEvent } = vi.hoisted(() 
     fase: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     semester: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     tahunAjaran: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    mataPelajaran: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    mataPelajaran: {
+      count: vi.fn().mockResolvedValue(0),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     guru: {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -318,5 +330,36 @@ describe("PlatformControlService (SUPER_ADMIN Tenant & Account Control)", () => 
         actorRole: "SUPER_ADMIN",
       })
     ).rejects.toThrow(/histori akademik/i);
+  });
+
+  it("aggregates real KBM weekday distribution and attendance rates for /sekolah analytics", async () => {
+    mockPrisma.sesiKelasAktual.findMany.mockResolvedValueOnce([
+      { tanggal: new Date("2026-11-23T08:00:00.000Z"), created_at: new Date() }, // Senin
+      { tanggal: new Date("2026-11-26T08:00:00.000Z"), created_at: new Date() }, // Kamis
+      { tanggal: new Date("2026-11-26T10:00:00.000Z"), created_at: new Date() }, // Kamis
+    ]);
+    mockPrisma.presensiSesiKelas.count
+      .mockResolvedValueOnce(187)
+      .mockResolvedValueOnce(9)
+      .mockResolvedValueOnce(6);
+    mockPrisma.raporSiswa.count.mockResolvedValueOnce(12);
+    mockPrisma.mataPelajaran.count.mockResolvedValueOnce(58);
+
+    const analytics = await platformControlService.getPlatformActivityAnalytics();
+
+    expect(analytics.activityDays).toEqual({
+      SENIN: 1,
+      SELASA: 0,
+      RABU: 0,
+      KAMIS: 2,
+      JUMAT: 0,
+      SABTU: 0,
+    });
+    expect(analytics.totalSesiAktual).toBe(3);
+    expect(analytics.attendance.hadirPct).toBe(92.6);
+    expect(analytics.attendance.izinSakitPct).toBe(4.5);
+    expect(analytics.attendance.alphaPct).toBe(3.0);
+    expect(analytics.totalRapor).toBe(12);
+    expect(analytics.totalMataPelajaran).toBe(58);
   });
 });

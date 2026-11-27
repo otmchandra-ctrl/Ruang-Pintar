@@ -63,15 +63,29 @@ describe("Role-Aware Navigation Filtering (Phase 05)", () => {
     expect(allItemIds).not.toContain("student-schedule");
   });
 
-  it("filters navigation correctly for SUPER_ADMIN role", () => {
-    const nav = getFilteredNavigation("SUPER_ADMIN");
+  it("filters navigation correctly for SUPER_ADMIN in Platform Mode (no active tenant)", () => {
+    const nav = getFilteredNavigation("SUPER_ADMIN", [], false, false);
+    const allItemIds = nav.flatMap((g) => g.items.map((i) => i.id));
+
+    expect(allItemIds).toEqual(["dashboard", "saas-schools"]);
+    expect(allItemIds).not.toContain("saas-academic");
+    expect(allItemIds).not.toContain("saas-students");
+    expect(allItemIds).not.toContain("saas-integration");
+  });
+
+  it("filters navigation correctly for SUPER_ADMIN in Active Tenant Support Mode", () => {
+    const nav = getFilteredNavigation("SUPER_ADMIN", [], false, true);
     const allItemIds = nav.flatMap((g) => g.items.map((i) => i.id));
 
     expect(allItemIds).toContain("dashboard");
-    expect(allItemIds.some((id) => id === "staff-school" || id === "saas-schools")).toBe(true);
-    expect(allItemIds.some((id) => id === "staff-academic" || id === "saas-academic")).toBe(true);
-    expect(allItemIds.some((id) => id === "staff-students" || id === "saas-students")).toBe(true);
-    expect(allItemIds.some((id) => id === "staff-reports" || id === "saas-reports")).toBe(true);
+    expect(allItemIds).toContain("saas-schools");
+    expect(allItemIds).toContain("saas-academic");
+    expect(allItemIds).toContain("saas-students");
+    expect(allItemIds).toContain("saas-users");
+    expect(allItemIds).toContain("saas-cbt");
+    expect(allItemIds).toContain("saas-integration");
+    expect(allItemIds).toContain("saas-reports");
+    expect(allItemIds).toContain("saas-announcements");
   });
 
   it("restricts SCHOOL_STAFF without capabilities from specialized administrative items", () => {

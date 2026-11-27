@@ -20,6 +20,7 @@ export interface NavItem {
   requiredPermission?: PermissionString;
   requiredCapability?: CapabilityBundle;
   requiredOwner?: boolean;
+  requiresActiveTenant?: boolean;
   badge?: string;
   isPhaseDeferred?: boolean;
   phaseNote?: string;
@@ -48,7 +49,7 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         title: "Pengumuman",
         href: "/pengumuman",
         iconName: "Megaphone",
-        roles: ["SUPER_ADMIN", "SCHOOL_STAFF", "GUARDIAN"],
+        roles: ["SCHOOL_STAFF", "GUARDIAN"],
         requiredPermission: "communication.announcement.view",
         isPhaseDeferred: false,
       },
@@ -312,19 +313,11 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         badge: "Tenant",
         isPhaseDeferred: false,
       },
-      {
-        id: "saas-users",
-        title: "Guru & Penugasan SaaS",
-        href: "/guru-pengajaran",
-        iconName: "GraduationCap",
-        roles: ["SUPER_ADMIN"],
-        isPhaseDeferred: false,
-      },
     ],
   },
   {
-    id: "saas-global-data",
-    title: "Direktori & Master Data",
+    id: "saas-school-context",
+    title: "Operasional Sekolah Aktif",
     items: [
       {
         id: "saas-academic",
@@ -332,29 +325,25 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         href: "/struktur-akademik",
         iconName: "Layers",
         roles: ["SUPER_ADMIN"],
+        requiresActiveTenant: true,
         isPhaseDeferred: false,
       },
       {
         id: "saas-students",
-        title: "Data Kesiswaan Global",
+        title: "Data Kesiswaan",
         href: "/data-siswa",
         iconName: "UserSquare2",
         roles: ["SUPER_ADMIN"],
+        requiresActiveTenant: true,
         isPhaseDeferred: false,
       },
-    ],
-  },
-  {
-    id: "saas-system",
-    title: "Sistem & Integrasi",
-    items: [
       {
-        id: "saas-integration",
-        title: "Pusat Integrasi",
-        href: "/integrasi",
-        iconName: "Plug",
+        id: "saas-users",
+        title: "Guru & Penugasan",
+        href: "/guru-pengajaran",
+        iconName: "GraduationCap",
         roles: ["SUPER_ADMIN"],
-        badge: "API Gateway",
+        requiresActiveTenant: true,
         isPhaseDeferred: false,
       },
       {
@@ -363,6 +352,26 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         href: "/cbt-ujian",
         iconName: "FileCheck",
         roles: ["SUPER_ADMIN"],
+        requiresActiveTenant: true,
+        isPhaseDeferred: false,
+      },
+      {
+        id: "saas-announcements",
+        title: "Pengumuman Sekolah",
+        href: "/pengumuman",
+        iconName: "Megaphone",
+        roles: ["SUPER_ADMIN"],
+        requiresActiveTenant: true,
+        isPhaseDeferred: false,
+      },
+      {
+        id: "saas-integration",
+        title: "Pusat Integrasi",
+        href: "/integrasi",
+        iconName: "Plug",
+        roles: ["SUPER_ADMIN"],
+        requiresActiveTenant: true,
+        badge: "API Gateway",
         isPhaseDeferred: false,
       },
       {
@@ -371,6 +380,7 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
         href: "/pimpinan",
         iconName: "BarChart3",
         roles: ["SUPER_ADMIN"],
+        requiresActiveTenant: true,
         isPhaseDeferred: false,
       },
     ],
@@ -528,7 +538,8 @@ export const CANONICAL_NAVIGATION_CONFIG: NavGroup[] = [
 export function getFilteredNavigation(
   userRole: BaseRole,
   userCapabilities: CapabilityBundle[] = [],
-  isOwner: boolean = false
+  isOwner: boolean = false,
+  hasActiveTenant: boolean = false
 ): NavGroup[] {
   const filteredGroups: NavGroup[] = [];
   const seenHrefs = new Set<string>();
@@ -547,14 +558,19 @@ export function getFilteredNavigation(
         continue;
       }
 
-      // 3. Jika item butuh capability bundle tertentu
+      // 3. Jika item hanya relevan saat Super Admin masuk ke konteks sekolah aktif
+      if (item.requiresActiveTenant && userRole === "SUPER_ADMIN" && !hasActiveTenant) {
+        continue;
+      }
+
+      // 4. Jika item butuh capability bundle tertentu
       if (item.requiredCapability) {
         if (!userCapabilities.includes(item.requiredCapability)) {
           continue;
         }
       }
 
-      // 3. Deduplikasi mutlak: dilarang menampilkan link rute yang sama dua kali
+      // 5. Deduplikasi mutlak: dilarang menampilkan link rute yang sama dua kali
       if (seenHrefs.has(item.href)) {
         continue;
       }

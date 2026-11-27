@@ -33,6 +33,7 @@ export interface MobileBottomNavProps {
   userRole: BaseRole;
   userCapabilities?: CapabilityBundle[];
   isOwner?: boolean;
+  hasActiveTenant?: boolean;
   onOpenMenu: () => void;
   className?: string;
 }
@@ -40,7 +41,8 @@ export interface MobileBottomNavProps {
 export function getMobileBottomNavItems(
   userRole: BaseRole,
   userCapabilities: CapabilityBundle[] = [],
-  isOwner: boolean = false
+  isOwner: boolean = false,
+  hasActiveTenant: boolean = false
 ): MobileBottomNavItem[] {
   switch (userRole) {
     case "TEACHER":
@@ -60,11 +62,17 @@ export function getMobileBottomNavItems(
       ];
 
     case "SUPER_ADMIN":
+      if (!hasActiveTenant) {
+        return [
+          { id: "home", label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+          { id: "schools", label: "Sekolah", href: "/sekolah", icon: Building2 },
+        ];
+      }
       return [
         { id: "home", label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+        { id: "schools", label: "Sekolah", href: "/sekolah", icon: Building2 },
         { id: "students", label: "Siswa", href: "/data-siswa", icon: UserSquare2 },
         { id: "academic", label: "Akademik", href: "/struktur-akademik", icon: Layers },
-        { id: "teachers", label: "Guru", href: "/guru-pengajaran", icon: GraduationCap },
       ];
 
     case "SCHOOL_STAFF": {
@@ -115,13 +123,14 @@ export function MobileBottomNav({
   userRole,
   userCapabilities = [],
   isOwner = false,
+  hasActiveTenant = false,
   onOpenMenu,
   className = "",
 }: MobileBottomNavProps) {
   const pathname = usePathname();
   const items = React.useMemo(
-    () => getMobileBottomNavItems(userRole, userCapabilities, isOwner),
-    [userRole, userCapabilities, isOwner]
+    () => getMobileBottomNavItems(userRole, userCapabilities, isOwner, hasActiveTenant),
+    [userRole, userCapabilities, isOwner, hasActiveTenant]
   );
 
   return (

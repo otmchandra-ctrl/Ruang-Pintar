@@ -39,6 +39,29 @@ export interface ResetPlatformUserPasswordResult {
   temporaryPassword: string;
 }
 
+export interface PlatformActivityAnalyticsData {
+  activityDays: {
+    SENIN: number;
+    SELASA: number;
+    RABU: number;
+    KAMIS: number;
+    JUMAT: number;
+    SABTU: number;
+  };
+  totalSesiAktual: number;
+  attendance: {
+    totalPresensiRecorded: number;
+    totalPresensiHadir: number;
+    totalPresensiIzinSakit: number;
+    totalPresensiAlpha: number;
+    hadirPct: number;
+    izinSakitPct: number;
+    alphaPct: number;
+  };
+  totalRapor: number;
+  totalMataPelajaran: number;
+}
+
 function assertSuperAdmin(actorRole: string) {
   if (actorRole !== "SUPER_ADMIN") {
     throw new SchoolDomainError(
@@ -732,6 +755,83 @@ export class PlatformControlService {
       deletedUserId: user.id,
       username: user.username,
       nama_lengkap: user.nama_lengkap,
+    };
+  }
+
+  /**
+   * Agregasi telemetri aktivitas KBM harian, Learner Engagement, & Penyampaian Nilai Akademik lintas-tenant.
+   */
+  async getPlatformActivityAnalytics(): Promise<PlatformActivityAnalyticsData> {
+    const [
+      allActualSessions,
+      totalPresensiHadir,
+      totalPresensiIzinSakit,
+      totalPresensiAlpha,
+      totalRapor,
+      totalMataPelajaran,
+    ] = await Promise.all([
+      prisma.sesiKelasAktual.findMany({
+        select: { tanggal: true, created_at: true },
+      }),
+      prisma.presensiSesiKelas.count({ where: { status: "HADIR" } }),
+      prisma.presensiSesiKelas.count({
+        where: { status: { in: ["IZIN", "SAKIT", "DISPENSASI"] } },
+      }),
+      prisma.presensiSesiKelas.count({ where: { status: "ALPHA" } }),
+      prisma.raporSiswa.count(),
+      prisma.mataPelajaran.count(),
+    ]);
+
+    const activityDays = {
+      SENIN: 0,
+      SELASA: 0,
+      RABU: 0,
+      KAMIS: 0,
+      JUMAT: 0,
+      SABTU: 0,
+    };
+
+    for (const s of allActualSessions) {
+      const raw = new Date(s.tanggal || s.created_at);
+      // Normalisasi ke hari kalender WIB (UTC+7) agar konsisten di server UTC maupun lokal
+      const wibDate = new Date(raw.getTime() + 7 * 60 * 60 * 1000);
+      const dayNum = wibDate.getUTCDay();
+      if (dayNum === 1) activityDays.SENIN++;
+      else if (dayNum === 2) activityDays.SELASA++;
+      else if (dayNum === 3) activityDays.RABU++;
+      else if (dayNum === 4) activityDays.KAMIS++;
+      else if (dayNum === 5) activityDays.JUMAT++;
+      else if (dayNum === 6) activityDays.SABTU++;
+    }
+
+    const totalPresensiRecorded = totalPresensiHadir + totalPresensiIzinSakit + totalPresensiAlpha;
+    const hadirPct =
+      totalPresensiRecorded > 0
+        ? Number(((totalPresensiHadir / totalPresensiRecorded) * 100).toFixed(1))
+        : 0;
+    const izinSakitPct =
+      totalPresensiRecorded > 0
+        ? Number(((totalPresensiIzinSakit / totalPresensiRecorded) * 100).toFixed(1))
+        : 0;
+    const alphaPct =
+      totalPresensiRecorded > 0
+        ? Number(((totalPresensiAlpha / totalPresensiRecorded) * 100).toFixed(1))
+        : 0;
+
+    return {
+      activityDays,
+      totalSesiAktual: allActualSessions.length,
+      attendance: {
+        totalPresensiRecorded,
+        totalPresensiHadir,
+        totalPresensiIzinSakit,
+        totalPresensiAlpha,
+        hadirPct,
+        izinSakitPct,
+        alphaPct,
+      },
+      totalRapor,
+      totalMataPelajaran,
     };
   }
 }

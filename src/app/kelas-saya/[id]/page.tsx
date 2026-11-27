@@ -96,6 +96,10 @@ export default async function ClassWorkspacePage({ params, searchParams }: PageP
   const searchParamsObj = searchParams ? await searchParams : undefined;
   const initialTab = searchParamsObj?.tab as any;
 
+  if (initialTab === "PENILAIAN") {
+    redirect(`/penilaian/${encodeURIComponent(penugasanId)}`);
+  }
+
   const canManage = isSuperAdmin || (guruId !== null && workspace.penugasan.guru_id === guruId);
 
   return (

@@ -16,7 +16,18 @@
 
 import React, { useState, useEffect, useTransition, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, Search, Loader2, FileText, ChevronRight, MessageCircle } from "lucide-react";
+import {
+  X,
+  Check,
+  Search,
+  Loader2,
+  FileText,
+  ChevronRight,
+  ChevronDown,
+  MessageCircle,
+  BookOpen,
+  WifiOff,
+} from "lucide-react";
 import {
   getSessionAttendanceAction,
   saveSessionAttendanceAction,
@@ -25,8 +36,16 @@ import {
   AttendanceStatus,
   ClassSessionAttendanceDTO,
   SaveAttendanceItemInput,
+  SaveSessionAttendanceInput,
   StudentAttendanceItemDTO,
 } from "../domain/attendance-types";
+import {
+  enqueueOfflineMutation,
+  getOfflineDataCache,
+  getOfflineMutation,
+  setOfflineDataCache,
+} from "@/shared/lib/offline-sync-queue";
+import { isLikelyNetworkError } from "@/shared/lib/offline-sync-runner";
 
 interface SessionAttendanceModalProps {
   sesiId: string | null;
@@ -72,7 +91,12 @@ function SessionAttendanceModalContent({
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [alasanKoreksi, setAlasanKoreksi] = useState("");
+  const [topikPembelajaran, setTopikPembelajaran] = useState("");
+  const [catatanJurnal, setCatatanJurnal] = useState("");
+  const [isJurnalOpen, setIsJurnalOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [hasPendingSync, setHasPendingSync] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Bottom Sheet Editor State (Detail View)
@@ -80,36 +104,82 @@ function SessionAttendanceModalContent({
   const [draftStatus, setDraftStatus] = useState<AttendanceStatus>("HADIR");
   const [draftCatatan, setDraftCatatan] = useState<string>("");
 
-  // Ambil data sesi dan daftar siswa saat modal dibuka
+  // Ambil data sesi dan daftar siswa saat modal dibuka (dengan fallback cache offline)
   useEffect(() => {
     let isMounted = true;
+    const cacheKey = `attendance:${sesiId}`;
+    const mutationKey = `SESSION_ATTENDANCE:${sesiId}`;
 
-    getSessionAttendanceAction(sesiId)
-      .then((res) => {
+    const hydrateSessionData = async (data: ClassSessionAttendanceDTO, offline: boolean) => {
+      if (!isMounted) return;
+      const pending = await getOfflineMutation<SaveSessionAttendanceInput>(mutationKey);
+      if (!isMounted) return;
+
+      setSessionData(data);
+      setIsOfflineMode(offline);
+      setHasPendingSync(Boolean(pending));
+      setTopikPembelajaran(pending?.payload.topik_pembelajaran ?? data.topik_pembelajaran ?? "");
+      setCatatanJurnal(pending?.payload.catatan_jurnal ?? data.catatan ?? "");
+      if (pending?.payload.alasan_koreksi) {
+        setAlasanKoreksi(pending.payload.alasan_koreksi);
+      }
+
+      const initialMap: Record<string, { status: AttendanceStatus; catatan: string }> = {};
+      data.daftar_siswa.forEach((s) => {
+        initialMap[s.siswa_id] = {
+          status: s.status,
+          catatan: s.catatan || "",
+        };
+      });
+
+      if (pending?.payload.items) {
+        pending.payload.items.forEach((item) => {
+          initialMap[item.siswa_id] = {
+            status: item.status,
+            catatan: item.catatan || "",
+          };
+        });
+      }
+
+      setItems(initialMap);
+    };
+
+    const loadSession = async () => {
+      const isCurrentlyOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+
+      if (isCurrentlyOffline) {
+        const cached = await getOfflineDataCache<ClassSessionAttendanceDTO>(cacheKey);
+        if (cached) {
+          await hydrateSessionData(cached, true);
+          return;
+        }
+      }
+
+      try {
+        const res = await getSessionAttendanceAction(sesiId);
         if (!isMounted) return;
         if (res.success && res.data) {
-          setSessionData(res.data);
-          const initialMap: Record<string, { status: AttendanceStatus; catatan: string }> = {};
-          res.data.daftar_siswa.forEach((s) => {
-            initialMap[s.siswa_id] = {
-              status: s.status,
-              catatan: s.catatan || "",
-            };
-          });
-          setItems(initialMap);
+          await setOfflineDataCache(cacheKey, res.data);
+          await hydrateSessionData(res.data, false);
         } else {
           onError?.(res.message);
           onClose();
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!isMounted) return;
+        const cached = await getOfflineDataCache<ClassSessionAttendanceDTO>(cacheKey);
+        if (cached) {
+          await hydrateSessionData(cached, true);
+          return;
+        }
         onError?.(err instanceof Error ? err.message : "Gagal memuat data presensi sesi.");
         onClose();
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+      }
+    };
+
+    loadSession().finally(() => {
+      if (isMounted) setIsLoading(false);
+    });
 
     return () => {
       isMounted = false;
@@ -215,19 +285,51 @@ function SessionAttendanceModalContent({
       catatan: items[s.siswa_id]?.catatan || null,
     }));
 
-    startTransition(async () => {
-      const res = await saveSessionAttendanceAction({
-        sesi_kelas_id: sessionData.sesi_id,
-        sekolah_id: sessionData.sekolah_id,
-        items: payloadItems,
-        alasan_koreksi: alasanKoreksi.trim() || undefined,
-      });
+    const payload: SaveSessionAttendanceInput = {
+      sesi_kelas_id: sessionData.sesi_id,
+      sekolah_id: sessionData.sekolah_id,
+      items: payloadItems,
+      alasan_koreksi: alasanKoreksi.trim() || undefined,
+      topik_pembelajaran: topikPembelajaran.trim() || undefined,
+      catatan_jurnal: catatanJurnal.trim() || undefined,
+    };
 
-      if (res.success) {
-        onSuccess?.(res.message);
-        onClose();
-      } else {
-        onError?.(res.message);
+    const enqueueLocally = async () => {
+      await enqueueOfflineMutation({
+        key: `SESSION_ATTENDANCE:${sessionData.sesi_id}`,
+        type: "SESSION_ATTENDANCE",
+        label: `Presensi ${sessionData.rombel_nama || "Sesi"}`,
+        payload,
+      });
+      onSuccess?.(
+        "Koneksi offline: Presensi disimpan di perangkat dan akan otomatis tersinkronisasi saat online."
+      );
+      onClose();
+    };
+
+    startTransition(async () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        await enqueueLocally();
+        return;
+      }
+
+      try {
+        const res = await saveSessionAttendanceAction(payload);
+
+        if (res.success) {
+          onSuccess?.(res.message);
+          onClose();
+        } else {
+          onError?.(res.message);
+        }
+      } catch (err) {
+        if (isLikelyNetworkError(err)) {
+          await enqueueLocally();
+          return;
+        }
+        onError?.(
+          err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan presensi."
+        );
       }
     });
   };
@@ -266,6 +368,7 @@ function SessionAttendanceModalContent({
     msg += `─────────────────────────\n`;
     msg += `🏫 Kelas: *${sessionData.rombel_nama}*\n`;
     msg += `📚 Mapel: *${sessionData.mata_pelajaran_nama}*\n`;
+    if (topikPembelajaran.trim()) msg += `📖 Topik/Materi: *${topikPembelajaran.trim()}*\n`;
     msg += `📅 Tanggal: *${formattedDateFull}*\n`;
     if (sessionData.guru_nama) msg += `👨‍🏫 Guru: *${sessionData.guru_nama}*\n`;
     msg += `─────────────────────────\n`;
@@ -369,6 +472,17 @@ function SessionAttendanceModalContent({
         </div>
 
         {/* Content Body */}
+        {(isOfflineMode || hasPendingSync) && !isLoading && (
+          <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/80 dark:border-amber-800/50 flex items-center gap-2 text-[11px] font-medium text-amber-800 dark:text-amber-200 shrink-0">
+            <WifiOff className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              {isOfflineMode
+                ? "Mode Offline: Menampilkan data tersimpan di perangkat. Perubahan akan otomatis disinkronkan saat online."
+                : "Ada perubahan presensi yang menunggu sinkronisasi ke server."}
+            </span>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="p-16 text-center space-y-3 flex-1 flex flex-col items-center justify-center">
             <Loader2 className="h-8 w-8 text-[#2563EB] animate-spin" />
@@ -470,6 +584,78 @@ function SessionAttendanceModalContent({
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* ========================================================= */}
+            {/* JURNAL PEMBELAJARAN (MATERI & AGENDA KBM)                  */}
+            {/* ========================================================= */}
+            <div className="px-4 sm:px-5 py-2.5 bg-blue-50/40 dark:bg-blue-950/20 border-b border-blue-100/70 dark:border-blue-900/40 shrink-0 transition-all">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setIsJurnalOpen((prev) => !prev)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setIsJurnalOpen((prev) => !prev);
+                  }
+                }}
+                className="flex items-center justify-between cursor-pointer select-none group"
+                aria-label="Buka tutup form jurnal mengajar"
+              >
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-[#2563EB] dark:text-blue-400 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#2563EB] dark:group-hover:text-blue-400 transition-colors">
+                    Jurnal Mengajar / KBM
+                  </span>
+                  {topikPembelajaran.trim() ? (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-[#2563EB] dark:text-blue-300">
+                      Terisi
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800">
+                      Opsional
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-medium text-[#2563EB] dark:text-blue-400">
+                  <span>{isJurnalOpen ? "Ringkas" : "Buka Jurnal"}</span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                      isJurnalOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {isJurnalOpen && (
+                <div className="mt-2 space-y-2 pt-2 border-t border-blue-200/50 dark:border-blue-900/40 animate-in fade-in duration-150">
+                  <div>
+                    <label className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Topik / Materi Pembelajaran
+                    </label>
+                    <input
+                      type="text"
+                      value={topikPembelajaran}
+                      onChange={(e) => setTopikPembelajaran(e.target.value)}
+                      placeholder="Contoh: Pengenalan Algoritma Searching & Sorting"
+                      className="w-full h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Catatan & Refleksi Pembelajaran
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={catatanJurnal}
+                      onChange={(e) => setCatatanJurnal(e.target.value)}
+                      placeholder="Catatan kegiatan, pemahaman siswa, kendala praktikum, dll. (opsional)"
+                      className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] resize-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ========================================================= */}
@@ -662,7 +848,7 @@ function SessionAttendanceModalContent({
                     ) : (
                       <>
                         <Check className="h-4 w-4" />
-                        <span>Simpan Presensi</span>
+                        <span>Simpan Presensi & Jurnal</span>
                       </>
                     )}
                   </button>

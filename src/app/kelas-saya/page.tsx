@@ -82,7 +82,8 @@ export default async function KelasSayaPage() {
   // Kontrol mutasi rombel (Ubah/Hapus) berlaku untuk Guru Mandiri perorangan (Solo Workspace) atau Super Admin.
   // Guru biasa di sekolah institusi formal (SEKOLAH) tidak diizinkan memutasi rombel sekolah secara sepihak.
   const isSoloTeacher =
-    school?.tipe_lisensi !== "SEKOLAH" && (Boolean(user.is_owner_tenant) || user.peran_dasar === "SUPER_ADMIN");
+    school?.tipe_lisensi !== "SEKOLAH" &&
+    (Boolean(user.is_owner_tenant) || user.peran_dasar === "SUPER_ADMIN");
 
   return (
     <AcademicShell

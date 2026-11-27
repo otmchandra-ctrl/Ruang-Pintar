@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ClassAssessmentTabView } from "@/modules/assessment/presentation/class-assessment-tab-view";
 import { TeacherGradebookOverviewView } from "@/modules/assessment/presentation/teacher-gradebook-overview-view";
+import { GradebookClassDetailView } from "@/modules/assessment/presentation/gradebook-class-detail-view";
 import { CreateAssessmentModal } from "@/modules/assessment/presentation/create-assessment-modal";
 import {
   DefinisiAsesmenDTO,
@@ -199,7 +200,111 @@ describe("M13 Assessment & Gradebook — Presentation Views (Academic Glass UI)"
     expect(screen.getByText("Dasar-Dasar Kejuruan RPL")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Buka Buku Nilai/i })).toHaveAttribute(
       "href",
-      "/kelas-saya/PENUGAS_1?tab=PENILAIAN"
+      "/penilaian/PENUGAS_1"
     );
+  });
+
+  it("binds TUGAS and PRAKTIK assessments to TP columns in UnifiedAcademicLedgerTable for grade input", () => {
+    const lingkupMateriList = [
+      {
+        id: "LM_1",
+        judul: "Produksi Konten Digital Multimedia",
+        tujuan_pembelajaran: [
+          { id: "TP_1", kode: "TP 1", deskripsi: "Memahami Konsep Multimedia" },
+          { id: "TP_3", kode: "TP 3", deskripsi: "Diseminasi Konten Multimedia" },
+        ],
+      },
+    ];
+
+    const mixedAssessments: DefinisiAsesmenDTO[] = [
+      {
+        ...mockAssessments[0],
+        id: "ASM_TP1",
+        judul: "Memahami Multimedia",
+        kategori: "FORMATIF",
+        lingkup_materi_id: "LM_1",
+        tp_id: "TP_1",
+        tp_kode: "TP 1",
+      },
+      {
+        ...mockAssessments[0],
+        id: "ASM_TP3_TUGAS",
+        judul: "TP2 & TP 3 - Pengumpulan Vidio",
+        kategori: "TUGAS",
+        lingkup_materi_id: "LM_1",
+        tp_id: "TP_3",
+        tp_kode: "TP 3",
+        status: "DRAFT",
+        is_published: false,
+      },
+    ];
+
+    render(
+      <ClassAssessmentTabView
+        penugasanId="PENUGAS_1"
+        canManage={true}
+        assessments={mixedAssessments}
+        gradebook={{
+          ...mockGradebook,
+          columns: [],
+          rows: [],
+        }}
+        lingkupMateriList={lingkupMateriList}
+        onRefresh={vi.fn()}
+        onShowToast={vi.fn()}
+      />
+    );
+
+    // Clicking TP 3 header must open InputGradesModal (not CreateAssessmentModal)
+    const tp3Header = screen.getByText("TP 3").closest("th");
+    expect(tp3Header).not.toBeNull();
+    fireEvent.click(tp3Header!);
+
+    expect(screen.queryByText("Buat Asesmen Pembelajaran Baru")).not.toBeInTheDocument();
+    expect(screen.getByText(/Memuat data siswa dan nilai/i)).toBeInTheDocument();
+  });
+
+  it("renders GradebookClassDetailView cleanly under /penilaian/[id] with back link to /penilaian", () => {
+    render(
+      <GradebookClassDetailView
+        workspace={{
+          penugasan: {
+            id: "PENUGAS_1",
+            sekolah_id: "SCH_1",
+            rombel_id: "ROM_1",
+            rombel_nama: "X TO 5",
+            tingkat_nama: "Kelas 10",
+            mata_pelajaran_id: "MP_1",
+            mata_pelajaran_nama: "Koding dan Kecerdasan Artifisial",
+            mata_pelajaran_kode: "KKA",
+            guru_id: "GURU_1",
+            guru_nama: "Eri Chandra A",
+            tahun_ajaran_id: "TA_1",
+            tahun_ajaran_nama: "2026/2027",
+            semester_id: "SEM_1",
+            semester_nama: "Ganjil",
+            jumlah_jam_minggu: 2,
+            status: "AKTIF",
+          },
+          total_siswa: 38,
+          lingkup_materi: [],
+          materi_list: [],
+          tugas_list: [],
+          administrasi_list: [],
+          jadwal_list: [],
+        }}
+        canManage={true}
+        assessments={mockAssessments}
+        gradebook={mockGradebook}
+      />
+    );
+
+    expect(screen.getByText("Koding dan Kecerdasan Artifisial")).toBeInTheDocument();
+    expect(screen.getByText("X TO 5")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Kembali ke Buku Nilai/i })).toHaveAttribute(
+      "href",
+      "/penilaian"
+    );
+    expect(screen.queryByText(/Akses penilaian kelas telah dialihkan/i)).not.toBeInTheDocument();
   });
 });

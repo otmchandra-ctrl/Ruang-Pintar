@@ -23,14 +23,18 @@ describe("MobileBottomNav Component", () => {
     ]);
   });
 
-  it("generates correct role-aware items for SUPER_ADMIN", () => {
-    const items = getMobileBottomNavItems("SUPER_ADMIN");
-    expect(items.map((i) => i.label)).toEqual(["Beranda", "Siswa", "Akademik", "Guru"]);
-    expect(items.map((i) => i.href)).toEqual([
+  it("generates contextual role-aware items for SUPER_ADMIN (Platform vs Active Tenant)", () => {
+    const platformItems = getMobileBottomNavItems("SUPER_ADMIN", [], false, false);
+    expect(platformItems.map((i) => i.label)).toEqual(["Beranda", "Sekolah"]);
+    expect(platformItems.map((i) => i.href)).toEqual(["/dashboard", "/sekolah"]);
+
+    const tenantItems = getMobileBottomNavItems("SUPER_ADMIN", [], false, true);
+    expect(tenantItems.map((i) => i.label)).toEqual(["Beranda", "Sekolah", "Siswa", "Akademik"]);
+    expect(tenantItems.map((i) => i.href)).toEqual([
       "/dashboard",
+      "/sekolah",
       "/data-siswa",
       "/struktur-akademik",
-      "/guru-pengajaran",
     ]);
   });
 

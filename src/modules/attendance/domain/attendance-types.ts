@@ -57,6 +57,7 @@ export interface ClassSessionAttendanceDTO extends SessionAttendanceSummaryDTO {
   status_sesi: string;
   ruangan?: string | null;
   topik_pembelajaran?: string | null;
+  catatan?: string | null;
   daftar_siswa: StudentAttendanceItemDTO[];
 }
 
@@ -72,6 +73,8 @@ export interface SaveSessionAttendanceInput {
   sekolah_id: string;
   items: SaveAttendanceItemInput[];
   alasan_koreksi?: string | null;
+  topik_pembelajaran?: string | null;
+  catatan_jurnal?: string | null;
 }
 
 export interface SessionAttendanceHistoryItemDTO {
@@ -91,7 +94,8 @@ export interface SessionAttendanceHistoryItemDTO {
   sudah_diabsen: boolean;
 }
 
-export type EvaluationAttendanceStatus = "Sangat Baik" | "Baik" | "Cukup" | "Perlu Perhatian";
+export type EvaluationAttendanceStatus =
+  "Sangat Baik" | "Baik" | "Cukup" | "Perlu Perhatian" | "Belum Ada Sesi";
 
 export interface StudentClassAttendanceRecapItemDTO {
   siswa_id: string;
@@ -111,6 +115,14 @@ export interface StudentClassAttendanceRecapItemDTO {
   status_evaluasi: EvaluationAttendanceStatus;
 }
 
+export interface ClassAttendanceSessionDateDTO {
+  sesi_id: string;
+  tanggal_iso: string; // YYYY-MM-DD
+  label_tanggal: string; // DD/MM, mis. "26/11"
+  bulan_key: string; // YYYY-MM, mis. "2026-11"
+  status_per_siswa: Record<string, string>;
+}
+
 export interface ClassAttendanceRecapDTO {
   penugasan_id: string;
   rombel_id: string;
@@ -126,5 +138,7 @@ export interface ClassAttendanceRecapDTO {
   total_siswa: number;
   rerata_kehadiran_kelas: number;
   jumlah_perlu_perhatian: number;
+  periode_label?: string;
+  sesi_pertemuan?: ClassAttendanceSessionDateDTO[];
   daftar_siswa: StudentClassAttendanceRecapItemDTO[];
 }

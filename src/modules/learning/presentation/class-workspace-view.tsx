@@ -461,10 +461,7 @@ export function ClassWorkspaceView({
               Akses penilaian kelas telah dialihkan ke menu global{" "}
               <strong>Buku Nilai & Rapor</strong>.
             </span>
-            <Link
-              href={`/penilaian?penugasanId=${penugasan.id}`}
-              className="font-bold underline ml-2"
-            >
+            <Link href={`/penilaian/${penugasan.id}`} className="font-bold underline ml-2">
               Buka Modul Buku Nilai &rarr;
             </Link>
           </div>

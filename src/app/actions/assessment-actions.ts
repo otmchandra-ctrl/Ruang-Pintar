@@ -73,7 +73,11 @@ export async function createAssessmentAction(
 
     revalidatePath(`/kelas-saya/${input.penugasan_mengajar_id}`);
     revalidatePath("/kelas-saya");
+    revalidatePath(`/penilaian/${input.penugasan_mengajar_id}`);
     revalidatePath("/penilaian");
+    revalidatePath("/dashboard");
+    revalidatePath("/rapor-siswa");
+    revalidatePath("/nilai-anak");
 
     return {
       success: true,
@@ -120,6 +124,7 @@ export async function updateAssessmentAction(
     );
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
+    revalidatePath(`/penilaian/${penugasanId}`);
     revalidatePath("/penilaian");
 
     return {
@@ -165,6 +170,7 @@ export async function deleteAssessmentAction(
     );
 
     revalidatePath(`/kelas-saya/${penugasanId}`);
+    revalidatePath(`/penilaian/${penugasanId}`);
     revalidatePath("/penilaian");
 
     return {
@@ -248,9 +254,13 @@ export async function saveAssessmentGradesAction(
 
     if (penugasanId) {
       revalidatePath(`/kelas-saya/${penugasanId}`);
+      revalidatePath(`/penilaian/${penugasanId}`);
     }
     revalidatePath("/kelas-saya");
     revalidatePath("/penilaian");
+    revalidatePath("/dashboard");
+    revalidatePath("/rapor-siswa");
+    revalidatePath("/nilai-anak");
 
     return {
       success: true,
@@ -298,9 +308,13 @@ export async function publishAssessmentAction(
 
     if (penugasanId) {
       revalidatePath(`/kelas-saya/${penugasanId}`);
+      revalidatePath(`/penilaian/${penugasanId}`);
     }
     revalidatePath("/kelas-saya");
     revalidatePath("/penilaian");
+    revalidatePath("/dashboard");
+    revalidatePath("/rapor-siswa");
+    revalidatePath("/nilai-anak");
 
     return {
       success: true,

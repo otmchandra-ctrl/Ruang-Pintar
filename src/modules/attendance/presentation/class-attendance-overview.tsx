@@ -140,13 +140,13 @@ export function ClassAttendanceOverview({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DIMULAI":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        return "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/70";
       case "SELESAI":
-        return "bg-blue-50 text-[#2563EB] border-blue-200";
+        return "bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-300 border-blue-200 dark:border-blue-800/70";
       case "DIBATALKAN":
-        return "bg-rose-50 text-rose-700 border-rose-200";
+        return "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/70";
       default:
-        return "bg-slate-50 text-slate-700 border-slate-200";
+        return "bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
     }
   };
 
@@ -163,30 +163,35 @@ export function ClassAttendanceOverview({
       )}
 
       {/* Modern Academic Glass Hero Banner */}
-      <div className="relative rounded-3xl bg-white border border-slate-100/90 p-6 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)] overflow-visible">
-        <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-blue-50/60 to-transparent rounded-r-3xl pointer-events-none" />
+      <div className="relative rounded-3xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-100/90 dark:border-blue-500/20 p-6 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.35)] overflow-visible">
+        <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-blue-50/60 dark:from-blue-950/40 to-transparent rounded-r-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="w-full md:max-w-[70%] space-y-3.5">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-              <Link href="/dashboard" className="hover:text-[#2563EB] transition-colors">
+            <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-400 font-medium">
+              <Link
+                href="/dashboard"
+                className="hover:text-[#2563EB] dark:hover:text-blue-400 transition-colors"
+              >
                 Dashboard
               </Link>
               <span>/</span>
-              <span className="text-slate-700 font-semibold">Rekap Presensi</span>
+              <span className="text-slate-700 dark:text-slate-200 font-semibold">
+                Rekap Presensi
+              </span>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] dark:text-white tracking-tight">
                   Presensi Kehadiran Siswa
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-700 font-bold text-xs">
+                <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/70 text-blue-700 dark:text-blue-300 font-bold text-xs whitespace-nowrap">
                   {schoolName}
                 </span>
               </div>
-              <p className="text-slate-500 text-xs sm:text-sm leading-relaxed max-w-2xl">
+              <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm leading-relaxed max-w-2xl">
                 Monitoring, audit, dan rekapitulasi kehadiran siswa per rombongan belajar dan
                 riwayat sesi KBM. Untuk presensi harian langsung, gunakan Presensi Cepat di
                 Dashboard atau Tab Presensi di Ruang Kelas Saya.
@@ -195,20 +200,20 @@ export function ClassAttendanceOverview({
 
             {/* Quick Badges */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50/80 border border-emerald-200/80 text-xs font-semibold text-emerald-700">
-                <PlayCircle className="h-3.5 w-3.5 text-emerald-600" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200/80 dark:border-emerald-800/60 text-xs font-semibold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                <PlayCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>
                   Kelas Berlangsung: <strong>{activeSessionsCount}</strong>
                 </span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-200/80 text-xs font-semibold text-[#2563EB]">
-                <CheckCircle2 className="h-3.5 w-3.5 text-[#2563EB]" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/80 dark:bg-blue-950/50 border border-blue-200/80 dark:border-blue-800/60 text-xs font-semibold text-[#2563EB] dark:text-blue-300 whitespace-nowrap">
+                <CheckCircle2 className="h-3.5 w-3.5 text-[#2563EB] dark:text-blue-400" />
                 <span>
                   Sesi Selesai: <strong>{completedSessionsCount}</strong>
                 </span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50/80 border border-indigo-200/80 text-xs font-semibold text-indigo-700">
-                <TrendingUp className="h-3.5 w-3.5 text-indigo-600" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 text-xs font-semibold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
+                <TrendingUp className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>
                   Rata-rata Kehadiran:{" "}
                   <strong>
@@ -223,16 +228,16 @@ export function ClassAttendanceOverview({
           <div className="flex flex-wrap md:flex-col items-stretch gap-2.5 w-full md:w-auto shrink-0">
             <Link
               href="/kelas-saya"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap"
             >
               <BookOpen className="h-4 w-4" />
               <span>Ruang Kelas Saya</span>
             </Link>
             <Link
               href="/sesi-pembelajaran"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-2xs transition-all cursor-pointer whitespace-nowrap"
             >
-              <PlayCircle className="h-4 w-4 text-slate-500" />
+              <PlayCircle className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               <span>Log Sesi KBM</span>
             </Link>
           </div>
@@ -241,67 +246,77 @@ export function ClassAttendanceOverview({
 
       {/* KPI Stat Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-2">
+        <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Rombel Diajar
             </span>
-            <div className="p-2 rounded-xl bg-blue-50 text-[#2563EB]">
+            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400">
               <BookOpen className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-slate-900">
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">
               {new Set(classes.map((c) => c.rombelId)).size} Rombel
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">{classes.length} Penugasan KBM</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              {classes.length} Penugasan KBM
+            </p>
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-2">
+        <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Sesi Berlangsung
             </span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
               <PlayCircle className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-emerald-700">{activeSessionsCount}</div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Siap diabsen sekarang</p>
+            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+              {activeSessionsCount}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Siap diabsen sekarang
+            </p>
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-2">
+        <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Total Riwayat Sesi
             </span>
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
+            <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
               <Calendar className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-purple-700">{sessions.length}</div>
-            <p className="text-[11px] text-slate-400 mt-0.5">Pertemuan tercatat</p>
+            <div className="text-2xl font-bold text-purple-700 dark:text-purple-400">
+              {sessions.length}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Pertemuan tercatat
+            </p>
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-2xs space-y-2">
+        <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Tingkat Kehadiran
             </span>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
               <TrendingUp className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-indigo-700">
+            <div className="text-2xl font-bold text-indigo-700 dark:text-indigo-400">
               {averageAttendanceOverall !== null ? `${averageAttendanceOverall}%` : "-"}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
               {averageAttendanceOverall !== null
                 ? "Rata-rata persentase hadir"
                 : "Belum ada presensi diambil"}
@@ -311,36 +326,36 @@ export function ClassAttendanceOverview({
       </div>
 
       {/* Tabs & Search Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white/90 border border-slate-200/80 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 shadow-sm">
         {/* Symmetric Tab Selector */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100/90 text-xs font-bold">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 text-xs font-bold overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab("sessions")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
               activeTab === "sessions"
-                ? "bg-white text-blue-700 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-xs"
+                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
-            <Clock className="h-3.5 w-3.5" />
+            <Clock className="h-3.5 w-3.5 shrink-0" />
             <span>Sesi KBM & Presensi Langsung</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-blue-100/60 text-blue-700 text-[10px]">
+            <span className="px-1.5 py-0.5 rounded-full bg-blue-100/60 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[10px]">
               {sessions.length}
             </span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("classes")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
               activeTab === "classes"
-                ? "bg-white text-blue-700 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-xs"
+                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
-            <Layers className="h-3.5 w-3.5" />
+            <Layers className="h-3.5 w-3.5 shrink-0" />
             <span>Rekapitulasi per Rombel</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">
+            <span className="px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px]">
               {classes.length}
             </span>
           </button>
@@ -348,26 +363,29 @@ export function ClassAttendanceOverview({
 
         {/* Search Input */}
         <div className="relative min-w-[220px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari rombel, mapel, guru..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB]"
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] transition-colors"
           />
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 p-3">
-        <label className="text-xs font-semibold text-slate-500" htmlFor="attendance-day-filter">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/75 p-3">
+        <label
+          className="text-xs font-semibold text-slate-500 dark:text-slate-400"
+          htmlFor="attendance-day-filter"
+        >
           Filter
         </label>
         <select
           id="attendance-day-filter"
           value={selectedDay}
           onChange={(event) => setSelectedDay(event.target.value)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] [color-scheme:light] dark:[color-scheme:dark]"
         >
           <option value="ALL">Semua hari</option>
           {[
@@ -388,7 +406,7 @@ export function ClassAttendanceOverview({
           aria-label="Filter kelas"
           value={selectedRombel}
           onChange={(event) => setSelectedRombel(event.target.value)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] [color-scheme:light] dark:[color-scheme:dark]"
         >
           <option value="ALL">Semua kelas</option>
           {rombelOptions.map(([value, label]) => (
@@ -401,7 +419,7 @@ export function ClassAttendanceOverview({
           aria-label="Filter mata pelajaran"
           value={selectedMapel}
           onChange={(event) => setSelectedMapel(event.target.value)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#2563EB] [color-scheme:light] dark:[color-scheme:dark]"
         >
           <option value="ALL">Semua mata pelajaran</option>
           {mapelOptions.map(([value, label]) => (
@@ -415,10 +433,10 @@ export function ClassAttendanceOverview({
       {/* TAB CONTENT 1: Sesi KBM & Presensi Cepat */}
       {activeTab === "sessions" && (
         <div className="space-y-4">
-          <div className="overflow-hidden rounded-2xl bg-white/90 border border-slate-200/80 shadow-sm">
+          <div className="overflow-hidden rounded-2xl bg-white/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-slate-50/75 border-b border-slate-100 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+                <thead className="bg-slate-50/75 dark:bg-slate-800/70 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
                   <tr>
                     <th className="px-5 py-3.5">Tanggal & Waktu Aktual</th>
                     <th className="px-4 py-3.5">Rombel & Mapel</th>
@@ -428,21 +446,24 @@ export function ClassAttendanceOverview({
                     <th className="px-5 py-3.5 text-right">Aksi Presensi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
                   {filteredSessions.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-6 py-12 text-center text-slate-400 text-xs sm:text-sm"
+                        className="px-6 py-12 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm"
                       >
                         Tidak ada data sesi kelas yang cocok dengan pencarian.
                       </td>
                     </tr>
                   ) : (
                     filteredSessions.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={s.id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors"
+                      >
                         <td className="px-5 py-3.5 whitespace-nowrap">
-                          <div className="font-bold text-slate-900">
+                          <div className="font-bold text-slate-900 dark:text-white">
                             {new Date(s.tanggal).toLocaleDateString("id-ID", {
                               weekday: "short",
                               day: "numeric",
@@ -450,8 +471,8 @@ export function ClassAttendanceOverview({
                               year: "numeric",
                             })}
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5 font-mono">
-                            <Clock className="h-3 w-3 text-slate-400" />
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
+                            <Clock className="h-3 w-3 text-slate-400 dark:text-slate-500" />
                             <span>
                               {s.jam_mulai_aktual
                                 ? new Date(s.jam_mulai_aktual).toLocaleTimeString("id-ID", {
@@ -469,34 +490,36 @@ export function ClassAttendanceOverview({
                           </div>
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className="font-bold text-slate-900 block">
+                          <span className="font-bold text-slate-900 dark:text-white block">
                             {s.mata_pelajaran_nama}
                           </span>
-                          <span className="text-xs text-slate-500 font-semibold block">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold block">
                             {s.rombel_nama}
                           </span>
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className="font-semibold text-slate-800 block">{s.guru_nama}</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            {s.guru_nama}
+                          </span>
                           {s.guru_pengganti_nama && (
-                            <span className="text-[11px] text-amber-600 font-medium block">
+                            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium block">
                               Pengganti: {s.guru_pengganti_nama}
                             </span>
                           )}
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className="font-medium text-slate-800 block truncate max-w-xs">
+                          <span className="font-medium text-slate-800 dark:text-slate-200 block truncate max-w-xs">
                             {s.topik_pembelajaran || "Tanpa topik khusus"}
                           </span>
                           {s.ruangan_aktual && (
-                            <span className="text-[11px] text-blue-600 font-semibold block">
+                            <span className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold block">
                               Ruang: {s.ruangan_aktual}
                             </span>
                           )}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusBadge(
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadge(
                               s.status
                             )}`}
                           >
@@ -511,7 +534,7 @@ export function ClassAttendanceOverview({
                           <button
                             type="button"
                             onClick={() => setSelectedSessionId(s.id)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs shadow-sm shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap"
                           >
                             <UserCheck className="h-3.5 w-3.5" />
                             <span>Presensi</span>
@@ -531,50 +554,54 @@ export function ClassAttendanceOverview({
       {activeTab === "classes" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClasses.length === 0 ? (
-            <div className="col-span-full p-12 text-center bg-white rounded-3xl border border-slate-200 text-slate-400 text-sm">
+            <div className="col-span-full p-12 text-center bg-white dark:bg-slate-900/75 rounded-3xl border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 text-sm">
               Tidak ada data rombongan belajar yang cocok dengan pencarian.
             </div>
           ) : (
             filteredClasses.map((c) => (
               <div
                 key={c.penugasanId}
-                className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                className="p-5 rounded-3xl bg-white dark:bg-slate-900/75 dark:backdrop-blur-xl border border-slate-200/80 dark:border-blue-500/20 shadow-sm hover:shadow-md dark:hover:border-blue-500/35 transition-all flex flex-col justify-between space-y-4"
               >
                 <div className="space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 text-[#2563EB] font-bold text-xs border border-blue-200/60">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 font-bold text-xs border border-blue-200/60 dark:border-blue-800/60 whitespace-nowrap">
                       {c.mapelKode}
                     </span>
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/60 px-2.5 py-0.5 rounded-full whitespace-nowrap">
                       {c.stats.rata_rata_kehadiran}% Kehadiran
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="text-base font-bold text-slate-900 leading-tight">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
                       {c.mapelNama}
                     </h3>
-                    <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
                       Rombel: {c.rombelNama} {c.tingkatNama ? `• ${c.tingkatNama}` : ""}
                     </p>
                     {isAdmin && (
-                      <p className="text-[11px] text-slate-400 mt-1">Pengampu: {c.guruNama}</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                        Pengampu: {c.guruNama}
+                      </p>
                     )}
                   </div>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">Total Sesi</span>
-                    <span className="font-bold text-slate-800">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400 block font-medium">
+                      Total Sesi
+                    </span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100">
                       {c.stats.total_sesi_terjadwal} Sesi
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400 block font-medium">
                       Presensi Terekam
                     </span>
-                    <span className="font-bold text-emerald-600">
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
                       {c.stats.total_presensi_diambil} Sesi
                     </span>
                   </div>
@@ -584,7 +611,7 @@ export function ClassAttendanceOverview({
                   <button
                     type="button"
                     onClick={() => setSelectedRecapPenugasanId(c.penugasanId)}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs border border-blue-200/80 transition-colors cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-[#2563EB] dark:text-blue-300 font-bold text-xs border border-blue-200/80 dark:border-blue-800/70 transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <TableProperties className="h-3.5 w-3.5" />
                     <span>Lihat Rekap Siswa</span>
@@ -592,7 +619,7 @@ export function ClassAttendanceOverview({
 
                   <Link
                     href={`/kelas-saya/${c.penugasanId}?tab=presensi`}
-                    className="flex items-center justify-center px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-colors"
+                    className="flex items-center justify-center px-3 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white border border-transparent dark:border-slate-700 font-semibold text-xs transition-colors"
                     title="Buka Lembar Presensi Kelas Lengkap"
                   >
                     <ArrowRight className="h-3.5 w-3.5" />

@@ -6,19 +6,24 @@ import { SuperAdminDashboardView } from "@/shared/components/dashboard/role-view
 
 export interface SuperAdminDashboardProps {
   user: AuthenticatedUser;
+  activeSchoolName?: string | null;
 }
 
-export async function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
+export async function SuperAdminDashboard({ user, activeSchoolName }: SuperAdminDashboardProps) {
   // Query 100% data operasional riil dari basis data (Zero Fake KPI)
   // eslint-disable-next-line react-hooks/purity
-  const fifteenMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+  const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
   // eslint-disable-next-line react-hooks/purity
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // eslint-disable-next-line react-hooks/purity
+  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   const [
     totalSekolah,
     totalSekolahFreemium,
     totalSekolahInstitusi,
+    totalSekolahSuspended,
+    expiringTrialsCount,
     totalGuru,
     totalSiswa,
     totalRombel,
@@ -44,10 +49,18 @@ export async function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
     failedLoginLast24h,
     paidTransactions,
     allActualSessions,
+    resolvedActiveSchool,
   ] = await Promise.all([
     prisma.sekolah.count(),
     prisma.sekolah.count({ where: { tipe_lisensi: "FREEMIUM" } }),
     prisma.sekolah.count({ where: { tipe_lisensi: "SEKOLAH" } }),
+    prisma.sekolah.count({ where: { status_aktif: false } }),
+    prisma.sekolah.count({
+      where: {
+        tipe_lisensi: "FREEMIUM",
+        trial_berakhir_pada: { lte: sevenDaysFromNow },
+      },
+    }),
     prisma.pengguna.count({ where: { peran_dasar: "TEACHER" } }),
     prisma.siswa.count(),
     prisma.rombel.count({ where: { status: "AKTIF" } }),
@@ -128,7 +141,7 @@ export async function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
     prisma.metadataBerkas.count(),
     prisma.metadataBerkas.aggregate({ _sum: { ukuran_byte: true } }),
     prisma.permintaanSetupKelasAi.count(),
-    prisma.sesiPengguna.count({ where: { terakhir_aktif_pada: { gte: fifteenMinsAgo } } }),
+    prisma.sesiPengguna.count({ where: { terakhir_aktif_pada: { gte: thirtyMinsAgo } } }),
     prisma.logPercobaanLogin.count({
       where: { sukses: false, dibuat_pada: { gte: twentyFourHoursAgo } },
     }),
@@ -139,6 +152,12 @@ export async function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
     prisma.sesiKelasAktual.findMany({
       select: { tanggal: true, created_at: true },
     }),
+    user.sekolah_id && !activeSchoolName
+      ? prisma.sekolah.findUnique({
+          where: { id: user.sekolah_id },
+          select: { id: true, nama: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   // Kalkulasi Sebaran Hari Riil Sesi KBM (Zero Fake Distribution)
@@ -222,19 +241,31 @@ export async function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
   });
 
   // Format Sekolah Riil
-  const sekolahList = daftarSekolahTerbaru.map((s) => ({
-    id: s.id,
-    nama: s.nama,
-    npsn: s.npsn,
-    jenjang: s.jenjang,
-    tipe_lisensi: s.tipe_lisensi,
-    statusAktif: s.status_aktif,
-    rombelCount: s._count.rombel,
-    siswaCount: s._count.siswa,
-    guruCount: s._count.guru,
-    cbtCount: s._count.ujian_cbt,
-    guruKontak: s.pengguna[0]?.nama_lengkap || "Admin Sekolah",
-  }));
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  const sekolahList = daftarSekolahTerbaru.map((s) => {
+    let trialDaysLeft: number | null = null;
+    if (s.tipe_lisensi === "FREEMIUM" && s.trial_berakhir_pada) {
+      trialDaysLeft = Math.ceil(
+        (new Date(s.trial_berakhir_pada).getTime() - nowMs) / (1000 * 60 * 60 * 24)
+      );
+    }
+
+    return {
+      id: s.id,
+      nama: s.nama,
+      npsn: s.npsn,
+      jenjang: s.jenjang,
+      tipe_lisensi: s.tipe_lisensi,
+      trialDaysLeft,
+      statusAktif: s.status_aktif,
+      rombelCount: s._count.rombel,
+      siswaCount: s._count.siswa,
+      guruCount: s._count.guru,
+      cbtCount: s._count.ujian_cbt,
+      guruKontak: s.pengguna[0]?.nama_lengkap || "Admin Sekolah",
+    };
+  });
 
   // Format Guru Riil
   const guruList = guruTerdaftarList.map((g) => ({
@@ -296,6 +327,13 @@ export async function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
   const estimatedMrr =
     totalPaidRevenue > 0 ? totalPaidRevenue : totalSekolahInstitusi * 2500000 + totalSiswa * 5000;
 
+  const activeTenant = user.sekolah_id
+    ? {
+        id: user.sekolah_id,
+        nama: activeSchoolName ?? resolvedActiveSchool?.nama ?? "Sekolah Terpilih",
+      }
+    : null;
+
   return (
     <SuperAdminDashboardView
       user={{
@@ -303,25 +341,26 @@ export async function SuperAdminDashboard({ user }: SuperAdminDashboardProps) {
         peran_dasar: user.peran_dasar,
         username: user.username,
       }}
+      activeTenant={activeTenant}
       stats={{
         totalSiswa,
         totalGuru,
         totalSekolah,
         totalSekolahFreemium,
         totalSekolahInstitusi,
+        totalSekolahSuspended,
+        expiringTrialsCount,
         totalRombel,
         totalSesiAktual,
         totalMataPelajaran,
         totalRapor,
       }}
       telemetry={{
-        concurrencyActive: Math.max(1, activeConcurrencyCount),
-        peakEstimate: Math.max(activeConcurrencyCount * 3, 25),
+        concurrencyActive: activeConcurrencyCount,
         cbtTotal: totalUjianCbt,
         cbtActive: totalUjianCbtAktif,
         cbtRunningSessions: totalSesiUjianBerjalan,
         cbtCompletedSessions: totalSesiUjianSelesai,
-        p95LatencyMs: 118,
         storageFilesCount: totalBerkas,
         storageTotalMb,
         aiRequestsCount: totalAiRequests,

@@ -81,6 +81,7 @@ export async function saveSessionAttendanceAction(
 
     revalidatePath("/sesi-pembelajaran");
     revalidatePath("/kelas-saya");
+    revalidatePath("/presensi-kelas");
     revalidatePath("/dashboard");
 
     return {
@@ -162,6 +163,42 @@ export async function getClassAttendanceRecapAction(
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Gagal memuat rekapitulasi presensi siswa.";
+    return { success: false, message };
+  }
+}
+
+/**
+ * Mengekspor rekapitulasi presensi pembelajaran kelas ke file Microsoft Excel (.xlsx).
+ */
+export async function exportAttendanceRecapExcelAction(
+  penugasanId: string,
+  monthKey?: string | null
+): Promise<AttendanceActionResult<{ base64: string; filename: string }>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) {
+      return { success: false, message: "Sekolah tidak teridentifikasi." };
+    }
+
+    await requirePermission("attendance.session.view", {
+      sekolah_id: user.sekolah_id,
+    });
+
+    const { exportAttendanceRecapToExcel } =
+      await import("@/modules/attendance/application/attendance-excel-export-service");
+
+    const exportResult = await exportAttendanceRecapToExcel(penugasanId, user.sekolah_id, monthKey);
+
+    return {
+      success: true,
+      message: "Rekapitulasi presensi Excel berhasil digenerate.",
+      data: {
+        base64: exportResult.base64,
+        filename: exportResult.filename,
+      },
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Gagal mengekspor file Excel.";
     return { success: false, message };
   }
 }

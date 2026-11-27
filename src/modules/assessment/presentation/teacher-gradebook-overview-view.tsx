@@ -186,7 +186,7 @@ export function TeacherGradebookOverviewView({
               {/* Action Button */}
               <div className="mt-4 pt-3 border-t border-slate-100">
                 <Link
-                  href={`/kelas-saya/${c.penugasan_id}?tab=PENILAIAN`}
+                  href={`/penilaian/${c.penugasan_id}`}
                   className="w-full h-9 rounded-xl bg-slate-100 hover:bg-[#2563EB] text-slate-700 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <FileSpreadsheet className="h-3.5 w-3.5" />

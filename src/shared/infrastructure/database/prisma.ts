@@ -16,8 +16,10 @@ declare global {
  * Configure SQLite pragmas for performance, concurrency, foreign key enforcement, and data durability.
  */
 export async function configureSqlitePragmas(client: PrismaClient): Promise<void> {
-  // Only apply pragmas on native SQLite, skip on Cloudflare D1
+  // Only apply pragmas on native SQLite; skip on Cloudflare D1 or PostgreSQL
   if ((client as any)?._custom_is_d1) return;
+  const dbUrl = typeof process !== "undefined" ? (process.env.DATABASE_URL ?? "") : "";
+  if (/^postgres(?:ql)?:\/\//i.test(dbUrl)) return;
 
   try {
     await client.$queryRawUnsafe("PRAGMA foreign_keys = ON;");

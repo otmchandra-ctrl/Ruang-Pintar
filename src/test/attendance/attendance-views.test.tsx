@@ -179,6 +179,85 @@ describe("ClassAttendanceTabView", () => {
     expect(screen.getByText("Aljabar Boolean")).toBeInTheDocument();
     expect(screen.getByText("28 Hadir (93%)")).toBeInTheDocument();
   });
+
+  it("supports monthly filtering and renders per-date attendance columns in recap table", () => {
+    const monthlyRecap: any = {
+      penugasan_id: "penugasan-1",
+      rombel_id: "rombel-1",
+      rombel_nama: "X DKV 1",
+      mata_pelajaran_id: "mapel-kka",
+      mata_pelajaran_nama: "Koding dan Kecerdasan Artifisial",
+      mata_pelajaran_kode: "KKA",
+      guru_id: "guru-1",
+      guru_nama: "Eri Chandra",
+      total_sesi_terjadwal: 2,
+      total_sesi_tercatat: 2,
+      total_siswa: 1,
+      rerata_kehadiran_kelas: 50,
+      jumlah_perlu_perhatian: 1,
+      sesi_pertemuan: [
+        {
+          sesi_id: "s-okt",
+          tanggal_iso: "2026-10-22",
+          label_tanggal: "22/10",
+          bulan_key: "2026-10",
+          status_per_siswa: { "siswa-1": "HADIR" },
+        },
+        {
+          sesi_id: "s-nov",
+          tanggal_iso: "2026-11-26",
+          label_tanggal: "26/11",
+          bulan_key: "2026-11",
+          status_per_siswa: { "siswa-1": "SAKIT" },
+        },
+      ],
+      daftar_siswa: [
+        {
+          siswa_id: "siswa-1",
+          nomor_absen: 1,
+          nis: "1001",
+          nisn: "0012345678",
+          nama_lengkap: "Ahmad Rizky",
+          foto_url: null,
+          hadir: 1,
+          sakit: 1,
+          izin: 0,
+          alpha: 0,
+          dispensasi: 0,
+          terlambat: 0,
+          total_sesi_tercatat: 2,
+          persentase_kehadiran: 50,
+          status_evaluasi: "Perlu Perhatian",
+        },
+      ],
+    };
+
+    render(
+      <ClassAttendanceTabView
+        canManage={true}
+        history={[]}
+        stats={{
+          total_sesi_terjadwal: 2,
+          total_sesi_selesai: 2,
+          total_presensi_diambil: 2,
+          rata_rata_kehadiran: 50,
+        }}
+        recap={monthlyRecap}
+        onOpenAttendance={vi.fn()}
+      />
+    );
+
+    // Kedua tanggal terlihat saat Semua Periode
+    expect(screen.getByText("22/10")).toBeInTheDocument();
+    expect(screen.getByText("26/11")).toBeInTheDocument();
+
+    // Pilih bulan November 2026
+    const monthSelect = screen.getByLabelText("Filter Periode Bulan");
+    fireEvent.change(monthSelect, { target: { value: "2026-11" } });
+
+    expect(screen.queryByText("22/10")).not.toBeInTheDocument();
+    expect(screen.getByText("26/11")).toBeInTheDocument();
+  });
 });
 
 describe("SessionAttendanceModal", () => {

@@ -144,7 +144,7 @@ export function ClassSettingsTab({ workspace, canManage }: ClassSettingsTabProps
 
         <div className="pt-2">
           <Link
-            href={`/penilaian?penugasanId=${penugasan.id}`}
+            href={`/penilaian/${penugasan.id}`}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <span>Buka Modul Buku Nilai & Rapor Kelas Ini</span>

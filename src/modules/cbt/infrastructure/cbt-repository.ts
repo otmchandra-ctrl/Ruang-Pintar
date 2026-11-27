@@ -1354,17 +1354,7 @@ export class CbtRepository {
         throw new CbtTimerExpiredError();
       }
 
-      let serializedJawaban: string | null = null;
-      if (input.jawaban_pilihan) {
-        serializedJawaban = JSON.stringify([input.jawaban_pilihan]);
-      } else if (input.jawaban_kompleks && input.jawaban_kompleks.length > 0) {
-        serializedJawaban = JSON.stringify(input.jawaban_kompleks);
-      } else if (input.jawaban_teks !== undefined && input.jawaban_teks !== null) {
-        serializedJawaban = JSON.stringify([input.jawaban_teks]);
-      } else if (input.jawaban_menjodohkan && Object.keys(input.jawaban_menjodohkan).length > 0) {
-        serializedJawaban = JSON.stringify(input.jawaban_menjodohkan);
-      }
-
+      const serializedJawaban = this.serializeJawabanPayload(input);
       const answerId = generateUlid();
 
       // 2. Single UPSERT query
@@ -1398,6 +1388,138 @@ export class CbtRepository {
         waktu_simpan: saved.waktu_simpan.toISOString(),
       };
     });
+  }
+
+  private serializeJawabanPayload(input: {
+    jawaban_pilihan?: string | null;
+    jawaban_teks?: string | null;
+    jawaban_kompleks?: string[] | null;
+    jawaban_menjodohkan?: Record<string, string> | null;
+  }): string | null {
+    if (input.jawaban_pilihan) {
+      return JSON.stringify([input.jawaban_pilihan]);
+    }
+    if (input.jawaban_kompleks && input.jawaban_kompleks.length > 0) {
+      return JSON.stringify(input.jawaban_kompleks);
+    }
+    if (input.jawaban_teks !== undefined && input.jawaban_teks !== null) {
+      return JSON.stringify([input.jawaban_teks]);
+    }
+    if (input.jawaban_menjodohkan && Object.keys(input.jawaban_menjodohkan).length > 0) {
+      return JSON.stringify(input.jawaban_menjodohkan);
+    }
+    return null;
+  }
+
+  /**
+   * Batch Autosave Pipeline untuk beban tinggi (D1 / SQLite single-writer):
+   * - 1x SELECT validasi attempt (ownership, single-device token, status, deadline)
+   * - Deduplikasi item per soal_id (mengambil state terbaru)
+   * - 1x array batch $transaction untuk seluruh upsert (didukung native sebagai 1 RPC batch di D1)
+   */
+  async saveAnswersBatchOptimized(input: {
+    sesi_ujian_id: string;
+    siswa_id: string;
+    session_token?: string | null;
+    items: Array<{
+      soal_id: string;
+      versi_soal_id?: string | null;
+      jawaban_pilihan?: string | null;
+      jawaban_teks?: string | null;
+      jawaban_kompleks?: string[] | null;
+      jawaban_menjodohkan?: Record<string, string> | null;
+      ragu_ragu?: boolean;
+    }>;
+  }): Promise<{ savedCount: number; waktu_simpan: string }> {
+    // Deduplikasi item berdasarkan soal_id (item terakhir menang)
+    const dedupedMap = new Map<string, (typeof input.items)[number]>();
+    for (const item of input.items) {
+      dedupedMap.set(item.soal_id, item);
+    }
+    const dedupedItems = Array.from(dedupedMap.values());
+
+    return cbtWriteQueue.enqueueBatchAutosave(
+      input.sesi_ujian_id,
+      dedupedItems.length,
+      async () => {
+        const attempt = await prisma.sesiUjianSiswa.findUnique({
+          where: { id: input.sesi_ujian_id },
+          select: {
+            id: true,
+            sekolah_id: true,
+            siswa_id: true,
+            status: true,
+            batas_waktu_server: true,
+            token_sesi_aktif: true,
+          },
+        });
+
+        if (!attempt) {
+          throw new CbtNotFoundError("Sesi Ujian", input.sesi_ujian_id);
+        }
+
+        if (attempt.siswa_id !== input.siswa_id) {
+          throw new CbtAttemptClosedError("Akses ditolak: Anda tidak berhak mengubah sesi ini.");
+        }
+
+        if (
+          attempt.token_sesi_aktif &&
+          input.session_token &&
+          attempt.token_sesi_aktif !== input.session_token
+        ) {
+          throw new CbtSessionInvalidatedError(
+            "Sesi ujian Anda telah dibuka di perangkat lain. Halaman ini telah dinonaktifkan."
+          );
+        }
+
+        if (attempt.status !== "SEDANG_MENGERJAKAN") {
+          throw new CbtAttemptClosedError("Sesi ujian sudah dikumpulkan atau terkunci.");
+        }
+
+        const now = new Date();
+        if (now.getTime() > attempt.batas_waktu_server.getTime()) {
+          await this.submitAttempt(attempt.id, "Batas waktu pengerjaan habis");
+          throw new CbtTimerExpiredError();
+        }
+
+        const operations = dedupedItems.map((item) => {
+          const serializedJawaban = this.serializeJawabanPayload(item);
+          const answerId = generateUlid();
+
+          return prisma.jawabanSiswa.upsert({
+            where: {
+              sesi_ujian_id_soal_id: {
+                sesi_ujian_id: input.sesi_ujian_id,
+                soal_id: item.soal_id,
+              },
+            },
+            update: {
+              versi_soal_id: item.versi_soal_id || undefined,
+              jawaban_peserta: serializedJawaban,
+              ragu_ragu: item.ragu_ragu !== undefined ? item.ragu_ragu : false,
+              waktu_simpan: now,
+            },
+            create: {
+              id: answerId,
+              sekolah_id: attempt.sekolah_id,
+              sesi_ujian_id: input.sesi_ujian_id,
+              soal_id: item.soal_id,
+              versi_soal_id: item.versi_soal_id || item.soal_id,
+              jawaban_peserta: serializedJawaban,
+              ragu_ragu: item.ragu_ragu || false,
+              waktu_simpan: now,
+            },
+          });
+        });
+
+        await prisma.$transaction(operations);
+
+        return {
+          savedCount: dedupedItems.length,
+          waktu_simpan: now.toISOString(),
+        };
+      }
+    );
   }
 
   // ============================================================================

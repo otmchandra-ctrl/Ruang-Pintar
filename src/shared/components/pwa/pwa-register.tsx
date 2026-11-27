@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, useRef } from "react";
-import { Download, Wifi, WifiOff, X, Share, Smartphone } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore, useRef, useCallback } from "react";
+import { Download, Wifi, WifiOff, X, Share, Smartphone, RefreshCw } from "lucide-react";
+import { listOfflineMutations, OFFLINE_QUEUE_CHANGED_EVENT } from "@/shared/lib/offline-sync-queue";
+import { syncOfflineMutations } from "@/shared/lib/offline-sync-runner";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -46,38 +48,112 @@ export function PwaRegister() {
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [isInAppBrowser, setIsInAppBrowser] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [isSyncingQueue, setIsSyncingQueue] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
 
   const prevOnlineRef = useRef(isOnline);
 
-  useEffect(() => {
-    // Check if app is already running in installed standalone mode
-    if (typeof window !== "undefined") {
-      const isStandalone =
-        (typeof window.matchMedia === "function" &&
-          window.matchMedia("(display-mode: standalone)").matches) ||
-        (navigator as any).standalone === true;
-      if (isStandalone) {
-        setIsInstalled(true);
+  const runOfflineSync = useCallback(async () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    queueMicrotask(() => setIsSyncingQueue(true));
+    try {
+      const result = await syncOfflineMutations();
+      const items = await listOfflineMutations();
+      setPendingSyncCount(items.length);
+      if (result.syncedCount > 0) {
+        setSyncSuccessMsg(`${result.syncedCount} data offline berhasil disinkronkan.`);
+        setTimeout(() => setSyncSuccessMsg(null), 4000);
       }
-
-      const ua = navigator.userAgent || "";
-      const isIosDevice = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
-      setIsIos(isIosDevice);
-
-      const inApp = /WhatsApp|FBAN|FBAV|Instagram|Line|Telegram/i.test(ua);
-      setIsInAppBrowser(inApp);
+    } finally {
+      setIsSyncingQueue(false);
     }
   }, []);
 
   useEffect(() => {
-    // If transitioning from offline -> online, show brief toast
-    if (!prevOnlineRef.current && isOnline) {
-      setShowBackOnline(true);
-      const timer = setTimeout(() => setShowBackOnline(false), 3500);
-      return () => clearTimeout(timer);
+    // Check if app is already running in installed standalone mode
+    if (typeof window !== "undefined") {
+      queueMicrotask(() => {
+        const isStandalone =
+          (typeof window.matchMedia === "function" &&
+            window.matchMedia("(display-mode: standalone)").matches) ||
+          (navigator as any).standalone === true;
+        if (isStandalone) {
+          setIsInstalled(true);
+        }
+
+        const ua = navigator.userAgent || "";
+        const isIosDevice = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+        setIsIos(isIosDevice);
+
+        const inApp = /WhatsApp|FBAN|FBAV|Instagram|Line|Telegram/i.test(ua);
+        setIsInAppBrowser(inApp);
+      });
     }
-    prevOnlineRef.current = isOnline;
-  }, [isOnline]);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncCount = () => {
+      listOfflineMutations()
+        .then((items) => {
+          if (!isMounted) return;
+          setPendingSyncCount(items.length);
+          if (items.length > 0 && isOnline) {
+            void runOfflineSync();
+          }
+        })
+        .catch(() => {});
+    };
+
+    syncCount();
+
+    const handleQueueChanged = () => {
+      listOfflineMutations()
+        .then((items) => {
+          if (isMounted) setPendingSyncCount(items.length);
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
+    return () => {
+      isMounted = false;
+      window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
+    };
+  }, [runOfflineSync, isOnline]);
+
+  useEffect(() => {
+    let backOnlineTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleOffline = () => {
+      prevOnlineRef.current = false;
+      setShowBackOnline(false);
+      if (backOnlineTimer) {
+        clearTimeout(backOnlineTimer);
+        backOnlineTimer = null;
+      }
+    };
+
+    const handleOnline = () => {
+      if (!prevOnlineRef.current) {
+        setShowBackOnline(true);
+        void runOfflineSync();
+        if (backOnlineTimer) clearTimeout(backOnlineTimer);
+        backOnlineTimer = setTimeout(() => setShowBackOnline(false), 3500);
+      }
+      prevOnlineRef.current = true;
+    };
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+      if (backOnlineTimer) clearTimeout(backOnlineTimer);
+    };
+  }, [runOfflineSync]);
 
   useEffect(() => {
     // 1. Service Worker: Hanya didaftarkan di production/test, dilarang di development lokal
@@ -176,6 +252,48 @@ export function PwaRegister() {
         </aside>
       )}
 
+      {/* 2b. Offline Sync Queue Status / Success Toast */}
+      {syncSuccessMsg && (
+        <aside
+          role="status"
+          aria-live="polite"
+          aria-label="Status sinkronisasi offline"
+          className="fixed bottom-16 left-4 z-50 flex items-center gap-2 rounded-full border border-cyan-500/40 bg-slate-900/95 px-4 py-2 text-xs font-medium text-cyan-200 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-300"
+        >
+          <RefreshCw className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
+          <span>{syncSuccessMsg}</span>
+        </aside>
+      )}
+
+      {pendingSyncCount > 0 && (
+        <aside
+          role="status"
+          aria-live="polite"
+          aria-label="Antrean sinkronisasi offline"
+          className="fixed bottom-16 left-4 z-50 flex items-center gap-2.5 rounded-full border border-amber-500/40 bg-slate-900/95 px-3.5 py-2 text-xs font-medium text-amber-200 shadow-xl backdrop-blur-md"
+        >
+          <RefreshCw
+            className={`h-3.5 w-3.5 shrink-0 text-amber-400 ${isSyncingQueue ? "animate-spin" : ""}`}
+          />
+          <span>
+            {isSyncingQueue
+              ? `Menyinkronkan ${pendingSyncCount} data...`
+              : isOffline
+                ? `${pendingSyncCount} data tersimpan offline`
+                : `${pendingSyncCount} data menunggu sinkronisasi`}
+          </span>
+          {!isOffline && !isSyncingQueue && (
+            <button
+              type="button"
+              onClick={runOfflineSync}
+              className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30 transition-colors cursor-pointer"
+            >
+              Sinkronkan
+            </button>
+          )}
+        </aside>
+      )}
+
       {/* 3. In-App Browser Warning (WhatsApp / Social Media Webview) */}
       {isInAppBrowser && !isBannerDismissed && (
         <aside
@@ -190,7 +308,8 @@ export function PwaRegister() {
           <div className="min-w-0 flex-1">
             <h2 className="text-xs font-semibold text-white">Buka di Browser Asli</h2>
             <p className="line-clamp-2 text-[11px] text-slate-400">
-              Ketuk menu ⋮ lalu pilih &quot;Buka di Chrome/Safari&quot; agar dapat memasang aplikasi ke HP Anda.
+              Ketuk menu ⋮ lalu pilih &quot;Buka di Chrome/Safari&quot; agar dapat memasang aplikasi
+              ke HP Anda.
             </p>
           </div>
 
@@ -219,7 +338,8 @@ export function PwaRegister() {
           <div className="min-w-0 flex-1">
             <h2 className="text-xs font-semibold text-white">Pasang di iPhone / iPad</h2>
             <p className="line-clamp-2 text-[11px] text-slate-400">
-              Ketuk tombol <strong>Bagikan (Share)</strong> di Safari, lalu pilih <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>.
+              Ketuk tombol <strong>Bagikan (Share)</strong> di Safari, lalu pilih{" "}
+              <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>.
             </p>
           </div>
 

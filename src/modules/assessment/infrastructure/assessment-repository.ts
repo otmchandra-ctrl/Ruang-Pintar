@@ -11,6 +11,7 @@ import {
   GradebookColumnDTO,
   GradebookStudentRowDTO,
   AssessmentCategory,
+  isFormatifAssessmentCategory,
   AssessmentTechnique,
   AssessmentStatus,
   GradeStatus,
@@ -524,7 +525,7 @@ export class AssessmentRepository {
             studentPassedCount++;
           }
 
-          if (col.kategori === "FORMATIF") {
+          if (isFormatifAssessmentCategory(col.kategori)) {
             totalFormatif += nilaiAngka;
             countFormatif++;
           } else {
@@ -588,8 +589,8 @@ export class AssessmentRepository {
       statistics: {
         total_siswa: rows.length,
         total_asesmen: columns.length,
-        total_formatif: columns.filter((c) => c.kategori === "FORMATIF").length,
-        total_sumatif: columns.filter((c) => c.kategori !== "FORMATIF").length,
+        total_formatif: columns.filter((c) => isFormatifAssessmentCategory(c.kategori)).length,
+        total_sumatif: columns.filter((c) => !isFormatifAssessmentCategory(c.kategori)).length,
         rata_rata_kelas: rataRataKelas,
         persentase_tuntas_kktp: tuntasPercent,
       },
@@ -654,8 +655,12 @@ export class AssessmentRepository {
       const totalSiswa = p.rombel._count.penempatan_rombel;
 
       const totalAsesmen = p.definisi_asesmen.length;
-      const totalFormatif = p.definisi_asesmen.filter((a) => a.kategori === "FORMATIF").length;
-      const totalSumatif = p.definisi_asesmen.filter((a) => a.kategori !== "FORMATIF").length;
+      const totalFormatif = p.definisi_asesmen.filter((a) =>
+        isFormatifAssessmentCategory(a.kategori)
+      ).length;
+      const totalSumatif = p.definisi_asesmen.filter(
+        (a) => !isFormatifAssessmentCategory(a.kategori)
+      ).length;
       const totalPublished = p.definisi_asesmen.filter((a) => a.status === "PUBLISHED").length;
 
       const allGrades = p.definisi_asesmen.flatMap((a) =>

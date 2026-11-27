@@ -32,6 +32,15 @@ describe("CBT Rich Stimulus & Multi-Format Engine", () => {
       expect(elWithRtl).not.toBeNull();
       expect(container.textContent).toContain("ما هي عاصمة إندونيسيا؟");
     });
+
+    it("renders PHP dollar variables in prose and code blocks without mangling as KaTeX", () => {
+      const phpQuestion =
+        "Setelah objek $produk1 = new Produk(); dibuat, isi property $nama dan akses:\n```php\n$this->sisi = $s;\nreturn $this->sisi * $this->sisi;\n```";
+      const { container } = render(<MathRenderer content={phpQuestion} />);
+      expect(container.querySelector(".katex")).toBeNull();
+      expect(container.textContent).toContain("$produk1 = new Produk();");
+      expect(container.textContent).toContain("$this->sisi = $s;");
+    });
   });
 
   describe("AudioStimulusPlayer", () => {

@@ -36,6 +36,7 @@ import {
   DefinisiAsesmenDTO,
   ClassGradebookDTO,
   AssessmentCategory,
+  isFormatifAssessmentCategory,
 } from "../domain/assessment-types";
 import { ClassAttendanceRecapDTO } from "@/modules/attendance/domain/attendance-types";
 import { CreateAssessmentModal } from "./create-assessment-modal";
@@ -117,8 +118,8 @@ export function ClassAssessmentTabView({
 
   // KPI Statistics
   const totalAsesmen = assessments.length;
-  const totalFormatif = assessments.filter((a) => a.kategori === "FORMATIF").length;
-  const totalSumatif = assessments.filter((a) => a.kategori !== "FORMATIF").length;
+  const totalFormatif = assessments.filter((a) => isFormatifAssessmentCategory(a.kategori)).length;
+  const totalSumatif = assessments.filter((a) => !isFormatifAssessmentCategory(a.kategori)).length;
   const rataRataKelas = gradebook.statistics.rata_rata_kelas ?? "-";
   const tuntasKktpPersen = gradebook.statistics.persentase_tuntas_kktp ?? "-";
 

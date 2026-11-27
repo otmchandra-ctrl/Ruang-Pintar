@@ -45,6 +45,7 @@ import { toggleSchoolActiveStatusAction } from "@/app/actions/school-actions";
 import type {
   PlatformTenantOwnerSummary,
   PlatformUserAccountItem,
+  PlatformActivityAnalyticsData,
 } from "@/modules/school/application/platform-control-service";
 import {
   ResetPlatformPasswordModal,
@@ -54,6 +55,7 @@ import {
   DeleteFreemiumTenantTarget,
 } from "./platform-control-modals";
 import { PlatformUsersDirectoryPanel } from "./platform-users-directory-panel";
+import { PlatformActivityAnalyticsSection } from "./platform-activity-analytics-section";
 
 export interface SchoolTenantItem {
   id: string;
@@ -94,6 +96,7 @@ export interface SchoolTenantItem {
 interface SuperAdminSchoolDirectoryViewProps {
   schools: SchoolTenantItem[];
   platformUsers?: PlatformUserAccountItem[];
+  analytics?: PlatformActivityAnalyticsData;
   currentUser?: {
     id: string;
     nama_lengkap: string;
@@ -105,6 +108,7 @@ interface SuperAdminSchoolDirectoryViewProps {
 export function SuperAdminSchoolDirectoryView({
   schools,
   platformUsers = [],
+  analytics,
   currentUser,
 }: SuperAdminSchoolDirectoryViewProps) {
   const router = useRouter();
@@ -1009,6 +1013,11 @@ export function SuperAdminSchoolDirectoryView({
           </div>
         </div>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          4B. GRAFIK AKTIVITAS KBM HARIAN & LEARNER ENGAGEMENT
+      ───────────────────────────────────────────────────────────── */}
+      {analytics && <PlatformActivityAnalyticsSection analytics={analytics} />}
 
       {/* ─────────────────────────────────────────────────────────────
           5. SEGMENTED TAB SWITCHER: TENANT VS PENGGUNA PLATFORM

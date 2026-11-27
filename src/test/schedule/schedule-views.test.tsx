@@ -131,57 +131,64 @@ describe("Phase 10 Presentation Views", () => {
     });
 
     it("merges 2 consecutive periods of same subject and class into 1 unified schedule card", () => {
-      const mockConsecutiveEntries: any[] = [
-        {
-          id: "SCH_01",
-          penugasan_mengajar_id: "TCH_01",
-          rombel_id: "ROM_01",
-          rombel_nama: "X DKV 1",
-          mata_pelajaran_id: "MP_01",
-          mata_pelajaran_nama: "Koding dan Kecerdasan Artifisial",
-          guru_id: "GURU_01",
-          guru_nama: "Budi Santoso",
-          tahun_ajaran_id: "TA_01",
-          slot_waktu_nama: "Jam ke-1",
-          slot_waktu_jam_mulai: "06:30",
-          slot_waktu_jam_selesai: "07:10",
-          slot_waktu_urutan: 1,
-          hari: "JUMAT",
-        },
-        {
-          id: "SCH_02",
-          penugasan_mengajar_id: "TCH_01",
-          rombel_id: "ROM_01",
-          rombel_nama: "X DKV 1",
-          mata_pelajaran_id: "MP_01",
-          mata_pelajaran_nama: "Koding dan Kecerdasan Artifisial",
-          guru_id: "GURU_01",
-          guru_nama: "Budi Santoso",
-          tahun_ajaran_id: "TA_01",
-          slot_waktu_nama: "Jam ke-2",
-          slot_waktu_jam_mulai: "07:10",
-          slot_waktu_jam_selesai: "07:50",
-          slot_waktu_urutan: 2,
-          hari: "JUMAT",
-        },
-      ];
+      // Pin tanggal ke hari Senin agar entri JUMAT tidak ikut terduplikasi di Spotlight Hari Ini
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-23T08:00:00+07:00"));
+      try {
+        const mockConsecutiveEntries: any[] = [
+          {
+            id: "SCH_01",
+            penugasan_mengajar_id: "TCH_01",
+            rombel_id: "ROM_01",
+            rombel_nama: "X DKV 1",
+            mata_pelajaran_id: "MP_01",
+            mata_pelajaran_nama: "Koding dan Kecerdasan Artifisial",
+            guru_id: "GURU_01",
+            guru_nama: "Budi Santoso",
+            tahun_ajaran_id: "TA_01",
+            slot_waktu_nama: "Jam ke-1",
+            slot_waktu_jam_mulai: "06:30",
+            slot_waktu_jam_selesai: "07:10",
+            slot_waktu_urutan: 1,
+            hari: "JUMAT",
+          },
+          {
+            id: "SCH_02",
+            penugasan_mengajar_id: "TCH_01",
+            rombel_id: "ROM_01",
+            rombel_nama: "X DKV 1",
+            mata_pelajaran_id: "MP_01",
+            mata_pelajaran_nama: "Koding dan Kecerdasan Artifisial",
+            guru_id: "GURU_01",
+            guru_nama: "Budi Santoso",
+            tahun_ajaran_id: "TA_01",
+            slot_waktu_nama: "Jam ke-2",
+            slot_waktu_jam_mulai: "07:10",
+            slot_waktu_jam_selesai: "07:50",
+            slot_waktu_urutan: 2,
+            hari: "JUMAT",
+          },
+        ];
 
-      render(
-        <MyScheduleView
-          entries={mockConsecutiveEntries}
-          teacherName="Budi Santoso"
-          isTeacher={true}
-        />
-      );
+        render(
+          <MyScheduleView
+            entries={mockConsecutiveEntries}
+            teacherName="Budi Santoso"
+            isTeacher={true}
+          />
+        );
 
-      // Verify only 1 card is rendered instead of 2 duplicate cards
-      expect(screen.getAllByText("Koding dan Kecerdasan Artifisial")).toHaveLength(1);
-      // Verify unified time range
-      expect(screen.getByText("06:30 - 07:50")).toBeInTheDocument();
-      // Verify badge JP label
-      expect(screen.getByText(/2 JP \(Jam ke-1 – 2\)/i)).toBeInTheDocument();
-      // Verify rombel
-      expect(screen.getByText("X DKV 1")).toBeInTheDocument();
+        // Verify only 1 card is rendered instead of 2 duplicate cards
+        expect(screen.getAllByText("Koding dan Kecerdasan Artifisial")).toHaveLength(1);
+        // Verify unified time range
+        expect(screen.getByText("06:30 - 07:50")).toBeInTheDocument();
+        // Verify badge JP label
+        expect(screen.getByText(/2 JP \(Jam ke-1 – 2\)/i)).toBeInTheDocument();
+        // Verify rombel
+        expect(screen.getByText("X DKV 1")).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

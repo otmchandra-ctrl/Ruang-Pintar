@@ -28,6 +28,8 @@ import {
   CreateVersiSoalSchema,
   CreateUjianCbtSchema,
   AutosaveJawabanSchema,
+  BatchAutosaveJawabanSchema,
+  BatchAutosaveJawabanInput,
   RecordIntegrityEventSchema,
   TransferToGradebookSchema,
 } from "../domain/cbt-validation";
@@ -726,6 +728,43 @@ export class CbtService {
 
     await this.repo.saveJawaban(input);
     return { savedAt: new Date(), saved: true };
+  }
+
+  /**
+   * Batch autosave beberapa jawaban sekaligus dalam 1 transaksi atomik (menghemat I/O D1 & SQLite)
+   */
+  async autosaveAnswersBatch(
+    rawInput: unknown,
+    _sekolahId: string,
+    siswaId: string
+  ): Promise<{ savedAt: Date; savedCount: number }> {
+    const parsed = BatchAutosaveJawabanSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      throw new CbtValidationError(
+        `Validasi batch autosave gagal: ${parsed.error.issues.map((i) => i.message).join(", ")}`
+      );
+    }
+
+    const input: BatchAutosaveJawabanInput = parsed.data;
+    const result = await this.repo.saveAnswersBatchOptimized({
+      sesi_ujian_id: input.sesi_ujian_siswa_id,
+      siswa_id: siswaId,
+      session_token: input.session_token,
+      items: input.items.map((item) => ({
+        soal_id: item.soal_id,
+        versi_soal_id: item.versi_soal_id,
+        jawaban_pilihan: item.jawaban_pilihan,
+        jawaban_teks: item.jawaban_teks,
+        jawaban_kompleks: item.jawaban_kompleks,
+        jawaban_menjodohkan: item.jawaban_menjodohkan,
+        ragu_ragu: item.ragu_ragu,
+      })),
+    });
+
+    return {
+      savedAt: new Date(result.waktu_simpan),
+      savedCount: result.savedCount,
+    };
   }
 
   /**

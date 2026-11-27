@@ -191,9 +191,13 @@ describe("MateriHubView (Chapter-Centric Workspace)", () => {
       />
     );
 
-    // Bab headers
-    expect(screen.getByText("Pengenalan Dasar HTML & CSS")).toBeInTheDocument();
-    expect(screen.getByText("Dasar JavaScript & Interaktivitas")).toBeInTheDocument();
+    // Bab headers (muncul di sidebar outline dan heading panel kanan)
+    expect(
+      screen.getByRole("heading", { name: "Pengenalan Dasar HTML & CSS" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Dasar JavaScript & Interaktivitas" })
+    ).toBeInTheDocument();
 
     // TP
     expect(screen.getByText("TP 1.1")).toBeInTheDocument();
@@ -247,5 +251,30 @@ describe("MateriHubView (Chapter-Centric Workspace)", () => {
     expect(screen.getByText("Dokumentasi MDN Web Docs")).toBeInTheDocument();
     expect(screen.queryByText("Panduan Modul HTML5 Semantik")).not.toBeInTheDocument();
     expect(screen.queryByText("Catatan JavaScript Dasar (Draf)")).not.toBeInTheDocument();
+  });
+
+  it("switches active chapter from sidebar and toggles list/grid view", () => {
+    render(
+      <MateriHubView
+        classes={mockClasses}
+        selectedPenugasanId="PEN_01"
+        workspace={mockWorkspace}
+        canManage={true}
+        teacherName="Budi Santoso, M.Kom."
+        isAdmin={false}
+      />
+    );
+
+    // Klik Bab 2 pada sidebar
+    const bab2SidebarBtn = screen.getByRole("button", { name: /BAB 2\s+Dasar JavaScript/i });
+    fireEvent.click(bab2SidebarBtn);
+
+    expect(screen.getByText("Catatan JavaScript Dasar (Draf)")).toBeInTheDocument();
+    expect(screen.queryByText("Panduan Modul HTML5 Semantik")).not.toBeInTheDocument();
+
+    // Toggle ke tampilan Kartu (Grid)
+    const gridBtn = screen.getByRole("button", { name: /Kartu/i });
+    fireEvent.click(gridBtn);
+    expect(screen.getByText("Catatan JavaScript Dasar (Draf)")).toBeInTheDocument();
   });
 });

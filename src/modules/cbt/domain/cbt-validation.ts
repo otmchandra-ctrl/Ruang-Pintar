@@ -88,6 +88,19 @@ export const AutosaveJawabanSchema = z.object({
   ragu_ragu: z.boolean().optional(),
 });
 
+export const BatchAutosaveJawabanSchema = z.object({
+  sesi_ujian_siswa_id: z.string().min(1),
+  session_token: z.string().optional().nullable(),
+  items: z
+    .array(
+      AutosaveJawabanSchema.extend({
+        soal_id: z.string().min(1),
+      })
+    )
+    .min(1)
+    .max(100),
+});
+
 export const RecordIntegrityEventSchema = z.object({
   sesi_ujian_siswa_id: z.string().min(1),
   nomor_urut_soal: z.number().int().optional().nullable(),
@@ -193,6 +206,7 @@ export type CreateBankSoalOutput = z.output<typeof CreateBankSoalSchema>;
 export type CreateVersiSoalInput = z.infer<typeof CreateVersiSoalSchema>;
 export type CreateUjianCbtInput = z.infer<typeof CreateUjianCbtSchema>;
 export type AutosaveJawabanInput = z.infer<typeof AutosaveJawabanSchema>;
+export type BatchAutosaveJawabanInput = z.infer<typeof BatchAutosaveJawabanSchema>;
 export type RecordIntegrityEventInput = z.infer<typeof RecordIntegrityEventSchema>;
 export type TransferToGradebookInput = z.infer<typeof TransferToGradebookSchema>;
 export type TransitionPublicationStatusInput = z.infer<typeof TransitionPublicationStatusSchema>;

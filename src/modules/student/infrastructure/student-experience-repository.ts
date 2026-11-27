@@ -15,6 +15,7 @@
 import { prisma } from "@/shared/infrastructure/database/prisma";
 import { generateUlid } from "@/shared/lib/ulid";
 import { getHariBelajarInTimezone } from "@/shared/lib/date-utils";
+import { isFormatifAssessmentCategory } from "@/modules/assessment/domain/assessment-types";
 import {
   StudentProfileContext,
   StudentTodayScheduleItem,
@@ -801,7 +802,7 @@ export class StudentExperienceRepository {
       const mapelGrades = subjectMap.get(mapelName) || [];
 
       const formatifGrades = mapelGrades.filter(
-        (g) => g.kategori === "FORMATIF" && g.nilaiAngka !== null
+        (g) => isFormatifAssessmentCategory(g.kategori) && g.nilaiAngka !== null
       );
       const sumatifGrades = mapelGrades.filter(
         (g) => (g.kategori === "SUMATIF" || g.kategori === "SUMATIF_AKHIR") && g.nilaiAngka !== null

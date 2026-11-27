@@ -2,41 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  GraduationCap,
-  Users,
-  Building2,
-  Calendar,
-  School,
-  Activity,
-  ArrowRight,
-  TrendingUp,
-  Eye,
-  Sparkles,
-  CheckCircle2,
-  ShieldCheck,
-  Server,
-  Clock,
-  Layers,
-  HardDrive,
-  FileCheck,
-  AlertTriangle,
-  ChevronRight,
-  ChevronLeft,
-  ExternalLink,
-  Laptop,
-  Smartphone,
-  Tablet,
-  X,
-  CreditCard,
-  Plus,
-  BarChart3,
-  Flame,
-  Info,
-} from "lucide-react";
-import { SystemStatusIndicator } from "@/shared/components/dashboard/system-status-indicator";
-import { ConcentricRingGauge } from "@/shared/components/motion/concentric-ring-gauge";
+import { useRouter } from "next/navigation";
+import { ChevronRight, ChevronLeft, X, LogIn, LogOut, Loader2, ArrowUpRight } from "lucide-react";
 import { AnimatedCounter } from "@/shared/components/motion/animated-counter";
+import { switchActiveTenantAction, clearActiveTenantAction } from "@/app/actions/tenant-actions";
 
 export interface SuperAdminDashboardViewProps {
   user: {
@@ -44,12 +13,18 @@ export interface SuperAdminDashboardViewProps {
     peran_dasar: string;
     username: string;
   };
+  activeTenant?: {
+    id: string;
+    nama: string;
+  } | null;
   stats: {
     totalSiswa: number;
     totalGuru: number;
     totalSekolah: number;
     totalSekolahFreemium: number;
     totalSekolahInstitusi: number;
+    totalSekolahSuspended: number;
+    expiringTrialsCount: number;
     totalRombel: number;
     totalSesiAktual: number;
     totalMataPelajaran: number;
@@ -57,12 +32,10 @@ export interface SuperAdminDashboardViewProps {
   };
   telemetry: {
     concurrencyActive: number;
-    peakEstimate: number;
     cbtTotal: number;
     cbtActive: number;
     cbtRunningSessions: number;
     cbtCompletedSessions: number;
-    p95LatencyMs: number;
     storageFilesCount: number;
     storageTotalMb: number;
     aiRequestsCount: number;
@@ -93,6 +66,7 @@ export interface SuperAdminDashboardViewProps {
     npsn: string | null;
     jenjang: string;
     tipe_lisensi: string;
+    trialDaysLeft: number | null;
     statusAktif: boolean;
     rombelCount: number;
     siswaCount: number;
@@ -143,64 +117,69 @@ export interface SuperAdminDashboardViewProps {
   };
 }
 
+function formatCompactRupiah(amount: number): string {
+  if (amount >= 1_000_000_000) {
+    return `Rp ${(amount / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (amount >= 1_000_000) {
+    return `Rp ${(amount / 1_000_000).toFixed(1).replace(/\.0$/, "")}Jt`;
+  }
+  if (amount >= 1_000) {
+    return `Rp ${Math.round(amount / 1_000)}Rb`;
+  }
+  return `Rp ${amount.toLocaleString("id-ID")}`;
+}
+
 export function SuperAdminDashboardView({
-  user: _user,
+  user,
+  activeTenant = null,
   stats,
   telemetry,
   attendance,
-  rombelList,
   sekolahList,
-  guruList: _guruList,
   auditLogs,
-  deviceStats: _deviceStats,
   activityDays,
 }: SuperAdminDashboardViewProps) {
-  // Live Server Clock
-  const [clockWib, setClockWib] = React.useState<string>("");
+  const router = useRouter();
+  const [switchingSchoolId, setSwitchingSchoolId] = React.useState<string | null>(null);
+  const [isClearingTenant, setIsClearingTenant] = React.useState(false);
+  const [tenantActionError, setTenantActionError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    const update = () => {
-      const now = new Date();
-      setClockWib(
-        now.toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }) + " WIB"
-      );
-    };
-    update();
-
-    if (process.env.NODE_ENV === "test") {
-      return;
+  const handleEnterTenant = async (schoolId: string) => {
+    setSwitchingSchoolId(schoolId);
+    setTenantActionError(null);
+    try {
+      const res = await switchActiveTenantAction(schoolId);
+      if (!res.success) {
+        setTenantActionError(res.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setTenantActionError("Gagal masuk ke konteks sekolah tersebut.");
+    } finally {
+      setSwitchingSchoolId(null);
     }
+  };
 
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const handleExitTenant = async () => {
+    setIsClearingTenant(true);
+    setTenantActionError(null);
+    try {
+      const res = await clearActiveTenantAction();
+      if (!res.success) {
+        setTenantActionError(res.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setTenantActionError("Gagal keluar kembali ke Mode Platform.");
+    } finally {
+      setIsClearingTenant(false);
+    }
+  };
 
-  // Cursor Spotlight Animation State
-  const [mousePos, setMousePos] = React.useState({ x: -1000, y: -1000 });
-  const [isHovering, setIsHovering] = React.useState(false);
-
-  const handleMouseMove = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMousePos({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
-  }, []);
-
-  // Pagination for Performa Rombongan Belajar (5 items per page)
-  const [rombelPage, setRombelPage] = React.useState(1);
-  const ROMBEL_PAGE_SIZE = 5;
-  const totalRombelPages = Math.max(1, Math.ceil(rombelList.length / ROMBEL_PAGE_SIZE));
-  const paginatedRombel = React.useMemo(() => {
-    const start = (rombelPage - 1) * ROMBEL_PAGE_SIZE;
-    return rombelList.slice(start, start + ROMBEL_PAGE_SIZE);
-  }, [rombelList, rombelPage]);
-
-  // Filter & Pagination for Audit Trail (5 items per page)
+  // Audit Log Filter & Pagination
   const [auditFilterAksi, setAuditFilterAksi] = React.useState<string>("ALL");
   const [auditPage, setAuditPage] = React.useState(1);
   const AUDIT_PAGE_SIZE = 5;
@@ -216,1078 +195,597 @@ export function SuperAdminDashboardView({
     return filteredAuditLogs.slice(start, start + AUDIT_PAGE_SIZE);
   }, [filteredAuditLogs, auditPage]);
 
-  // Selected Log for Activity Detail Modal
+  // Modal detail audit log
   const [selectedLog, setSelectedLog] = React.useState<(typeof auditLogs)[0] | null>(null);
-  const [isClosingModal, setIsClosingModal] = React.useState(false);
 
-  const handleOpenLogModal = React.useCallback((log: (typeof auditLogs)[0]) => {
-    setSelectedLog(log);
-    setIsClosingModal(false);
-  }, []);
-
-  const handleCloseLogModal = React.useCallback(() => {
-    setIsClosingModal(true);
-    setTimeout(() => {
-      setSelectedLog(null);
-      setIsClosingModal(false);
-    }, 200);
-  }, []);
-
-  // Close on Escape key
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && selectedLog) {
-        handleCloseLogModal();
+        setSelectedLog(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedLog, handleCloseLogModal]);
+  }, [selectedLog]);
 
-  // Interactive Day Hover for Ringkasan Aktivitas Pembelajaran
-  const [hoveredDay, setHoveredDay] = React.useState<number | null>(null);
-
-  // Sebaran Hari Riil KBM Berdasarkan Data Sesi Database (Senin s/d Sabtu)
+  // Sebaran Hari KBM (Senin - Sabtu)
   const daysActivity = React.useMemo(() => {
     const dayKeys: Array<{ label: string; key: keyof NonNullable<typeof activityDays> }> = [
-      { label: "Senin", key: "SENIN" },
-      { label: "Selasa", key: "SELASA" },
-      { label: "Rabu", key: "RABU" },
-      { label: "Kamis", key: "KAMIS" },
-      { label: "Jumat", key: "JUMAT" },
-      { label: "Sabtu", key: "SABTU" },
+      { label: "Sen", key: "SENIN" },
+      { label: "Sel", key: "SELASA" },
+      { label: "Rab", key: "RABU" },
+      { label: "Kam", key: "KAMIS" },
+      { label: "Jum", key: "JUMAT" },
+      { label: "Sab", key: "SABTU" },
     ];
+    const items = dayKeys.map(({ label, key }) => ({
+      day: label,
+      count: activityDays?.[key] ?? 0,
+    }));
+    const maxCount = Math.max(...items.map((i) => i.count), 1);
+    return items.map((i) => ({
+      ...i,
+      heightPct: i.count > 0 ? Math.max(14, Math.round((i.count / maxCount) * 100)) : 6,
+    }));
+  }, [activityDays]);
 
-    return dayKeys.map(({ label, key }) => {
-      const count = activityDays?.[key] ?? 0;
-      return {
-        day: label,
-        count,
-        pct: stats.totalSesiAktual > 0 ? Math.round((count / stats.totalSesiAktual) * 100) : 0,
-      };
-    });
-  }, [activityDays, stats.totalSesiAktual]);
+  const attentionCount = stats.expiringTrialsCount + stats.totalSekolahSuspended;
 
-  // Kalkulasi Koordinat Matematis Murni (X & Y Dinamis sesuai Count)
-  const chartPoints = React.useMemo(() => {
-    const xCoords = [35, 120, 205, 295, 385, 465];
-    const maxVal = Math.max(...daysActivity.map((d) => d.count), 1);
-
-    return daysActivity.map((d, i) => {
-      // Dasar grafik pada y = 105 (0 sesi). Puncak grafik pada y = 25 (maksimal sesi).
-      const y = Math.round(105 - (d.count / maxVal) * 80);
-      return {
-        x: xCoords[i],
-        y,
-        day: d.day,
-        count: d.count,
-        pct: d.pct,
-      };
-    });
-  }, [daysActivity]);
-
-  // Konstruksi Path Garis & Area Kurva Berbasis Koordinat Riil
-  const { linePath, areaPath } = React.useMemo(() => {
-    if (chartPoints.length === 0) return { linePath: "", areaPath: "" };
-
-    let line = `M ${chartPoints[0].x} ${chartPoints[0].y}`;
-    for (let i = 1; i < chartPoints.length; i++) {
-      const prev = chartPoints[i - 1];
-      const curr = chartPoints[i];
-      const cp1x = prev.x + (curr.x - prev.x) / 2;
-      const cp1y = prev.y;
-      const cp2x = prev.x + (curr.x - prev.x) / 2;
-      const cp2y = curr.y;
-      line += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
+  const renderLicenseLabel = (school: SuperAdminDashboardViewProps["sekolahList"][number]) => {
+    if (school.tipe_lisensi === "SEKOLAH") {
+      return (
+        <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 whitespace-nowrap">
+          Lisensi Penuh
+        </span>
+      );
     }
-
-    const firstX = chartPoints[0].x;
-    const lastX = chartPoints[chartPoints.length - 1].x;
-    const area = `${line} L ${lastX} 115 L ${firstX} 115 Z`;
-
-    return { linePath: line, areaPath: area };
-  }, [chartPoints]);
-
-  // Deteksi Hari Teraktif Riil Berdasarkan Nilai Tertinggi
-  const peakDayInfo = React.useMemo(() => {
-    let max = -1;
-    let peakDays: string[] = [];
-    for (const d of daysActivity) {
-      if (d.count > max) {
-        max = d.count;
-        peakDays = [d.day];
-      } else if (d.count === max && max > 0) {
-        peakDays.push(d.day);
+    if (school.trialDaysLeft !== null) {
+      if (school.trialDaysLeft < 0) {
+        return (
+          <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+            Trial Kadaluarsa
+          </span>
+        );
       }
+      if (school.trialDaysLeft <= 7) {
+        return (
+          <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+            Trial • Sisa {school.trialDaysLeft}h
+          </span>
+        );
+      }
+      return (
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
+          Freemium • {school.trialDaysLeft}h
+        </span>
+      );
     }
-    if (max <= 0) return "Belum Ada Sesi";
-    return peakDays.join(" & ");
-  }, [daysActivity]);
+    return (
+      <span className="text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
+        Freemium
+      </span>
+    );
+  };
 
   return (
-    <div
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
-      className="relative space-y-6 sm:space-y-7 pb-20 font-lato overflow-hidden pt-2 sm:pt-1 scroll-smooth"
-    >
-      {/* ─────────────────────────────────────────────────────────────
-          CURSOR SPOTLIGHT INTERACTIVE ANIMATION (LUXURY SAAS GLOW)
-      ───────────────────────────────────────────────────────────── */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300 hidden md:block"
-        style={{
-          opacity: isHovering ? 1 : 0,
-          background: `radial-gradient(650px circle at ${mousePos.x}px ${mousePos.y}px, rgba(37, 99, 235, 0.07), transparent 75%)`,
-        }}
-      />
+    <div className="w-full">
+      <div className="space-y-4 sm:space-y-5 pb-10 w-full max-w-7xl mx-auto">
+        {tenantActionError && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+            {tenantActionError}
+          </div>
+        )}
 
-      {/* ─────────────────────────────────────────────────────────────
-          1. TOPBAR & DASHBOARD HEADER (Contract Match & Blue Gradient)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-in fade-in-50 duration-300">
-        <div>
-          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 dark:text-white font-lato">
-              Dashboard Super Admin
-            </h1>
-            {/* Year Badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-blue-700/15 border border-blue-500/30 text-xs font-bold text-blue-700 dark:text-blue-300 shadow-2xs whitespace-nowrap">
-              <Calendar className="size-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-              <span>Tahun Ajaran 2026/2027</span>
-            </div>
-          </div>
-          {/* Subtitle contract string */}
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 font-normal font-lato">
-            Pusat pemantauan ekosistem SaaS: adopsi sekolah, guru mandiri, dan operasional akademik.
-          </p>
-        </div>
+        <div className="pt-1.5 sm:pt-2.5 md:pt-4 grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 items-start">
+          {/* ─────────────────────────────────────────────────────────
+              LEFT WORKSPACE (8 Columns) — Mirip Teacher Dashboard
+          ───────────────────────────────────────────────────────── */}
+          <div className="xl:col-span-8 space-y-4 sm:space-y-5">
+            {/* 1. Calm Minimalist Hero */}
+            <section className="rounded-[28px] bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl border border-slate-200/80 dark:border-white/15 p-5 sm:p-6 shadow-[0_12px_36px_rgba(0,0,0,0.04)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.3)] space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50/90 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 text-xs font-mono font-bold border border-blue-100 dark:border-blue-900/60">
+                  {activeTenant
+                    ? `Mode Dukungan Sekolah • ${activeTenant.nama}`
+                    : "Platform Control • SaaS"}
+                </span>
+                <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
+                  {telemetry.concurrencyActive} sesi aktif saat ini
+                </span>
+              </div>
 
-        {/* Right Controls: Sidebar-style Gradient Blue Pills (Tanpa Hitam) */}
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-          {/* Concurrency Badge */}
-          <div className="px-4 py-2 rounded-2xl bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#1E40AF] text-white flex items-center gap-2 shadow-md shadow-blue-500/15 border border-blue-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5">
-            <Activity className="size-4 text-cyan-300 animate-pulse" />
-            <span className="text-xs font-mono font-bold text-cyan-200">
-              {telemetry.concurrencyActive} Live Sesi
-            </span>
-          </div>
-
-          {/* Clock */}
-          <div className="px-4 py-2 rounded-2xl bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#1E40AF] text-white flex items-center gap-2 shadow-md shadow-blue-500/15 border border-blue-400/40 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5">
-            <Clock className="size-4 text-blue-200" />
-            <span className="text-xs font-mono font-bold text-white tracking-wider">
-              {clockWib || "08.00.00 WIB"}
-            </span>
-          </div>
-
-          {/* Operational Status Indicator */}
-          <div className="p-1 rounded-2xl bg-white/90 dark:bg-slate-900/90 shadow-xs border border-blue-100 dark:border-slate-800 shrink-0">
-            <SystemStatusIndicator initialStatus="normal" />
-          </div>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          2. MISSION CONTROL EXECUTIVE TELEMETRY STRIP (Sidebar Gradient Blue)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="relative z-10 p-5 rounded-3xl bg-gradient-to-br from-[#1E3A8A] via-[#1D4ED8] to-[#1E40AF] text-white shadow-xl shadow-blue-900/20 border border-blue-400/30 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-hidden animate-in fade-in-50 slide-in-from-bottom-2 duration-400">
-        {/* Metric 1: MRR & Monetization */}
-        <div className="p-4 rounded-2xl bg-white/10 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-white/10 flex items-center gap-3.5 transition-all duration-300 hover:bg-white/15 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="size-11 rounded-2xl bg-emerald-400/20 text-emerald-300 flex items-center justify-center shrink-0 shadow-inner">
-            <CreditCard className="size-5.5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[11px] uppercase font-bold tracking-wider text-blue-200 block">
-              Estimasi MRR SaaS
-            </span>
-            <span className="text-lg font-black font-mono text-emerald-300 block truncate mt-0.5">
-              Rp {telemetry.estimatedMrr.toLocaleString("id-ID")}
-            </span>
-          </div>
-        </div>
-
-        {/* Metric 2: Live CBT Concurrency */}
-        <div className="p-4 rounded-2xl bg-white/10 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-white/10 flex items-center gap-3.5 transition-all duration-300 hover:bg-white/15 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="size-11 rounded-2xl bg-purple-400/20 text-purple-300 flex items-center justify-center shrink-0 shadow-inner">
-            <ShieldCheck className="size-5.5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[11px] uppercase font-bold tracking-wider text-blue-200 block">
-              Beban Ujian CBT Live
-            </span>
-            <span className="text-lg font-black font-mono text-purple-200 block truncate mt-0.5">
-              {telemetry.cbtRunningSessions} Sesi Berjalan
-            </span>
-          </div>
-        </div>
-
-        {/* Metric 3: Storage & Footprint */}
-        <div className="p-4 rounded-2xl bg-white/10 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-white/10 flex items-center gap-3.5 transition-all duration-300 hover:bg-white/15 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="size-11 rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0 shadow-inner">
-            <HardDrive className="size-5.5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[11px] uppercase font-bold tracking-wider text-blue-200 block">
-              Disk Storage & AI
-            </span>
-            <span className="text-lg font-black font-mono text-amber-200 block truncate mt-0.5">
-              {telemetry.storageTotalMb} MB ({telemetry.storageFilesCount} Berkas)
-            </span>
-          </div>
-        </div>
-
-        {/* Metric 4: Platform Health */}
-        <div className="p-4 rounded-2xl bg-white/10 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-white/10 flex items-center gap-3.5 transition-all duration-300 hover:bg-white/15 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="size-11 rounded-2xl bg-cyan-400/20 text-cyan-300 flex items-center justify-center shrink-0 shadow-inner">
-            <Server className="size-5.5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[11px] uppercase font-bold tracking-wider text-blue-200 block">
-              SLA & Latensi p95
-            </span>
-            <span className="text-lg font-black font-mono text-cyan-200 block truncate mt-0.5">
-              99.98% • {telemetry.p95LatencyMs}ms p95
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          3. AKSI CEPAT SUPER ADMIN TOOLBAR (Contract Match)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border border-blue-100 dark:border-slate-800 shadow-sm animate-in fade-in-50 duration-400">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider mr-1 font-lato">
-            Aksi Cepat Super Admin
-          </span>
-          <Link
-            href="/sekolah"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] hover:from-blue-700 hover:to-blue-800 text-white text-xs font-bold shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md shrink-0"
-          >
-            <Plus className="size-3.5" />
-            <span>Daftarkan Sekolah Baru</span>
-          </Link>
-          <Link
-            href="/data-siswa"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all duration-200 hover:-translate-y-0.5 shrink-0"
-          >
-            <Users className="size-3.5 text-indigo-500" />
-            <span>Data Siswa ({stats.totalSiswa})</span>
-          </Link>
-          <Link
-            href="/guru-pengajaran"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all duration-200 hover:-translate-y-0.5 shrink-0"
-          >
-            <GraduationCap className="size-3.5 text-emerald-500" />
-            <span>Direktori Guru ({stats.totalGuru})</span>
-          </Link>
-          <Link
-            href="/cbt-ujian"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all duration-200 hover:-translate-y-0.5 shrink-0"
-          >
-            <ShieldCheck className="size-3.5 text-purple-500" />
-            <span>Bilik CBT ({telemetry.cbtTotal})</span>
-          </Link>
-          <Link
-            href="/rapor-siswa"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all duration-200 hover:-translate-y-0.5 shrink-0"
-          >
-            <FileCheck className="size-3.5 text-amber-500" />
-            <span>e-Rapor Merdeka</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          4. KEY METRICS ROW (4-Column Stat Cards - Contract Match)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="relative z-10 grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Total Siswa Terdata */}
-        <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-blue-400/50">
-          <div className="flex items-center justify-between">
-            <div className="size-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-              <Users className="size-5" />
-            </div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-xl whitespace-nowrap">
-              <span>Real Siswa</span>
-            </span>
-          </div>
-          <div className="mt-4">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block font-lato">
-              Total Siswa Terdata
-            </span>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1 font-mono">
-              <AnimatedCounter value={stats.totalSiswa} />
-            </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-              {stats.totalSiswa > 0
-                ? `${stats.totalSiswa} siswa terdaftar di database`
-                : "Belum ada siswa terdaftar"}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 2: Guru Terdaftar (SaaS) */}
-        <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-emerald-400/50">
-          <div className="flex items-center justify-between">
-            <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <GraduationCap className="size-5" />
-            </div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-xl whitespace-nowrap">
-              <span>{stats.totalGuru > 0 ? "Aktif" : "0 Guru"}</span>
-            </span>
-          </div>
-          <div className="mt-4">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block font-lato">
-              Guru Terdaftar (SaaS)
-            </span>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1 font-mono">
-              <AnimatedCounter value={stats.totalGuru} />
-            </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-              {stats.totalGuru > 0
-                ? `${stats.totalGuru} pendidik siap mengajar & mengelola KBM`
-                : "Belum ada guru yang mendaftar"}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: Total Sekolah Pengguna */}
-        <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-amber-400/50">
-          <div className="flex items-center justify-between">
-            <div className="size-11 rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <School className="size-5" />
-            </div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-xl whitespace-nowrap">
-              <span>{stats.totalSekolahInstitusi} Institusi</span>
-            </span>
-          </div>
-          <div className="mt-4">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block font-lato">
-              Total Sekolah Pengguna
-            </span>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1 font-mono">
-              <AnimatedCounter value={stats.totalSekolah} />
-            </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-              {stats.totalSekolahFreemium} Freemium • {stats.totalSekolahInstitusi} Lisensi Penuh
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Total Rombel / Kelas */}
-        <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-rose-400/50">
-          <div className="flex items-center justify-between">
-            <div className="size-11 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-              <Building2 className="size-5" />
-            </div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-xl whitespace-nowrap">
-              <span>{stats.totalRombel > 0 ? "Rombel Aktif" : "0 Rombel"}</span>
-            </span>
-          </div>
-          <div className="mt-4">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block font-lato">
-              Total Rombel / Kelas
-            </span>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1 font-mono">
-              <AnimatedCounter value={stats.totalRombel} />
-            </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-              {stats.totalRombel > 0
-                ? `${stats.totalRombel} rombongan belajar terjadwal`
-                : "Belum ada rombel terdaftar"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          5. TENANT DIRECTORY COCKPIT (Pusat Pengawasan Sekolah B2B)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="relative z-10 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Building2 className="size-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight font-lato">
-                Direktori Tenant Sekolah & Lisensi Aktif
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Supervisi data multi-tenant, kuota siswa, lisensi B2B, dan kesehatan operasional
-              institusi
-            </p>
-          </div>
-          <Link
-            href="/sekolah"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-2xs"
-          >
-            <span>Buka Manajemen Tenant</span>
-            <ExternalLink className="size-3 text-slate-400" />
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto no-scrollbar pt-1">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pb-3 border-b border-slate-100 dark:border-slate-800">
-                <th className="pb-3 pr-4 font-semibold">Nama Sekolah & NPSN</th>
-                <th className="pb-3 pr-4 font-semibold">Jenjang & Lisensi</th>
-                <th className="pb-3 pr-4 font-semibold">Roster (Siswa / Guru)</th>
-                <th className="pb-3 pr-4 font-semibold">Rombel & CBT</th>
-                <th className="pb-3 text-right font-semibold">Status & Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {sekolahList.map((sch) => (
-                <tr
-                  key={sch.id}
-                  className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition"
-                >
-                  <td className="py-3.5 pr-4">
-                    <div className="flex items-center gap-3">
-                      <div className="size-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-black text-xs flex items-center justify-center shrink-0 shadow-2xs font-mono">
-                        {sch.nama.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm block">
-                          {sch.nama}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-400">
-                          NPSN: {sch.npsn || "Belum Terdaftar"} • ID: {sch.id.slice(0, 8)}...
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    <div className="space-y-1">
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
-                        {sch.tipe_lisensi === "SEKOLAH" ? "INSTITUSI LISENSI" : "FREEMIUM"}
-                      </span>
-                      <span className="text-[11px] text-slate-500 block">{sch.jenjang}</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 pr-4 font-mono">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {sch.siswaCount} Siswa
-                    </span>{" "}
-                    • <span className="text-slate-500">{sch.guruCount} Guru</span>
-                  </td>
-                  <td className="py-3.5 pr-4 font-mono text-slate-700 dark:text-slate-300">
-                    <span>{sch.rombelCount} Rombel</span> • <span>{sch.cbtCount} Ujian CBT</span>
-                  </td>
-                  <td className="py-3.5 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-2">
-                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                        Aktif
-                      </span>
-                      <Link
-                        href={`/kelas-saya`}
-                        className="ml-2 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-[11px] transition"
-                      >
-                        Lihat Kelas
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          6. ACADEMIC PULSE: Ringkasan Aktivitas Pembelajaran & Engagement
-      ───────────────────────────────────────────────────────────── */}
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7 items-stretch">
-        {/* Left 6 Cols: Ringkasan Aktivitas Pembelajaran (Kurva Dinamis & Interaktif) */}
-        <div className="lg:col-span-6 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:border-blue-400/40">
-          <div>
-            <div className="flex items-center justify-between pb-2 flex-wrap gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="size-5 text-blue-600 dark:text-blue-400" />
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight font-lato">
-                    Ringkasan Aktivitas Pembelajaran
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Monitoring frekuensi pelaksanaan sesi Kegiatan Belajar Mengajar (KBM) harian oleh
-                  guru di kelas
+              <div className="space-y-1.5">
+                <h1 className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                  Halo, {user.nama_lengkap}!
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-[65ch]">
+                  {activeTenant
+                    ? `Anda sedang memeriksa ruang kerja ${activeTenant.nama}. Menu operasional sekolah kini tersedia di sidebar; keluar kapan saja untuk kembali ke tampilan global.`
+                    : attentionCount > 0
+                      ? `Terdapat ${stats.totalSekolah} sekolah terdaftar dengan ${attentionCount} tenant butuh perhatian (${stats.expiringTrialsCount} trial hampir habis/kadaluarsa, ${stats.totalSekolahSuspended} nonaktif).`
+                      : `Seluruh ${stats.totalSekolah} sekolah aktif berjalan normal dengan ${stats.totalSiswa} siswa dan ${stats.totalGuru} guru. Pilih sekolah di bawah untuk masuk ke mode dukungan.`}
                 </p>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 text-[11px] font-bold">
-                <span className="size-2 rounded-full bg-blue-600 animate-pulse" />
-                <span>Live KBM Sync</span>
-              </div>
-            </div>
 
-            {/* Interactive Dynamic Wave & Data Points */}
-            <div className="pt-4 relative">
-              <svg className="w-full h-36 overflow-visible" viewBox="0 0 500 120">
-                <defs>
-                  <linearGradient id="realWaveGradBlue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563EB" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
+              <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+                <Link
+                  href={activeTenant ? `/sekolah?sekolahId=${activeTenant.id}` : "/sekolah"}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all active:scale-[0.98] whitespace-nowrap"
+                >
+                  <span>{activeTenant ? "Profil & Unit Sekolah" : "Kelola Sekolah & Lisensi"}</span>
+                  <ArrowUpRight className="size-3.5" />
+                </Link>
 
-                {/* Horizontal grid lines */}
-                <line
-                  x1="0"
-                  y1="25"
-                  x2="500"
-                  y2="25"
-                  stroke="currentColor"
-                  className="text-slate-100 dark:text-slate-800"
-                  strokeDasharray="3 3"
-                />
-                <line
-                  x1="0"
-                  y1="65"
-                  x2="500"
-                  y2="65"
-                  stroke="currentColor"
-                  className="text-slate-100 dark:text-slate-800"
-                  strokeDasharray="3 3"
-                />
-                <line
-                  x1="0"
-                  y1="105"
-                  x2="500"
-                  y2="105"
-                  stroke="currentColor"
-                  className="text-slate-100 dark:text-slate-800"
-                  strokeDasharray="3 3"
-                />
-
-                {/* Area path */}
-                {areaPath && (
-                  <path
-                    d={areaPath}
-                    fill="url(#realWaveGradBlue)"
-                    className="transition-all duration-500 ease-out"
-                  />
-                )}
-                {/* Wave Curve */}
-                {linePath && (
-                  <path
-                    d={linePath}
-                    fill="none"
-                    stroke="#2563EB"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="transition-all duration-500 ease-out"
-                  />
-                )}
-
-                {/* Interactive Day Points */}
-                {chartPoints.map((pt, i) => (
-                  <g
-                    key={pt.day}
-                    onMouseEnter={() => setHoveredDay(i)}
-                    onMouseLeave={() => setHoveredDay(null)}
-                    className="cursor-pointer group"
+                {activeTenant ? (
+                  <button
+                    type="button"
+                    onClick={handleExitTenant}
+                    disabled={isClearingTenant}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
                   >
-                    {/* Hover Pulse Ring */}
-                    {hoveredDay === i && (
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={10}
-                        className="fill-blue-500/20 stroke-blue-500/40 stroke-1 animate-pulse"
-                      />
+                    {isClearingTenant ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <LogOut className="size-3.5" />
                     )}
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={hoveredDay === i ? 6.5 : 4.5}
-                      className={`stroke-white dark:stroke-slate-900 stroke-2 transition-all duration-200 ${
-                        pt.count > 0 ? "fill-blue-600" : "fill-slate-400 dark:fill-slate-600"
-                      }`}
-                    />
-                    {/* Tooltip Badge on SVG Hover */}
-                    {hoveredDay === i && (
-                      <g className="pointer-events-none transition-all">
-                        <rect
-                          x={Math.max(8, Math.min(410, pt.x - 42))}
-                          y={Math.max(4, pt.y - 28)}
-                          width="84"
-                          height="20"
-                          rx="5"
-                          className="fill-slate-900/90 dark:fill-slate-800/95 stroke-slate-700/50 stroke-1 shadow-sm"
-                        />
-                        <text
-                          x={Math.max(8, Math.min(410, pt.x - 42)) + 42}
-                          y={Math.max(4, pt.y - 28) + 14}
-                          textAnchor="middle"
-                          className="text-[10px] font-bold fill-white font-mono"
-                        >
-                          {pt.day}: {pt.count} sesi
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                ))}
-              </svg>
+                    <span>Keluar ke Mode Platform</span>
+                  </button>
+                ) : (
+                  <a
+                    href="#audit-trail"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all whitespace-nowrap"
+                  >
+                    <span>Riwayat Audit ({auditLogs.length})</span>
+                  </a>
+                )}
+              </div>
 
-              {/* Day Labels and Activity Tooltips */}
-              <div className="grid grid-cols-6 text-center text-xs font-bold text-slate-500 dark:text-slate-400 pt-2 px-1">
-                {daysActivity.map((d, i) => (
+              {activeTenant && (
+                <div className="pt-3 border-t border-slate-200/70 dark:border-slate-800 flex flex-wrap items-center gap-1.5">
+                  {[
+                    { label: "Kurikulum", href: "/struktur-akademik" },
+                    { label: "Data Siswa", href: "/data-siswa" },
+                    { label: "Guru & Penugasan", href: "/guru-pengajaran" },
+                    { label: "CBT", href: "/cbt-ujian" },
+                    { label: "Integrasi", href: "/integrasi" },
+                    { label: "Laporan", href: "/pimpinan" },
+                  ].map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-700 dark:text-slate-200 hover:text-[#2563EB] dark:hover:text-blue-300 text-[11px] font-semibold transition-colors whitespace-nowrap"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* 2. Minimalist 4-Card KPI Strip (Tanpa kotak ikon, tanpa gradient wall) */}
+            <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <Link
+                href="/sekolah"
+                className="p-4 rounded-2xl bg-white/75 dark:bg-slate-900/75 backdrop-blur-[16px] border border-slate-200/80 dark:border-white/15 shadow-2xs hover:border-blue-300 dark:hover:border-blue-700 transition-all flex flex-col justify-between"
+              >
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Total Sekolah
+                </span>
+                <div className="mt-2.5">
+                  <div className="font-mono text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                    <AnimatedCounter value={stats.totalSekolah} decimals={0} />
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 truncate">
+                    {stats.totalSekolahInstitusi} Lisensi • {stats.totalSekolahFreemium} Trial
+                  </p>
+                </div>
+              </Link>
+
+              <div className="p-4 rounded-2xl bg-white/75 dark:bg-slate-900/75 backdrop-blur-[16px] border border-slate-200/80 dark:border-white/15 shadow-2xs flex flex-col justify-between">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Total Siswa
+                </span>
+                <div className="mt-2.5">
+                  <div className="font-mono text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                    <AnimatedCounter value={stats.totalSiswa} decimals={0} />
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 truncate">
+                    {stats.totalGuru} Guru • {stats.totalRombel} Rombel
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/sekolah"
+                className="p-4 rounded-2xl bg-white/75 dark:bg-slate-900/75 backdrop-blur-[16px] border border-slate-200/80 dark:border-white/15 shadow-2xs hover:border-amber-300 dark:hover:border-amber-700 transition-all flex flex-col justify-between"
+              >
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Perlu Tindak Lanjut
+                </span>
+                <div className="mt-2.5">
                   <div
-                    key={d.day}
-                    onMouseEnter={() => setHoveredDay(i)}
-                    onMouseLeave={() => setHoveredDay(null)}
-                    className={`py-1 rounded-xl transition-all cursor-pointer ${
-                      hoveredDay === i
-                        ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 font-extrabold shadow-2xs"
-                        : "hover:text-blue-600"
+                    className={`font-mono text-2xl sm:text-3xl font-black tracking-tight leading-none ${
+                      attentionCount > 0
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-slate-900 dark:text-white"
                     }`}
                   >
-                    <span className="block text-[11px]">{d.day}</span>
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                      {d.count} Sesi
-                    </span>
+                    <AnimatedCounter value={attentionCount} decimals={0} />
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 truncate">
+                    {stats.expiringTrialsCount} Trial • {stats.totalSekolahSuspended} Nonaktif
+                  </p>
+                </div>
+              </Link>
 
-          {/* Bottom Insights: Kenapa grafik ini sangat penting & informatif */}
-          <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Hari Teraktif
-              </span>
-              <span className="font-bold text-blue-600 dark:text-blue-400 text-xs mt-0.5 block">
-                {peakDayInfo}
-              </span>
-            </div>
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Total Sesi KBM
-              </span>
-              <span className="font-bold font-mono text-slate-800 dark:text-slate-200 text-xs mt-0.5 block">
-                {stats.totalSesiAktual} Sesi Terdata
-              </span>
-            </div>
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Status KBM
-              </span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs mt-0.5 block">
-                {stats.totalSesiAktual > 0 ? "Sesi Berjalan" : "Terkoneksi"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right 6 Cols: Learner Engagement Ring Gauge & Quick Stats */}
-        <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
-          <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 flex-1 transition-all duration-300 hover:shadow-lg hover:border-blue-400/40">
-            <div className="flex items-center justify-between pb-2">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight font-lato">
-                Learner Engagement
-              </h2>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Keaktifan Siswa
-              </span>
-            </div>
-
-            <div className="pt-2">
-              <ConcentricRingGauge
-                title=""
-                subtitle=""
-                centerValue={attendance.hadirPct}
-                centerLabel={
-                  attendance.totalPresensiRecorded > 0 ? "Rata-rata Kehadiran" : "0 Sesi Masuk"
-                }
-                segments={[
-                  {
-                    id: "hadir",
-                    label: "Siswa Hadir Tepat Waktu",
-                    count: attendance.totalPresensiHadir,
-                    percentage: attendance.hadirPct,
-                    color: "#2563EB",
-                    strokeColor: "#2563EB",
-                    bgColor: "bg-blue-500",
-                  },
-                  {
-                    id: "izinsakit",
-                    label: "Izin & Sakit Terverifikasi",
-                    count: attendance.totalPresensiIzinSakit,
-                    percentage: attendance.izinSakitPct,
-                    color: "#F59E0B",
-                    strokeColor: "#F59E0B",
-                    bgColor: "bg-amber-500",
-                  },
-                  {
-                    id: "alpha",
-                    label: "Alpha / Perlu Perhatian",
-                    count: attendance.totalPresensiAlpha,
-                    percentage: attendance.alphaPct,
-                    color: "#F43F5E",
-                    strokeColor: "#F43F5E",
-                    bgColor: "bg-rose-500",
-                  },
-                ]}
-              />
-            </div>
-          </div>
-
-          {/* Quick Stats Widget: Gradient Blue seperti Sidebar (Bukan Hitam) */}
-          <div className="rounded-2xl bg-gradient-to-br from-[#1D4ED8] via-[#2563EB] to-[#1E40AF] text-white p-5 sm:p-6 shadow-lg shadow-blue-600/20 border border-blue-400/40 space-y-3 transition-all duration-300 hover:-translate-y-0.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-bold tracking-wider text-blue-200">
-                Penyampaian Nilai Akademik
-              </span>
-              <FileCheck className="size-4 text-emerald-300" />
-            </div>
-            <div className="grid grid-cols-2 gap-4 pt-1 font-mono">
-              <div>
-                <span className="text-2xl font-black text-white">{stats.totalRapor}</span>
-                <span className="text-[11px] text-blue-200 block font-lato font-normal">
-                  e-Rapor Dicetak
+              <div className="p-4 rounded-2xl bg-white/75 dark:bg-slate-900/75 backdrop-blur-[16px] border border-slate-200/80 dark:border-white/15 shadow-2xs flex flex-col justify-between">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Estimasi MRR
                 </span>
+                <div className="mt-2.5">
+                  <div className="font-mono text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none truncate">
+                    {formatCompactRupiah(telemetry.estimatedMrr)}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 truncate">
+                    {telemetry.cbtRunningSessions} CBT Live • {telemetry.storageTotalMb} MB
+                  </p>
+                </div>
               </div>
-              <div>
-                <span className="text-2xl font-black text-white">{stats.totalMataPelajaran}</span>
-                <span className="text-[11px] text-blue-200 block font-lato font-normal">
-                  Mata Pelajaran Aktif
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </section>
 
-      {/* ─────────────────────────────────────────────────────────────
-          7. DUA KOLOM BERSEBELAHAN RAMPING DENGAN PAGINATION (5 ITEMS/HAL):
-             - KOLOM KIRI: Performa Rombongan Belajar & KBM
-             - KOLOM KANAN: Audit Trail Transaksi & Mutasi Sistem
-      ───────────────────────────────────────────────────────────── */}
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-7 items-start">
-        {/* ── KOLOM KIRI: PERFORMA ROMBONGAN BELAJAR & KBM (5 Baris / Halaman) ── */}
-        <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4 transition-all duration-300 hover:shadow-lg hover:border-blue-400/40">
-          <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <Building2 className="size-4.5 text-blue-600 dark:text-blue-400" />
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight font-lato">
-                  Performa Rombongan Belajar & KBM
-                </h2>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Data tingkat kehadiran & siswa terdaftar (5 kelas per halaman)
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-[11px] font-bold border border-blue-200 dark:border-blue-900">
-              <span>{rombelList.length} Rombel</span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto no-scrollbar pt-1">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <th className="pb-3 pr-3 font-semibold">Kelas & Guru</th>
-                  <th className="pb-3 pr-3 font-semibold">Siswa & Mapel</th>
-                  <th className="pb-3 text-right font-semibold">Status KBM</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {paginatedRombel.length > 0 ? (
-                  paginatedRombel.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group"
-                    >
-                      <td className="py-3 pr-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 font-bold text-xs flex items-center justify-center shrink-0 font-mono">
-                            {item.nama.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-bold text-slate-900 dark:text-white text-xs group-hover:text-blue-600 transition-colors truncate">
-                              {item.nama}
-                            </div>
-                            <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                              {item.guruNama}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <div className="font-semibold text-slate-700 dark:text-slate-300 truncate">
-                          {item.siswaCount} Siswa
-                        </div>
-                        <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                          {item.mapelNama}
-                        </div>
-                      </td>
-                      <td className="py-3 text-right whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 font-mono">
-                          {item.sessionCount > 0 ? `${item.completion}% Hadir` : "0 Sesi"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center text-slate-400 text-xs">
-                      Belum ada data rombel aktif.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls Rombel */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              Hal <span className="font-bold text-slate-800 dark:text-white">{rombelPage}</span>{" "}
-              dari {totalRombelPages}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setRombelPage((p) => Math.max(1, p - 1))}
-                disabled={rombelPage === 1}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                title="Halaman Sebelumnya"
-              >
-                <ChevronLeft className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setRombelPage((p) => Math.min(totalRombelPages, p + 1))}
-                disabled={rombelPage === totalRombelPages}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                title="Halaman Berikutnya"
-              >
-                <ChevronRight className="size-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ── KOLOM KANAN: AUDIT TRAIL TRANSAKSI & MUTASI SISTEM (5 Baris / Halaman) ── */}
-        <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4 transition-all duration-300 hover:shadow-lg hover:border-blue-400/40">
-          <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="size-4.5 text-emerald-600 dark:text-emerald-400" />
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight font-lato">
-                  Audit Trail Transaksi & Mutasi Sistem
-                </h3>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Append-only log mutasi data platform (5 transaksi per halaman)
-              </p>
-            </div>
-            {/* Inline Filter Aksi Pills */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-              {["ALL", "CREATE", "UPDATE", "DELETE"].map((aksi) => (
-                <button
-                  key={aksi}
-                  type="button"
-                  onClick={() => {
-                    setAuditFilterAksi(aksi);
-                    setAuditPage(1);
-                  }}
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition ${
-                    auditFilterAksi === aksi
-                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-2xs"
-                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
+            {/* 3. Daftar Sekolah (Minimalis & Langsung Bisa Aksi) */}
+            <section className="rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/15 p-5 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    Daftar Sekolah
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Pilih &ldquo;Masuk&rdquo; untuk inspeksi sekolah atau &ldquo;Kelola&rdquo; untuk
+                    mengatur lisensi
+                  </p>
+                </div>
+                <Link
+                  href="/sekolah"
+                  className="text-xs font-mono font-bold text-[#2563EB] dark:text-blue-400 hover:underline inline-flex items-center gap-1 shrink-0 whitespace-nowrap"
                 >
-                  {aksi}
-                </button>
-              ))}
-            </div>
+                  <span>Kelola Semua</span>
+                  <ChevronRight className="size-3.5" />
+                </Link>
+              </div>
+
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
+                      <th className="pb-2.5 pr-3 font-semibold">Sekolah</th>
+                      <th className="pb-2.5 pr-3 font-semibold">Lisensi</th>
+                      <th className="pb-2.5 pr-3 font-semibold">Skala</th>
+                      <th className="pb-2.5 text-right font-semibold">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {sekolahList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                          Belum ada sekolah terdaftar.
+                        </td>
+                      </tr>
+                    ) : (
+                      sekolahList.map((sch) => {
+                        const isCurrentActive = activeTenant?.id === sch.id;
+                        const isSwitching = switchingSchoolId === sch.id;
+
+                        return (
+                          <tr
+                            key={sch.id}
+                            className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                          >
+                            <td className="py-3 pr-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                                  {sch.nama}
+                                </span>
+                                {!sch.statusAktif && (
+                                  <span className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+                                    Nonaktif
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                                {sch.jenjang} • NPSN: {sch.npsn || "-"}
+                              </div>
+                            </td>
+                            <td className="py-3 pr-3">{renderLicenseLabel(sch)}</td>
+                            <td className="py-3 pr-3 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {sch.siswaCount} siswa • {sch.guruCount} guru
+                            </td>
+                            <td className="py-3 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5">
+                                {isCurrentActive ? (
+                                  <button
+                                    type="button"
+                                    onClick={handleExitTenant}
+                                    disabled={isClearingTenant}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                                  >
+                                    {isClearingTenant ? (
+                                      <Loader2 className="size-3 animate-spin" />
+                                    ) : (
+                                      <LogOut className="size-3" />
+                                    )}
+                                    <span>Keluar</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEnterTenant(sch.id)}
+                                    disabled={isSwitching || !sch.statusAktif}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                                  >
+                                    {isSwitching ? (
+                                      <Loader2 className="size-3 animate-spin" />
+                                    ) : (
+                                      <LogIn className="size-3" />
+                                    )}
+                                    <span>Masuk</span>
+                                  </button>
+                                )}
+                                <Link
+                                  href={`/sekolah?sekolahId=${sch.id}`}
+                                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-[11px] transition"
+                                >
+                                  Kelola
+                                </Link>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
 
-          <div className="overflow-x-auto no-scrollbar pt-1">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <th className="pb-3 pr-2 font-semibold">Waktu & Aktor</th>
-                  <th className="pb-3 pr-2 font-semibold">Tindakan & Modul</th>
-                  <th className="pb-3 text-right font-semibold">Detail</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {paginatedAuditLogs.length > 0 ? (
-                  paginatedAuditLogs.map((log) => (
-                    <tr
-                      key={log.id}
-                      onClick={() => handleOpenLogModal(log)}
-                      className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
+          {/* ─────────────────────────────────────────────────────────
+              RIGHT RAIL (4 Columns) — Ringkasan Sistem & Log Audit
+          ───────────────────────────────────────────────────────── */}
+          <div className="xl:col-span-4 space-y-4 sm:space-y-5">
+            {/* Ringkasan Ekosistem */}
+            <section className="rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/15 p-5 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Ringkasan Platform
+                </h2>
+                <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                  Data Riil
+                </span>
+              </div>
+
+              <dl className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                <div className="py-2 flex items-center justify-between gap-2">
+                  <dt className="text-slate-500 dark:text-slate-400">Sesi KBM Tercatat</dt>
+                  <dd className="font-mono font-bold text-slate-900 dark:text-white">
+                    {stats.totalSesiAktual}
+                  </dd>
+                </div>
+                <div className="py-2 flex items-center justify-between gap-2">
+                  <dt className="text-slate-500 dark:text-slate-400">Kehadiran Tercatat</dt>
+                  <dd className="font-mono font-bold text-slate-900 dark:text-white">
+                    {attendance.totalPresensiRecorded > 0 ? `${attendance.hadirPct}%` : "Belum ada"}
+                  </dd>
+                </div>
+                <div className="py-2 flex items-center justify-between gap-2">
+                  <dt className="text-slate-500 dark:text-slate-400">Ujian CBT</dt>
+                  <dd className="font-mono font-bold text-slate-900 dark:text-white">
+                    {telemetry.cbtRunningSessions} berjalan / {telemetry.cbtTotal}
+                  </dd>
+                </div>
+                <div className="py-2 flex items-center justify-between gap-2">
+                  <dt className="text-slate-500 dark:text-slate-400">Login Gagal (24 Jam)</dt>
+                  <dd
+                    className={`font-mono font-bold ${
+                      telemetry.failedLoginLast24h > 0
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-slate-900 dark:text-white"
+                    }`}
+                  >
+                    {telemetry.failedLoginLast24h}
+                  </dd>
+                </div>
+                <div className="py-2 flex items-center justify-between gap-2">
+                  <dt className="text-slate-500 dark:text-slate-400">Berkas &amp; AI</dt>
+                  <dd className="font-mono font-bold text-slate-900 dark:text-white">
+                    {telemetry.storageTotalMb} MB • {telemetry.aiRequestsCount} AI
+                  </dd>
+                </div>
+              </dl>
+
+              {/* Mini Sebaran KBM 6 Hari */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold">Aktivitas KBM Mingguan</span>
+                  <span className="font-mono">{stats.totalSesiAktual} sesi</span>
+                </div>
+                <div className="grid grid-cols-6 gap-2 items-end h-14 pt-1">
+                  {daysActivity.map((d) => (
+                    <div
+                      key={d.day}
+                      className="flex flex-col items-center gap-1 h-full justify-end"
                     >
-                      <td className="py-3 pr-2">
-                        <div className="flex items-center gap-2">
-                          <div className="size-7 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold text-[11px] flex items-center justify-center shrink-0">
-                            {log.aksi === "CREATE" ? "+" : log.aksi === "DELETE" ? "×" : "✎"}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-bold text-slate-800 dark:text-slate-200 text-xs block truncate">
-                              {log.aktor_role}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono block">
-                              {log.timeAgo}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 pr-2">
+                      <div
+                        className={`w-full rounded-t-md transition-all ${
+                          d.count > 0
+                            ? "bg-[#2563EB] dark:bg-blue-500"
+                            : "bg-slate-200 dark:bg-slate-800"
+                        }`}
+                        style={{ height: `${d.heightPct}%` }}
+                        title={`${d.day}: ${d.count} sesi`}
+                      />
+                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                        {d.day}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Log Audit Terbaru */}
+            <section
+              id="audit-trail"
+              className="rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-white/15 p-5 shadow-2xs space-y-3"
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Log Audit</h2>
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
+                  {[
+                    { id: "ALL", label: "Semua" },
+                    { id: "CREATE", label: "Buat" },
+                    { id: "UPDATE", label: "Ubah" },
+                    { id: "DELETE", label: "Hapus" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setAuditFilterAksi(item.id);
+                        setAuditPage(1);
+                      }}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition cursor-pointer ${
+                        auditFilterAksi === item.id
+                          ? "bg-white dark:bg-slate-700 text-[#2563EB] dark:text-blue-300 shadow-2xs"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {paginatedAuditLogs.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                    Belum ada rekaman audit.
+                  </p>
+                ) : (
+                  paginatedAuditLogs.map((log) => (
+                    <button
+                      key={log.id}
+                      type="button"
+                      onClick={() => setSelectedLog(log)}
+                      className="w-full py-2.5 text-left hover:bg-slate-50/70 dark:hover:bg-slate-800/40 rounded-lg px-1.5 -mx-1.5 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                    >
+                      <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                              log.aksi === "CREATE"
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                : log.aksi === "DELETE"
-                                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                                  : "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-                            }`}
-                          >
+                          <span className="text-[10px] font-mono font-bold text-[#2563EB] dark:text-blue-400">
                             {log.aksi}
                           </span>
-                          <span className="font-semibold text-blue-600 dark:text-blue-400 text-xs truncate">
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
                             {log.tipe_sumber}
                           </span>
                         </div>
-                      </td>
-                      <td className="py-3 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenLogModal(log);
-                          }}
-                          className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 transition text-[11px] font-bold inline-flex items-center gap-1"
-                        >
-                          <Eye className="size-3" />
-                          <span>Lihat</span>
-                        </button>
-                      </td>
-                    </tr>
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate">
+                          {log.aktor_role} • {log.timeAgo}
+                        </div>
+                      </div>
+                      <ChevronRight className="size-3.5 text-slate-400 shrink-0" />
+                    </button>
                   ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center text-slate-400 text-xs">
-                      Tidak ada rekaman audit log sesuai filter.
-                    </td>
-                  </tr>
                 )}
-              </tbody>
-            </table>
-          </div>
+              </div>
 
-          {/* Pagination Controls Audit */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              Hal <span className="font-bold text-slate-800 dark:text-white">{auditPage}</span> dari{" "}
-              {totalAuditPages}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setAuditPage((p) => Math.max(1, p - 1))}
-                disabled={auditPage === 1}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                title="Halaman Sebelumnya"
-              >
-                <ChevronLeft className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuditPage((p) => Math.min(totalAuditPages, p + 1))}
-                disabled={auditPage === totalAuditPages}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                title="Halaman Berikutnya"
-              >
-                <ChevronRight className="size-3.5" />
-              </button>
-            </div>
+              {totalAuditPages > 1 && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className="font-mono">
+                    {auditPage} / {totalAuditPages}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setAuditPage((p) => Math.max(1, p - 1))}
+                      disabled={auditPage === 1}
+                      aria-label="Halaman audit sebelumnya"
+                      className="p-1 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronLeft className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuditPage((p) => Math.min(totalAuditPages, p + 1))}
+                      disabled={auditPage === totalAuditPages}
+                      aria-label="Halaman audit berikutnya"
+                      className="p-1 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronRight className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
         </div>
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          8. AUDIT LOG DETAIL MODAL (Inspect Snapshot Payload)
-      ───────────────────────────────────────────────────────────── */}
+      {/* Modal Detail Audit Log */}
       {selectedLog && (
         <div
           role="dialog"
           aria-modal="true"
-          className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200 ${
-            isClosingModal ? "opacity-0" : "opacity-100 animate-in fade-in-0"
-          }`}
-          onClick={handleCloseLogModal}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-950/75 backdrop-blur-xs"
+          onClick={() => setSelectedLog(null)}
         >
           <div
-            className={`w-full max-w-xl max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-all duration-200 ${
-              isClosingModal ? "scale-95 opacity-0" : "scale-100 opacity-100 animate-in zoom-in-95"
-            }`}
+            className="w-full max-w-xl max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-slate-900 dark:to-slate-900">
-              <div className="flex items-center gap-2.5">
-                <div className="size-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                  {selectedLog.aksi === "CREATE" ? "+" : selectedLog.aksi === "DELETE" ? "×" : "✎"}
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white font-lato">
-                    Audit Snapshot Mutasi Data
-                  </h4>
-                  <span className="text-[11px] font-mono text-slate-400">ID: {selectedLog.id}</span>
-                </div>
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Detail Audit Mutasi Data
+                </h4>
+                <span className="text-[11px] font-mono text-slate-400">ID: {selectedLog.id}</span>
               </div>
               <button
                 type="button"
-                onClick={handleCloseLogModal}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                onClick={() => setSelectedLog(null)}
+                aria-label="Tutup detail audit"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            {/* Content */}
             <div className="p-5 overflow-y-auto space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block font-lato">
-                    Aktor (Pelaku)
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Aktor
                   </span>
                   <span className="font-bold text-slate-900 dark:text-white mt-0.5 block">
                     {selectedLog.aktor_role}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block font-lato">
-                    Tipe Mutasi
-                  </span>
-                  <span className="font-black text-blue-600 dark:text-blue-400 mt-0.5 block font-mono">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Aksi</span>
+                  <span className="font-bold text-[#2563EB] dark:text-blue-400 mt-0.5 block font-mono">
                     {selectedLog.aksi}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block font-lato">
-                    Modul Terkait
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Modul
                   </span>
                   <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block">
                     {selectedLog.tipe_sumber}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block font-lato">
-                    Waktu Transaksi
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Waktu
                   </span>
                   <span className="font-mono text-slate-700 dark:text-slate-300 mt-0.5 block text-[11px]">
                     {selectedLog.dibuat_pada}
@@ -1298,27 +796,26 @@ export function SuperAdminDashboardView({
               {selectedLog.payload_sesudah ? (
                 <div>
                   <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1.5 block">
-                    Snapshot Data Terkini (JSON):
+                    Snapshot Data (JSON):
                   </span>
                   <pre className="p-3.5 rounded-2xl bg-slate-950 text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-56 leading-relaxed border border-slate-800">
                     {selectedLog.payload_sesudah}
                   </pre>
                 </div>
               ) : (
-                <div className="py-4 text-center text-slate-400">
-                  <p>Tidak ada snapshot payload tersimpan untuk transaksi ini.</p>
-                </div>
+                <p className="py-4 text-center text-slate-400">
+                  Tidak ada snapshot payload tersimpan.
+                </p>
               )}
             </div>
 
-            {/* Footer */}
             <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
               <button
                 type="button"
-                onClick={handleCloseLogModal}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold transition shadow-xs"
+                onClick={() => setSelectedLog(null)}
+                className="px-4 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer"
               >
-                Tutup Jendela
+                Tutup
               </button>
             </div>
           </div>

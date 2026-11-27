@@ -41,6 +41,7 @@ import {
   ClassGradebookDTO,
   DefinisiAsesmenDTO,
   GradebookColumnDTO,
+  isFormatifAssessmentCategory,
 } from "../domain/assessment-types";
 import { ClassAttendanceRecapDTO } from "@/modules/attendance/domain/attendance-types";
 import { exportGradebookExcelAction } from "@/app/actions/assessment-actions";
@@ -116,9 +117,9 @@ export function UnifiedAcademicLedgerTable({
         const lmNumber = lmIdx + 1;
         const lmKode = lm.kode || `LM ${lmNumber}`;
 
-        // Asesmen formatif yang terikat ke LM ini
+        // Asesmen formatif/tugas/praktik yang terikat ke LM ini
         const formatifAssessmentsInLm = assessments.filter(
-          (a) => a.lingkup_materi_id === lm.id && a.kategori === "FORMATIF"
+          (a) => a.lingkup_materi_id === lm.id && isFormatifAssessmentCategory(a.kategori)
         );
 
         if (lm.tujuan_pembelajaran && lm.tujuan_pembelajaran.length > 0) {
@@ -220,7 +221,7 @@ export function UnifiedAcademicLedgerTable({
 
       // Asesmen formatif umum (tidak terikat ke LM manapun)
       const unlinkedFormatif = assessments.filter(
-        (a) => !a.lingkup_materi_id && a.kategori === "FORMATIF"
+        (a) => !a.lingkup_materi_id && isFormatifAssessmentCategory(a.kategori)
       );
       if (unlinkedFormatif.length > 0) {
         const extraCols: UnifiedLedgerColumn[] = unlinkedFormatif.map((a, idx) => ({
@@ -245,7 +246,9 @@ export function UnifiedAcademicLedgerTable({
       }
     } else {
       // Fallback jika belum ada Lingkup Materi sama sekali
-      const formatifAssessments = assessments.filter((a) => a.kategori === "FORMATIF");
+      const formatifAssessments = assessments.filter((a) =>
+        isFormatifAssessmentCategory(a.kategori)
+      );
       if (formatifAssessments.length > 0) {
         const cols = formatifAssessments.map((a, idx) => ({
           id: `col_formatif_raw_${a.id}`,

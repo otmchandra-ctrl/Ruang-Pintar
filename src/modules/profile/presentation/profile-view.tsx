@@ -64,7 +64,12 @@ export interface ProfileViewProps {
   } | null;
 }
 
-export function ProfileView({ user, schoolName, teacherProfile, canEditName = false }: ProfileViewProps) {
+export function ProfileView({
+  user,
+  schoolName,
+  teacherProfile,
+  canEditName = false,
+}: ProfileViewProps) {
   const [activeTab, setActiveTab] = useState<"KONTAK" | "AKADEMIK">("KONTAK");
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{

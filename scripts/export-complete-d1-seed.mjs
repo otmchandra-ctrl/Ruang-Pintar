@@ -54,6 +54,9 @@ async function main() {
   // 1. Academic & Teaching Schedule (Everything for Teacher & Schedule Dashboard)
   await exportGroup("Akademik & Jadwal Guru", "prisma/d1-seed-jadwal.sql", [
     { name: "sekolah", table: "sekolah" },
+    { name: "langgananTenant", table: "langganan_tenant" },
+    { name: "jabatan", table: "jabatan" },
+    { name: "penugasanJabatan", table: "penugasan_jabatan" },
     { name: "tahunAjaran", table: "tahun_ajaran" },
     { name: "semester", table: "semester" },
     { name: "fase", table: "fase" },

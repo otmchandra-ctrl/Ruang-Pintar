@@ -9,6 +9,14 @@
 
 export type AssessmentCategory = "FORMATIF" | "SUMATIF" | "SUMATIF_AKHIR" | "TUGAS" | "PRAKTIK";
 
+/**
+ * Mengelompokkan kategori asesmen yang berperan sebagai penilaian proses / formatif pada TP
+ * (mencakup FORMATIF, TUGAS, dan PRAKTIK).
+ */
+export function isFormatifAssessmentCategory(kategori: string): boolean {
+  return kategori === "FORMATIF" || kategori === "TUGAS" || kategori === "PRAKTIK";
+}
+
 export type AssessmentTechnique =
   "TES_TERTULIS" | "TES_LISAN" | "PENUGASAN" | "KINERJA" | "PORTOFOLIO";
 

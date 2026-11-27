@@ -52,6 +52,7 @@ describe("CBT Player Choice Clicking Diagnostic", () => {
         manifest={[mockManifestItem]}
         initialTimeRemainingSeconds={3600}
         initialSavedAnswers={{}}
+        autosaveBatchDelayMs={0}
         ujian={{
           judul: "Latihan TKA - Kejuruan Rekayasa Perangkat Lunak",
           deskripsi: "Petunjuk pengerjaan",

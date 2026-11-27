@@ -1293,5 +1293,16 @@ Status: **READY FOR HUMAN REVIEW**
    - ESLint `npm run lint`: **0 errors, 4 warnings non-blocking (PASS)**.
    - Prettier `npm run format:check`: **100% compliant (PASS)**.
    - Vitest: **99 test files, 538 tests passing (100% PASS)**, termasuk `src/test/saas/tenant-entitlement-foundation.test.ts` dan `src/test/ai-assistant/teacher-onboarding-flow.test.tsx`.
-   - Next.js Production Build (`npm run build`): **100% PASS (28 rute terkompilasi optimal)**.
-   - Database Migration Status: **23 migration verified up to date**.
+- Next.js Production Build (`npm run build`): **100% PASS (28 rute terkompilasi optimal)**.
+- Database Migration Status: **23 migration verified up to date**.
+
+---
+
+# 48. Kebijakan Rilis & Sinkronisasi Online (Human Directive — 27 Nov 2026)
+
+- **Arahan Pemilik Proyek:** Setiap perubahan pada sistem diharapkan dapat langsung dirasakan pada lingkungan online (`ruang-pintar.otmchandra.workers.dev`) setelah lolos Quality Gates, bukan berhenti hanya di build lokal.
+- **Alur Rilis Online Terverifikasi di Repositori:**
+  1. Verifikasi Quality Gates (`typecheck`, `lint`, `prettier`, `vitest`, `npm run build`).
+  2. Sinkronisasi Git selektif ke remote `origin` (`otmchandra-ctrl/Ruang-Pintar`) dan `cloudflare` (`rejischandra27-ai/RuangPintar`) — **dilarang keras** mengikutsertakan file kredensial/sensitif lokal (misalnya `docs/rekap-kredensial-siswa-xiirpl.*`).
+  3. Build & deploy Cloudflare Workers melalui `npm run build:cloudflare` dan `npx wrangler deploy` (konfigurasi di `wrangler.jsonc`) setelah konfirmasi eksplisit Human sesuai Deploy Gate.
+

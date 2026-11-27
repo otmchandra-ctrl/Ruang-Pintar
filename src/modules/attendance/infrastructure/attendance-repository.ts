@@ -7,6 +7,7 @@ import { ulid } from "ulidx";
 import {
   AttendanceStatus,
   ClassAttendanceRecapDTO,
+  ClassAttendanceSessionDateDTO,
   ClassSessionAttendanceDTO,
   EvaluationAttendanceStatus,
   SaveSessionAttendanceInput,
@@ -127,6 +128,7 @@ export class AttendanceRepository {
       status_sesi: session.status,
       ruangan: session.ruangan_aktual,
       topik_pembelajaran: session.topik_pembelajaran,
+      catatan: session.catatan,
       total_siswa,
       jumlah_hadir,
       jumlah_izin,
@@ -189,20 +191,71 @@ export class AttendanceRepository {
         }
       }
 
-      // Update status sesi dari TERJADWAL menjadi DIMULAI jika belum
+      // Update status sesi dari TERJADWAL menjadi DIMULAI jika belum, dan perbarui jurnal KBM
       const currentSession = await tx.sesiKelasAktual.findUnique({
         where: { id: sesi_kelas_id },
-        select: { status: true, jam_mulai_aktual: true },
+        select: {
+          status: true,
+          jam_mulai_aktual: true,
+          penugasan_mengajar_id: true,
+          guru_id: true,
+          tanggal: true,
+        },
       });
 
+      const sessionUpdateData: Record<string, any> = {};
       if (currentSession && currentSession.status === "TERJADWAL") {
+        sessionUpdateData.status = "DIMULAI";
+        sessionUpdateData.jam_mulai_aktual = currentSession.jam_mulai_aktual || new Date();
+      }
+      if (input.topik_pembelajaran !== undefined) {
+        sessionUpdateData.topik_pembelajaran = input.topik_pembelajaran;
+      }
+      if (input.catatan_jurnal !== undefined) {
+        sessionUpdateData.catatan = input.catatan_jurnal;
+      }
+      if (Object.keys(sessionUpdateData).length > 0) {
         await tx.sesiKelasAktual.update({
           where: { id: sesi_kelas_id },
-          data: {
-            status: "DIMULAI",
-            jam_mulai_aktual: currentSession.jam_mulai_aktual || new Date(),
-          },
+          data: sessionUpdateData,
         });
+      }
+
+      // Sinkronisasi otomatis ke Jurnal Administrasi Pembelajaran jika topik materi diisi
+      if (input.topik_pembelajaran && input.topik_pembelajaran.trim() && currentSession) {
+        const existingAdmin = await tx.administrasiPembelajaran.findFirst({
+          where: { sesi_kelas_aktual_id: sesi_kelas_id },
+        });
+
+        if (existingAdmin) {
+          await tx.administrasiPembelajaran.update({
+            where: { id: existingAdmin.id },
+            data: {
+              materi_disampaikan: input.topik_pembelajaran.trim(),
+              kegiatan_pembelajaran:
+                input.catatan_jurnal?.trim() || existingAdmin.kegiatan_pembelajaran,
+              status_realisasi: "TERLAKSANA",
+            },
+          });
+        } else {
+          const prevCount = await tx.administrasiPembelajaran.count({
+            where: { penugasan_mengajar_id: currentSession.penugasan_mengajar_id },
+          });
+          await tx.administrasiPembelajaran.create({
+            data: {
+              id: ulid(),
+              sekolah_id,
+              penugasan_mengajar_id: currentSession.penugasan_mengajar_id,
+              sesi_kelas_aktual_id: sesi_kelas_id,
+              guru_id: currentSession.guru_id,
+              tanggal: currentSession.tanggal,
+              pertemuan_ke: prevCount + 1,
+              materi_disampaikan: input.topik_pembelajaran.trim(),
+              kegiatan_pembelajaran: input.catatan_jurnal?.trim() || null,
+              status_realisasi: "TERLAKSANA",
+            },
+          });
+        }
       }
     });
 
@@ -454,21 +507,27 @@ export class AttendanceRepository {
       }
 
       // Hitung persentase kehadiran: (Hadir + Terlambat + Dispensasi) / Total Sesi Tercatat
-      // Jika belum ada sesi tercatat, default 100%
+      // Jika belum ada sesi tercatat, persentase kehadiran 0 (belum ada KBM terlaksana)
       const effectivePresent = hadir + terlambat + dispensasi;
       const persentase =
-        total_sesi_tercatat > 0 ? Math.round((effectivePresent / total_sesi_tercatat) * 100) : 100;
+        total_sesi_tercatat > 0 ? Math.round((effectivePresent / total_sesi_tercatat) * 100) : 0;
 
-      sumPercentages += persentase;
+      if (total_sesi_tercatat > 0) {
+        sumPercentages += persentase;
+      }
 
-      let status_evaluasi: EvaluationAttendanceStatus = "Sangat Baik";
-      if (persentase < 75 || alpha >= 3) {
-        status_evaluasi = "Perlu Perhatian";
-        jumlahPerluPerhatian++;
-      } else if (persentase < 85) {
-        status_evaluasi = "Cukup";
-      } else if (persentase < 95) {
-        status_evaluasi = "Baik";
+      let status_evaluasi: EvaluationAttendanceStatus = "Belum Ada Sesi";
+      if (total_sesi_tercatat > 0) {
+        if (persentase < 75 || alpha >= 3) {
+          status_evaluasi = "Perlu Perhatian";
+          jumlahPerluPerhatian++;
+        } else if (persentase < 85) {
+          status_evaluasi = "Cukup";
+        } else if (persentase < 95) {
+          status_evaluasi = "Baik";
+        } else {
+          status_evaluasi = "Sangat Baik";
+        }
       }
 
       return {
@@ -490,8 +549,29 @@ export class AttendanceRepository {
       };
     });
 
+    // Petakan sesi pertemuan beserta tanggal (DD/MM) dan status per siswa
+    const sesi_pertemuan: ClassAttendanceSessionDateDTO[] = sessionsWithAttendance.map((s) => {
+      const tanggalIso = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+      }).format(s.tanggal);
+      const [, monthPart, dayPart] = tanggalIso.split("-");
+      const statusPerSiswa: Record<string, string> = {};
+      for (const p of s.presensi_siswa) {
+        statusPerSiswa[p.siswa_id] = p.status;
+      }
+
+      return {
+        sesi_id: s.id,
+        tanggal_iso: tanggalIso,
+        label_tanggal: `${dayPart}/${monthPart}`,
+        bulan_key: tanggalIso.slice(0, 7),
+        status_per_siswa: statusPerSiswa,
+      };
+    });
+
     const total_siswa = daftar_siswa.length;
-    const rerata_kehadiran_kelas = total_siswa > 0 ? Math.round(sumPercentages / total_siswa) : 100;
+    const rerata_kehadiran_kelas =
+      total_sesi_tercatat > 0 && total_siswa > 0 ? Math.round(sumPercentages / total_siswa) : 0;
 
     return {
       penugasan_id: assignment.id,
@@ -508,6 +588,7 @@ export class AttendanceRepository {
       total_siswa,
       rerata_kehadiran_kelas,
       jumlah_perlu_perhatian: jumlahPerluPerhatian,
+      sesi_pertemuan,
       daftar_siswa,
     };
   }

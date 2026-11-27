@@ -109,4 +109,30 @@ describe("AcademicShell Component (Phase 05)", () => {
     // Modal closes
     expect(screen.queryByText("Konfirmasi Keluar")).not.toBeInTheDocument();
   });
+
+  it("shows active tenant banner for SUPER_ADMIN when sekolah_id is set and hides it in Platform Mode", () => {
+    const { rerender } = render(
+      <AcademicShell
+        user={{ ...mockUser, peran_dasar: "SUPER_ADMIN", sekolah_id: null }}
+        activeSchoolName={null}
+      >
+        <div>Konten Platform</div>
+      </AcademicShell>
+    );
+
+    expect(screen.queryByText("Mode Dukungan Sekolah Aktif")).not.toBeInTheDocument();
+
+    rerender(
+      <AcademicShell
+        user={{ ...mockUser, peran_dasar: "SUPER_ADMIN", sekolah_id: "01J00000000000000000000001" }}
+        activeSchoolName="SMK Otomindo"
+      >
+        <div>Konten Tenant</div>
+      </AcademicShell>
+    );
+
+    expect(screen.getByText("Mode Dukungan Sekolah Aktif")).toBeInTheDocument();
+    expect(screen.getByText("SMK Otomindo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Keluar ke Mode Platform/i })).toBeInTheDocument();
+  });
 });

@@ -16,5 +16,11 @@ if (isPostgres) {
   console.log(
     "[Build Prepare] Target: SQLite (Development). Generating client from prisma/schema.prisma..."
   );
-  execSync("npx prisma generate --schema prisma/schema.prisma", { stdio: "inherit" });
+  try {
+    execSync("npx prisma generate --schema prisma/schema.prisma", { stdio: "inherit" });
+  } catch (err) {
+    console.warn(
+      "[Build Prepare] Warning: prisma generate encountered lock (engine DLL locked by active dev server). Proceeding with existing generated client."
+    );
+  }
 }

@@ -12,11 +12,21 @@ export const metadata: Metadata = {
   description: "Pusat rekapitulasi penilaian formatif, sumatif, dan buku nilai guru",
 };
 
-export default async function PenilaianPage() {
+interface PenilaianPageProps {
+  searchParams?: Promise<{ penugasanId?: string }>;
+}
+
+export default async function PenilaianPage({ searchParams }: PenilaianPageProps) {
   const user = await requirePermission("assessment.grades.manage");
 
   if (!user.sekolah_id) {
     redirect("/dashboard");
+  }
+
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const penugasanId = resolvedSearchParams?.penugasanId?.trim();
+  if (penugasanId) {
+    redirect(`/penilaian/${encodeURIComponent(penugasanId)}`);
   }
 
   const isSuperAdmin = user.peran_dasar === "SUPER_ADMIN";

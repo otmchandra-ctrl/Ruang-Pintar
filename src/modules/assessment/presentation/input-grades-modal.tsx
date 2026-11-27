@@ -12,13 +12,21 @@ import {
   Save,
   Send,
   HelpCircle,
+  WifiOff,
 } from "lucide-react";
 import {
   getAssessmentGradesAction,
   saveAssessmentGradesAction,
   publishAssessmentAction,
 } from "@/app/actions/assessment-actions";
-import { DefinisiAsesmenDTO, NilaiSiswaDTO } from "../domain/assessment-types";
+import { BulkSaveGradesInput, DefinisiAsesmenDTO, NilaiSiswaDTO } from "../domain/assessment-types";
+import {
+  enqueueOfflineMutation,
+  getOfflineDataCache,
+  getOfflineMutation,
+  setOfflineDataCache,
+} from "@/shared/lib/offline-sync-queue";
+import { isLikelyNetworkError } from "@/shared/lib/offline-sync-runner";
 
 interface InputGradesModalProps {
   asesmenId: string;
@@ -43,6 +51,8 @@ export function InputGradesModal({
   const [grades, setGrades] = useState<NilaiSiswaDTO[]>([]);
   const [alasanKoreksi, setAlasanKoreksi] = useState("");
   const [showCorrectionInput, setShowCorrectionInput] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [hasPendingSync, setHasPendingSync] = useState(false);
 
   const isLoadingData = loadedAsesmenId !== asesmenId;
 
@@ -51,33 +61,94 @@ export function InputGradesModal({
     onClose();
   };
 
-  // Load grades when modal opens
+  // Load grades when modal opens (dengan fallback cache offline)
   useEffect(() => {
     if (!isOpen || !asesmenId) return;
     if (loadedAsesmenId === asesmenId) return;
 
     let isMounted = true;
+    const cacheKey = `grades:${asesmenId}`;
+    const mutationKey = `ASSESSMENT_GRADES:${asesmenId}`;
 
-    getAssessmentGradesAction(asesmenId)
-      .then((res) => {
+    const hydrateGradesData = async (
+      data: { asesmen: DefinisiAsesmenDTO; grades: NilaiSiswaDTO[] },
+      offline: boolean
+    ) => {
+      if (!isMounted) return;
+      const pending = await getOfflineMutation<BulkSaveGradesInput>(mutationKey);
+      if (!isMounted) return;
+
+      let mergedGrades = data.grades;
+      if (pending?.payload.grades) {
+        const pendingMap = new Map(pending.payload.grades.map((g) => [g.siswa_id, g]));
+        const kktpVal = data.asesmen.kkm_kktp || 75;
+        mergedGrades = data.grades.map((g) => {
+          const p = pendingMap.get(g.siswa_id);
+          if (!p) return g;
+          return {
+            ...g,
+            nilai_angka: p.nilai_angka,
+            is_tercapai_kktp: p.nilai_angka !== null ? p.nilai_angka >= kktpVal : null,
+            capaian_kompetensi: p.capaian_kompetensi ?? g.capaian_kompetensi,
+            catatan: p.catatan ?? g.catatan,
+          };
+        });
+      }
+
+      setAsesmen(data.asesmen);
+      setGrades(mergedGrades);
+      setIsOfflineMode(offline);
+      setHasPendingSync(Boolean(pending));
+      setLoadedAsesmenId(asesmenId);
+      if (pending?.payload.alasan_koreksi) {
+        setAlasanKoreksi(pending.payload.alasan_koreksi);
+      }
+
+      const hasExistingGrades = mergedGrades.some((g) => g.nilai_angka !== null);
+      if (hasExistingGrades) {
+        setShowCorrectionInput(true);
+      }
+    };
+
+    const loadGrades = async () => {
+      const isCurrentlyOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+
+      if (isCurrentlyOffline) {
+        const cached = await getOfflineDataCache<{
+          asesmen: DefinisiAsesmenDTO;
+          grades: NilaiSiswaDTO[];
+        }>(cacheKey);
+        if (cached) {
+          await hydrateGradesData(cached, true);
+          return;
+        }
+      }
+
+      try {
+        const res = await getAssessmentGradesAction(asesmenId);
         if (!isMounted) return;
         if (res.success && res.data) {
-          setAsesmen(res.data.asesmen);
-          setGrades(res.data.grades);
-          setLoadedAsesmenId(asesmenId);
-          // Jika ada nilai yang sudah tersimpan sebelumnya, tampilkan field catatan koreksi
-          const hasExistingGrades = res.data.grades.some((g) => g.nilai_angka !== null);
-          if (hasExistingGrades) {
-            setShowCorrectionInput(true);
-          }
+          await setOfflineDataCache(cacheKey, res.data);
+          await hydrateGradesData(res.data, false);
         } else {
           onError(res.message);
           onClose();
         }
-      })
-      .catch((err) => {
-        if (isMounted) onError(err.message || "Gagal memuat data asesmen");
-      });
+      } catch (err) {
+        if (!isMounted) return;
+        const cached = await getOfflineDataCache<{
+          asesmen: DefinisiAsesmenDTO;
+          grades: NilaiSiswaDTO[];
+        }>(cacheKey);
+        if (cached) {
+          await hydrateGradesData(cached, true);
+          return;
+        }
+        onError(err instanceof Error ? err.message : "Gagal memuat data asesmen");
+      }
+    };
+
+    loadGrades();
 
     return () => {
       isMounted = false;
@@ -132,44 +203,74 @@ export function InputGradesModal({
 
   // Simpan nilai (Draf atau Publish)
   const handleSave = (shouldPublish = false) => {
-    startTransition(async () => {
-      const payload = {
-        asesmen_id: asesmenId,
-        grades: grades.map((g) => ({
-          siswa_id: g.siswa_id,
-          penempatan_rombel_id: g.penempatan_rombel_id,
-          nilai_angka: g.nilai_angka,
-          capaian_kompetensi: g.capaian_kompetensi,
-          catatan: g.catatan,
-          status: shouldPublish ? ("PUBLISHED" as const) : ("DRAFT" as const),
-          alasan_koreksi: alasanKoreksi || null,
-        })),
+    const payload: BulkSaveGradesInput = {
+      asesmen_id: asesmenId,
+      grades: grades.map((g) => ({
+        siswa_id: g.siswa_id,
+        penempatan_rombel_id: g.penempatan_rombel_id,
+        nilai_angka: g.nilai_angka,
+        capaian_kompetensi: g.capaian_kompetensi,
+        catatan: g.catatan,
+        status: shouldPublish ? ("PUBLISHED" as const) : ("DRAFT" as const),
         alasan_koreksi: alasanKoreksi || null,
-      };
+      })),
+      alasan_koreksi: alasanKoreksi || null,
+    };
 
-      const res = await saveAssessmentGradesAction(payload, penugasanId);
-      if (!res.success) {
-        onError(res.message);
+    const enqueueLocally = async () => {
+      await enqueueOfflineMutation({
+        key: `ASSESSMENT_GRADES:${asesmenId}`,
+        type: "ASSESSMENT_GRADES",
+        label: `Nilai ${asesmen?.judul || "Asesmen"}`,
+        payload,
+        meta: {
+          penugasanId,
+          shouldPublish,
+        },
+      });
+      onSuccess(
+        "Koneksi offline: Nilai disimpan di perangkat dan akan otomatis tersinkronisasi saat online."
+      );
+      handleClose();
+    };
+
+    startTransition(async () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        await enqueueLocally();
         return;
       }
 
-      if (shouldPublish) {
-        const pubRes = await publishAssessmentAction(
-          {
-            asesmen_id: asesmenId,
-            target_audience: "SEMUA",
-          },
-          penugasanId
-        );
-        if (pubRes.success) {
-          onSuccess("Nilai berhasil disimpan dan resmi dipublikasikan.");
-          handleClose();
-        } else {
-          onError(pubRes.message);
+      try {
+        const res = await saveAssessmentGradesAction(payload, penugasanId);
+        if (!res.success) {
+          onError(res.message);
+          return;
         }
-      } else {
-        onSuccess(res.message);
-        handleClose();
+
+        if (shouldPublish) {
+          const pubRes = await publishAssessmentAction(
+            {
+              asesmen_id: asesmenId,
+              target_audience: "SEMUA",
+            },
+            penugasanId
+          );
+          if (pubRes.success) {
+            onSuccess("Nilai berhasil disimpan dan resmi dipublikasikan.");
+            handleClose();
+          } else {
+            onError(pubRes.message);
+          }
+        } else {
+          onSuccess(res.message);
+          handleClose();
+        }
+      } catch (err) {
+        if (isLikelyNetworkError(err)) {
+          await enqueueLocally();
+          return;
+        }
+        onError(err instanceof Error ? err.message : "Gagal menyimpan nilai asesmen.");
       }
     });
   };
@@ -238,6 +339,18 @@ export function InputGradesModal({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Offline / Pending Sync Notice */}
+        {(isOfflineMode || hasPendingSync) && !isLoadingData && (
+          <div className="px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/80 dark:border-amber-800/50 flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-200">
+            <WifiOff className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              {isOfflineMode
+                ? "Mode Offline: Menampilkan data nilai dari cache perangkat. Perubahan akan otomatis disinkronkan saat online."
+                : "Ada draf nilai yang menunggu sinkronisasi ke server."}
+            </span>
+          </div>
+        )}
 
         {/* Quick Toolbar & Live Stats */}
         <div className="px-6 py-2.5 bg-slate-50/40 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">

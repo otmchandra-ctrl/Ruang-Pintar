@@ -9,7 +9,82 @@ interface MathRendererProps {
   isArabic?: boolean;
 }
 
-function renderTextWithCode(text: string, keyPrefix: string) {
+function renderMathAndPlainText(text: string, keyPrefix: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const regex = /(\$\$[\s\S]+?\$\$|\$[^\$\n]+?\$)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let keyIdx = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    const mathStr = match[0];
+    const isBlock = mathStr.startsWith("$$") && mathStr.endsWith("$$");
+
+    if (!isBlock) {
+      const charAfterClose = text[match.index + mathStr.length] ?? "";
+      const inner = mathStr.slice(1, -1);
+      // Hindari salah tafsir variabel PHP pada satu baris (mis. "$produk1 ... $nama") sebagai rumus KaTeX
+      const looksLikeCodeVariables =
+        /[A-Za-z0-9_]/.test(charAfterClose) ||
+        /(?:->|::|;|\b(?:new|echo|return|public|private|protected|function|class)\b)/.test(inner);
+      if (looksLikeCodeVariables) {
+        continue;
+      }
+    }
+
+    if (match.index > lastIndex) {
+      parts.push(
+        <span key={`${keyPrefix}-t-${keyIdx++}`} className="whitespace-pre-wrap">
+          {text.substring(lastIndex, match.index)}
+        </span>
+      );
+    }
+
+    const latex = isBlock ? mathStr.slice(2, -2).trim() : mathStr.slice(1, -1).trim();
+
+    try {
+      const html = katex.renderToString(latex, {
+        displayMode: isBlock,
+        throwOnError: false,
+        output: "htmlAndMathml",
+      });
+
+      parts.push(
+        <span
+          key={`${keyPrefix}-m-${keyIdx++}`}
+          dangerouslySetInnerHTML={{ __html: html }}
+          className={
+            isBlock
+              ? "block my-2 text-center overflow-x-auto py-1"
+              : "inline-block px-1 align-baseline"
+          }
+        />
+      );
+    } catch {
+      parts.push(
+        <code
+          key={`${keyPrefix}-merr-${keyIdx++}`}
+          className="text-red-500 bg-red-50 dark:bg-red-950/40 dark:text-red-300 px-1 rounded text-xs font-mono"
+        >
+          {mathStr}
+        </code>
+      );
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(
+      <span key={`${keyPrefix}-t-${keyIdx++}`} className="whitespace-pre-wrap">
+        {text.substring(lastIndex)}
+      </span>
+    );
+  }
+  return parts;
+}
+
+function renderTextWithCodeAndMath(text: string, keyPrefix: string): React.ReactNode[] {
   const codeRegex = /```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g;
   const elements: React.ReactNode[] = [];
   let lastIdx = 0;
@@ -19,9 +94,10 @@ function renderTextWithCode(text: string, keyPrefix: string) {
   while ((codeMatch = codeRegex.exec(text)) !== null) {
     if (codeMatch.index > lastIdx) {
       elements.push(
-        <span key={`${keyPrefix}-t-${subKey++}`} className="whitespace-pre-wrap">
-          {text.substring(lastIdx, codeMatch.index)}
-        </span>
+        ...renderMathAndPlainText(
+          text.substring(lastIdx, codeMatch.index),
+          `${keyPrefix}-p-${subKey++}`
+        )
       );
     }
     const lang = codeMatch[1]?.trim();
@@ -43,11 +119,7 @@ function renderTextWithCode(text: string, keyPrefix: string) {
   }
 
   if (lastIdx < text.length) {
-    elements.push(
-      <span key={`${keyPrefix}-t-${subKey++}`} className="whitespace-pre-wrap">
-        {text.substring(lastIdx)}
-      </span>
-    );
+    elements.push(...renderMathAndPlainText(text.substring(lastIdx), `${keyPrefix}-p-${subKey++}`));
   }
   return elements;
 }
@@ -65,68 +137,10 @@ export function MathRenderer({ content, className = "", isArabic = false }: Math
     );
   }, [content, isArabic]);
 
-  // Parser teks yang memisahkan antara teks biasa, inline math ($...$), dan block math ($$...$$)
+  // Ekstrak blok kode terlebih dahulu sebelum mem-parsing rumus LaTeX
   const renderedElements = useMemo(() => {
     if (!content) return null;
-
-    // Regex untuk memisahkan $$block$$ dan $inline$
-    const parts: React.ReactNode[] = [];
-    const regex = /(\$\$[\s\S]+?\$\$|\$[^\$\n]+?\$)/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    let keyIdx = 0;
-
-    while ((match = regex.exec(content)) !== null) {
-      // Teks sebelum rumus
-      if (match.index > lastIndex) {
-        const textBefore = content.substring(lastIndex, match.index);
-        parts.push(...renderTextWithCode(textBefore, `pre-${keyIdx++}`));
-      }
-
-      const mathStr = match[0];
-      const isBlock = mathStr.startsWith("$$") && mathStr.endsWith("$$");
-      const latex = isBlock ? mathStr.slice(2, -2).trim() : mathStr.slice(1, -1).trim();
-
-      try {
-        const html = katex.renderToString(latex, {
-          displayMode: isBlock,
-          throwOnError: false,
-          output: "htmlAndMathml",
-        });
-
-        parts.push(
-          <span
-            key={`math-${keyIdx++}`}
-            dangerouslySetInnerHTML={{ __html: html }}
-            className={
-              isBlock
-                ? "block my-2 text-center overflow-x-auto py-1"
-                : "inline-block px-1 align-baseline"
-            }
-          />
-        );
-      } catch {
-        // Fallback jika terjadi error sintaks LaTeX
-        parts.push(
-          <code
-            key={`math-err-${keyIdx++}`}
-            className="text-red-500 bg-red-50 dark:bg-red-950/40 dark:text-red-300 px-1 rounded text-xs font-mono"
-          >
-            {mathStr}
-          </code>
-        );
-      }
-
-      lastIndex = regex.lastIndex;
-    }
-
-    // Sisa teks setelah rumus terakhir
-    if (lastIndex < content.length) {
-      parts.push(...renderTextWithCode(content.substring(lastIndex), `post-${keyIdx++}`));
-    }
-
-    return parts;
+    return renderTextWithCodeAndMath(content, "root");
   }, [content]);
 
   return (

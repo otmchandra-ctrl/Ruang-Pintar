@@ -140,10 +140,12 @@ export async function updateProfileSelfAction(
             telepon,
             alamat,
             ...(finalNamaLengkap ? { nama_lengkap: finalNamaLengkap } : {}),
-            ...(canEditName ? {
-              gelar_depan: gelarDepanRaw || null,
-              gelar_belakang: gelarBelakangRaw || null,
-            } : {}),
+            ...(canEditName
+              ? {
+                  gelar_depan: gelarDepanRaw || null,
+                  gelar_belakang: gelarBelakangRaw || null,
+                }
+              : {}),
             ...(foto_url !== undefined ? { foto_url } : {}),
           },
         });

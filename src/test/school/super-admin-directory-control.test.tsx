@@ -165,4 +165,39 @@ describe("SuperAdminSchoolDirectoryView — Tenant & User Control", () => {
 
     expect(screen.getByText(/Reset Kata Sandi Pengguna/i)).toBeInTheDocument();
   });
+
+  it("renders line and concentric ring analytics charts when analytics prop is provided", () => {
+    render(
+      <SuperAdminSchoolDirectoryView
+        schools={mockSchools}
+        platformUsers={mockPlatformUsers}
+        analytics={{
+          activityDays: { SENIN: 8, SELASA: 13, RABU: 17, KAMIS: 20, JUMAT: 16, SABTU: 1 },
+          totalSesiAktual: 75,
+          attendance: {
+            totalPresensiRecorded: 202,
+            totalPresensiHadir: 187,
+            totalPresensiIzinSakit: 9,
+            totalPresensiAlpha: 6,
+            hadirPct: 92.6,
+            izinSakitPct: 4.5,
+            alphaPct: 3.0,
+          },
+          totalRapor: 0,
+          totalMataPelajaran: 58,
+        }}
+        currentUser={{
+          id: "usr_super",
+          nama_lengkap: "Super Admin",
+          peran_dasar: "SUPER_ADMIN",
+          sekolah_id: null,
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Ringkasan Aktivitas Pembelajaran/i)).toBeInTheDocument();
+    expect(screen.getByText(/Learner Engagement/i)).toBeInTheDocument();
+    expect(screen.getByText(/Penyampaian Nilai Akademik/i)).toBeInTheDocument();
+    expect(screen.getByText(/75 Sesi Terdata/i)).toBeInTheDocument();
+  });
 });

@@ -86,6 +86,36 @@ export class CbtWriteQueue {
   }
 
   /**
+   * Menjalankan batch autosave per attempt secara serialized agar tidak bentrok
+   * dengan single-writer lock pada SQLite/D1.
+   */
+  async enqueueBatchAutosave<T>(
+    attemptId: string,
+    itemCount: number,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    this.stats.totalAutosavesQueued += itemCount;
+    const key = `${attemptId}:batch`;
+
+    const execute = async () => {
+      try {
+        const result = await withSqliteRetry(operation);
+        this.stats.totalAutosavesProcessed += itemCount;
+        this.stats.lastProcessedAt = new Date();
+        return result;
+      } finally {
+        this.inFlightAutosaves.delete(key);
+      }
+    };
+
+    const existing = this.inFlightAutosaves.get(key);
+    const taskPromise = existing ? existing.then(execute, execute) : execute();
+    this.inFlightAutosaves.set(key, taskPromise);
+
+    return taskPromise;
+  }
+
+  /**
    * Menjalankan submit attempt secara IDEMPOTEN murni:
    * Jika ada submit attemptId yang sedang berjalan (in-flight), request berikutnya
    * TIDAK MEMBUAT transaksi baru, melainkan langsung membagi promise yang sama.

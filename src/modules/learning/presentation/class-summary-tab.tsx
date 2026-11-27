@@ -25,6 +25,7 @@ import {
   Plus,
   ArrowRight,
   Loader2,
+  BookCheck,
 } from "lucide-react";
 import { TeacherClassWorkspaceDTO, MateriPembelajaranDTO } from "../domain/learning-types";
 import {
@@ -242,6 +243,7 @@ export function ClassSummaryTab({
   attendanceRecap,
   studentDirectory = [],
   onOpenCreateTugas,
+  onOpenCreateJurnal,
   onOpenSessionAttendance,
   isOpeningAttendance = false,
   onSelectStudent,
@@ -536,21 +538,35 @@ export function ClassSummaryTab({
                 </div>
               </div>
 
-              {canManage && onOpenSessionAttendance && (
-                <button
-                  type="button"
-                  disabled={isOpeningAttendance}
-                  onClick={() => onOpenSessionAttendance()}
-                  title="Ambil Presensi Sesi"
-                  className="p-1.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/60 hover:bg-blue-100 text-[#2563EB] dark:text-blue-400 border border-blue-200/80 text-xs font-bold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center min-w-[28px] min-h-[28px]"
-                >
-                  {isOpeningAttendance ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Plus className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {canManage && onOpenCreateJurnal && (
+                  <button
+                    type="button"
+                    onClick={onOpenCreateJurnal}
+                    title="Isi Jurnal Administrasi KBM"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50/80 dark:bg-emerald-950/60 hover:bg-emerald-100/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <BookCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Isi Jurnal</span>
+                  </button>
+                )}
+
+                {canManage && onOpenSessionAttendance && (
+                  <button
+                    type="button"
+                    disabled={isOpeningAttendance}
+                    onClick={() => onOpenSessionAttendance()}
+                    title="Ambil Presensi Sesi"
+                    className="p-1.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/60 hover:bg-blue-100 text-[#2563EB] dark:text-blue-400 border border-blue-200/80 text-xs font-bold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center min-w-[28px] min-h-[28px]"
+                  >
+                    {isOpeningAttendance ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Angka & Light Neon Glass Segmented Bar */}

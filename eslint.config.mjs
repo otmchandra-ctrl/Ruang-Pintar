@@ -5,6 +5,7 @@ const eslintConfig = [
   {
     ignores: [
       ".next/**",
+      ".open-next/**",
       ".next-supabase-migration-check/**",
       "out/**",
       "build/**",

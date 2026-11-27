@@ -401,4 +401,57 @@ describe("STAGE UX-04.1: Attendance Workflow Optimization", () => {
       );
     });
   });
+
+  it("Jurnal KBM: allows inputting topik and catatan jurnal and submits with attendance", async () => {
+    (attendanceActions.getSessionAttendanceAction as any).mockResolvedValue({
+      success: true,
+      data: {
+        ...mockSessionData,
+        topik_pembelajaran: "Dasar Polymorphism",
+        catatan: "Siswa aktif berdiskusi",
+      },
+    });
+
+    (attendanceActions.saveSessionAttendanceAction as any).mockResolvedValue({
+      success: true,
+      message: "Presensi dan jurnal berhasil disimpan.",
+    });
+
+    render(<SessionAttendanceModal sesiId="sesi-pbo-101" isOpen={true} onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jurnal Mengajar / KBM")).toBeInTheDocument();
+    });
+
+    // Check pre-populated values
+    const topikInput = screen.getByPlaceholderText(
+      /Pengenalan Algoritma Searching/i
+    ) as HTMLInputElement;
+    expect(topikInput.value).toBe("Dasar Polymorphism");
+
+    const catatanInput = screen.getByPlaceholderText(
+      /Catatan kegiatan, pemahaman siswa/i
+    ) as HTMLTextAreaElement;
+    expect(catatanInput.value).toBe("Siswa aktif berdiskusi");
+
+    // Modify topic and notes
+    fireEvent.change(topikInput, { target: { value: "Polymorphism & Abstraction OOP" } });
+    fireEvent.change(catatanInput, {
+      target: { value: "Seluruh praktikum lab terlaksana lancar" },
+    });
+
+    // Submit
+    const simpanBtn = screen.getByRole("button", { name: /Simpan Presensi Kelas/i });
+    fireEvent.click(simpanBtn);
+
+    await waitFor(() => {
+      expect(attendanceActions.saveSessionAttendanceAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sesi_kelas_id: "sesi-pbo-101",
+          topik_pembelajaran: "Polymorphism & Abstraction OOP",
+          catatan_jurnal: "Seluruh praktikum lab terlaksana lancar",
+        })
+      );
+    });
+  });
 });

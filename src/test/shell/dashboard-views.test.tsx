@@ -1,6 +1,13 @@
 import React from "react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
 import { TeacherDashboard } from "@/shared/components/dashboard/role-views/teacher-dashboard";
 import { StudentDashboard } from "@/shared/components/dashboard/role-views/student-dashboard";
 import { GuardianDashboard } from "@/shared/components/dashboard/role-views/guardian-dashboard";
@@ -341,21 +348,33 @@ describe("Role Dashboard Views & Page Contracts (Phase 05)", () => {
     expect(screen.getByText("Modul Operasional & Wewenang")).toBeInTheDocument();
   });
 
-  it("renders SuperAdminDashboard with core stat cards, activity chart, and quick actions", async () => {
-    const jsx = await SuperAdminDashboard({ user: mockAdmin });
-    render(jsx);
+  it("renders SuperAdminDashboard in Platform Mode and Active Tenant Mode cleanly without slop", async () => {
+    const platformJsx = await SuperAdminDashboard({
+      user: { ...mockAdmin, sekolah_id: null },
+    });
+    const { unmount } = render(platformJsx);
 
-    expect(screen.getByText(/Tahun Ajaran 2026\/2027/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Pusat pemantauan ekosistem SaaS: adopsi sekolah, guru mandiri, dan operasional akademik."
-      )
-    ).toBeInTheDocument();
-    expect(screen.getByText("Total Sekolah Pengguna")).toBeInTheDocument();
-    expect(screen.getByText("Guru Terdaftar (SaaS)")).toBeInTheDocument();
-    expect(screen.getByText("Total Rombel / Kelas")).toBeInTheDocument();
-    expect(screen.getByText("Total Siswa Terdata")).toBeInTheDocument();
-    expect(screen.getByText("Ringkasan Aktivitas Pembelajaran")).toBeInTheDocument();
-    expect(screen.getByText("Aksi Cepat Super Admin")).toBeInTheDocument();
+    expect(screen.getByText(/Platform Control • SaaS/i)).toBeInTheDocument();
+    expect(screen.getByText(`Halo, ${mockAdmin.nama_lengkap}!`)).toBeInTheDocument();
+    expect(screen.getByText("Total Sekolah")).toBeInTheDocument();
+    expect(screen.getByText("Total Siswa")).toBeInTheDocument();
+    expect(screen.getByText("Perlu Tindak Lanjut")).toBeInTheDocument();
+    expect(screen.getByText("Estimasi MRR")).toBeInTheDocument();
+    expect(screen.getByText("Daftar Sekolah")).toBeInTheDocument();
+    expect(screen.getByText("Ringkasan Platform")).toBeInTheDocument();
+    expect(screen.getByText("Log Audit")).toBeInTheDocument();
+    expect(screen.queryByText("e-Rapor Merdeka")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lihat Kelas")).not.toBeInTheDocument();
+    unmount();
+
+    const tenantJsx = await SuperAdminDashboard({
+      user: mockAdmin,
+      activeSchoolName: "SMK Otomindo",
+    });
+    render(tenantJsx);
+
+    expect(screen.getByText(/Mode Dukungan Sekolah • SMK Otomindo/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Keluar ke Mode Platform/i })).toBeInTheDocument();
+    expect(screen.getByText("Kurikulum")).toBeInTheDocument();
   });
 });

@@ -27,6 +27,7 @@ import {
   HasilUjianCbtDTO,
   BankSoalDTO,
 } from "@/modules/cbt/domain/cbt-types";
+import type { BatchAutosaveJawabanInput } from "@/modules/cbt/domain/cbt-validation";
 import {
   generateQuestionsWithGemini,
   generateMixedExamWithGemini,
@@ -674,6 +675,25 @@ export async function autosaveAnswerAction(
 
     const res = await cbtService.autosaveAnswer(input, user.sekolah_id, siswaId);
     return { success: true, message: "Jawaban tersimpan otomatis.", data: res };
+  } catch (err) {
+    return { success: false, message: getSafeErrorMessage(err) };
+  }
+}
+
+export async function batchAutosaveAnswersAction(
+  input: BatchAutosaveJawabanInput
+): Promise<CbtActionResult<{ savedAt: Date; savedCount: number }>> {
+  try {
+    const user = await requireAuth();
+    if (!user.sekolah_id) return { success: false, message: "Sekolah tidak teridentifikasi." };
+
+    const { siswaId } = await resolveStudentContext(user.id, user.peran_dasar, user.sekolah_id);
+    if (!siswaId) {
+      return { success: false, message: "Identitas siswa tidak valid." };
+    }
+
+    const res = await cbtService.autosaveAnswersBatch(input, user.sekolah_id, siswaId);
+    return { success: true, message: "Batch jawaban tersimpan otomatis.", data: res };
   } catch (err) {
     return { success: false, message: getSafeErrorMessage(err) };
   }

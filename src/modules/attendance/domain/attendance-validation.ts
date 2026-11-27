@@ -19,4 +19,6 @@ export const SaveSessionAttendanceSchema = z.object({
   sekolah_id: z.string().min(1, "ID sekolah wajib diisi"),
   items: z.array(SaveAttendanceItemSchema).min(1, "Minimal 1 siswa dalam daftar presensi"),
   alasan_koreksi: z.string().max(255).nullable().optional(),
+  topik_pembelajaran: z.string().max(255).nullable().optional(),
+  catatan_jurnal: z.string().max(1000).nullable().optional(),
 });

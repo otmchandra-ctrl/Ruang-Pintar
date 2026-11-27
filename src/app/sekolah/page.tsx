@@ -37,7 +37,7 @@ export default async function SchoolManagementPage(props: SchoolManagementPagePr
 
   // Mode 1: SUPER_ADMIN membuka direktori multi-tenant sekolah & lisensi
   if (isSuperAdmin && !searchParams?.sekolahId) {
-    const [rawSchools, platformDirectory] = await Promise.all([
+    const [rawSchools, platformDirectory, activityAnalytics] = await Promise.all([
       prisma.sekolah.findMany({
         orderBy: { created_at: "desc" },
         include: {
@@ -62,6 +62,7 @@ export default async function SchoolManagementPage(props: SchoolManagementPagePr
         },
       }),
       platformControlService.listPlatformDirectoryData(),
+      platformControlService.getPlatformActivityAnalytics(),
     ]);
 
     const enrichedSchools = rawSchools.map((school) => ({
@@ -74,6 +75,7 @@ export default async function SchoolManagementPage(props: SchoolManagementPagePr
         <SuperAdminSchoolDirectoryView
           schools={enrichedSchools}
           platformUsers={platformDirectory.platformUsers}
+          analytics={activityAnalytics}
           currentUser={user}
         />
       </AcademicShell>

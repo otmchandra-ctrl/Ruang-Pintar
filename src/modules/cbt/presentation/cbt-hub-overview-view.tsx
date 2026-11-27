@@ -828,36 +828,50 @@ export function CbtHubOverviewView({
                           </div>
 
                           {/* Action Footer: MONITOR & AKHIRI UJIAN */}
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2.5 z-10">
-                            {/* Tombol MONITOR PROCTOR */}
+                          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col gap-2 z-10">
+                            {/* Tombol MONITOR PROCTOR (Hero Action Cockpit) */}
                             <Link
                               href={`/cbt-ujian/proctor/${e.id}`}
-                              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition active:scale-[0.98] cursor-pointer"
+                              className="group relative w-full inline-flex items-center justify-between py-2.5 px-4 rounded-xl bg-[#1E293B] hover:bg-[#0F172A] active:bg-[#020617] dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-xs font-bold shadow-xs hover:shadow-md transition-all duration-150 active:scale-[0.99] cursor-pointer whitespace-nowrap overflow-hidden"
                             >
-                              <ShieldCheck className="h-4 w-4" />
-                              <span>Monitor Proctor Live</span>
+                              <div className="flex items-center gap-2">
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                </span>
+                                <ShieldCheck className="h-4 w-4 text-blue-300 dark:text-blue-100 shrink-0 group-hover:scale-110 transition-transform" />
+                                <span className="tracking-wide">Monitor Proctor Live</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-300 dark:text-blue-100 group-hover:text-white transition-colors">
+                                <span>Buka Ruang</span>
+                                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                              </div>
                             </Link>
 
-                            {/* Tombol PENGATURAN CBT */}
-                            <button
-                              type="button"
-                              onClick={() => setExamToEdit(e)}
-                              className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 text-xs font-bold transition active:scale-[0.98] cursor-pointer"
-                              title="Ubah Pengaturan Ujian (Durasi, Token, Acak Soal, KKTP)"
-                            >
-                              <SlidersHorizontal className="h-4 w-4 text-slate-600 dark:text-slate-300" />
-                              <span className="hidden sm:inline">Pengaturan</span>
-                            </button>
+                            {/* Tombol Sekunder: Pengaturan & Akhiri Ujian (Symmetric Grid) */}
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* Tombol PENGATURAN CBT */}
+                              <button
+                                type="button"
+                                onClick={() => setExamToEdit(e)}
+                                className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 active:bg-slate-200 dark:bg-slate-800/70 dark:hover:bg-slate-800 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white border border-slate-200/80 dark:border-white/10 text-xs font-semibold transition active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                                title="Ubah Pengaturan Ujian (Durasi, Token, Acak Soal, KKTP)"
+                              >
+                                <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                                <span>Pengaturan</span>
+                              </button>
 
-                            {/* Tombol AKHIRI UJIAN */}
-                            <button
-                              type="button"
-                              onClick={() => setExamToEnd(e)}
-                              className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-900/50 text-xs font-bold transition active:scale-[0.98] cursor-pointer"
-                            >
-                              <StopCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                              <span>Akhiri Ujian</span>
-                            </button>
+                              {/* Tombol AKHIRI UJIAN */}
+                              <button
+                                type="button"
+                                onClick={() => setExamToEnd(e)}
+                                className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-rose-50/70 hover:bg-rose-100 active:bg-rose-200/80 dark:bg-rose-950/30 dark:hover:bg-rose-900/50 text-rose-700 hover:text-rose-800 dark:text-rose-300 border border-rose-200/80 hover:border-rose-300 dark:border-rose-900/50 text-xs font-semibold transition active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                                title="Hentikan sesi ujian aktif dan kumpulkan semua lembar kerja siswa"
+                              >
+                                <StopCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                                <span>Akhiri Ujian</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
