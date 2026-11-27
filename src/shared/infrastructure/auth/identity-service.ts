@@ -219,6 +219,11 @@ export class IdentityService {
       },
     });
 
+    // Cabut seluruh sesi aktif pengguna agar wajib login ulang memakai kata sandi baru
+    await prisma.sesiPengguna.deleteMany({
+      where: { pengguna_id: userId },
+    });
+
     await recordAuditEvent({
       sekolah_id: user.sekolah_id,
       aktor_id: actorId,

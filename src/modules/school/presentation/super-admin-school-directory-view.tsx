@@ -29,6 +29,9 @@ import {
   AlertTriangle,
   Radio,
   ArrowRight,
+  KeyRound,
+  Trash2,
+  UserCog,
 } from "lucide-react";
 import {
   AcademicDataTable,
@@ -39,6 +42,18 @@ import { CreateSchoolModal } from "./create-school-modal";
 import { ManageLicenseModal, ManageLicenseSchool } from "./manage-license-modal";
 import { switchActiveTenantAction, clearActiveTenantAction } from "@/app/actions/tenant-actions";
 import { toggleSchoolActiveStatusAction } from "@/app/actions/school-actions";
+import type {
+  PlatformTenantOwnerSummary,
+  PlatformUserAccountItem,
+} from "@/modules/school/application/platform-control-service";
+import {
+  ResetPlatformPasswordModal,
+  DeleteFreemiumTenantModal,
+  DeletePlatformUserModal,
+  ResetPasswordTarget,
+  DeleteFreemiumTenantTarget,
+} from "./platform-control-modals";
+import { PlatformUsersDirectoryPanel } from "./platform-users-directory-panel";
 
 export interface SchoolTenantItem {
   id: string;
@@ -52,6 +67,7 @@ export interface SchoolTenantItem {
   telepon: string | null;
   email: string | null;
   created_at: Date | string;
+  ownerSummary?: PlatformTenantOwnerSummary | null;
   _count?: {
     siswa: number;
     guru: number;
@@ -77,6 +93,7 @@ export interface SchoolTenantItem {
 
 interface SuperAdminSchoolDirectoryViewProps {
   schools: SchoolTenantItem[];
+  platformUsers?: PlatformUserAccountItem[];
   currentUser?: {
     id: string;
     nama_lengkap: string;
@@ -87,13 +104,21 @@ interface SuperAdminSchoolDirectoryViewProps {
 
 export function SuperAdminSchoolDirectoryView({
   schools,
+  platformUsers = [],
   currentUser,
 }: SuperAdminSchoolDirectoryViewProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = React.useState<"tenants" | "users">("tenants");
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = React.useState(false);
   const [selectedSchoolForLicense, setSelectedSchoolForLicense] =
     React.useState<ManageLicenseSchool | null>(null);
+  const [resetTarget, setResetTarget] = React.useState<ResetPasswordTarget | null>(null);
+  const [deleteTenantTarget, setDeleteTenantTarget] =
+    React.useState<DeleteFreemiumTenantTarget | null>(null);
+  const [deleteUserTarget, setDeleteUserTarget] = React.useState<PlatformUserAccountItem | null>(
+    null
+  );
 
   const [switchingSchoolId, setSwitchingSchoolId] = React.useState<string | null>(null);
   const [isClearingTenant, setIsClearingTenant] = React.useState(false);
@@ -279,6 +304,26 @@ export function SuperAdminSchoolDirectoryView({
                     ID: {school.id.slice(0, 10)}...
                   </span>
                 </div>
+                {school.ownerSummary ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                    <span className="font-semibold text-indigo-700 dark:text-indigo-300">
+                      Pemilik: {school.ownerSummary.nama_lengkap}
+                    </span>
+                    <span className="text-slate-400">•</span>
+                    <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">
+                      {school.ownerSummary.email || `@${school.ownerSummary.username}`}
+                    </span>
+                    {school.ownerSummary.status_akun === "TERKUNCI" && (
+                      <span className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 text-[9px] font-bold">
+                        TERKUNCI
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[11px] italic text-slate-400 dark:text-slate-500">
+                    Tanpa Akun Pemilik
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -477,6 +522,50 @@ export function SuperAdminSchoolDirectoryView({
                 <span>Lisensi</span>
               </button>
 
+              {/* Tombol 2b: Reset Sandi Pemilik/Admin Tenant */}
+              {school.ownerSummary && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResetTarget({
+                      userId: school.ownerSummary!.userId,
+                      nama_lengkap: school.ownerSummary!.nama_lengkap,
+                      username: school.ownerSummary!.username,
+                      email: school.ownerSummary!.email,
+                      sekolah_nama: school.nama,
+                    })
+                  }
+                  title="Reset Sandi Pemilik/Admin Tenant"
+                  aria-label={`Reset Sandi ${school.ownerSummary.nama_lengkap}`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 text-xs font-bold transition cursor-pointer"
+                >
+                  <KeyRound className="size-3.5" />
+                  <span className="hidden xl:inline">Reset Sandi</span>
+                </button>
+              )}
+
+              {/* Tombol 2c: Hapus Permanen Tenant FREEMIUM (Terproteksi) */}
+              {school.tipe_lisensi === "FREEMIUM" && school.id !== currentUser?.sekolah_id && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDeleteTenantTarget({
+                      id: school.id,
+                      nama: school.nama,
+                      tipe_lisensi: school.tipe_lisensi,
+                      _count: school._count,
+                      ownerSummary: school.ownerSummary,
+                    })
+                  }
+                  title="Hapus Permanen Tenant Trial"
+                  aria-label={`Hapus Trial ${school.nama}`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800 text-xs font-bold transition cursor-pointer"
+                >
+                  <Trash2 className="size-3.5" />
+                  <span className="hidden xl:inline">Hapus</span>
+                </button>
+              )}
+
               {/* Tombol 3: Kelola Struktur & Profil */}
               <Link
                 href={`/sekolah?sekolahId=${school.id}`}
@@ -579,6 +668,22 @@ export function SuperAdminSchoolDirectoryView({
           </span>
         </div>
 
+        {/* Identitas Pemilik Mobile */}
+        <div className="px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
+          {school.ownerSummary ? (
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <span className="font-bold text-indigo-700 dark:text-indigo-300">
+                Pemilik: {school.ownerSummary.nama_lengkap}
+              </span>
+              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                {school.ownerSummary.email || `@${school.ownerSummary.username}`}
+              </span>
+            </div>
+          ) : (
+            <span className="italic text-slate-400 dark:text-slate-500">Tanpa Akun Pemilik</span>
+          )}
+        </div>
+
         {/* Lisensi & Kapasitas Grid */}
         <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 dark:border-slate-800 font-mono">
           <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
@@ -596,7 +701,7 @@ export function SuperAdminSchoolDirectoryView({
         </div>
 
         {/* Mobile Action Buttons */}
-        <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
           {isCurrentActive ? (
             <span className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center gap-1">
               <Radio className="size-3 text-blue-600" />
@@ -614,7 +719,46 @@ export function SuperAdminSchoolDirectoryView({
             </button>
           )}
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {school.ownerSummary && (
+              <button
+                type="button"
+                onClick={() =>
+                  setResetTarget({
+                    userId: school.ownerSummary!.userId,
+                    nama_lengkap: school.ownerSummary!.nama_lengkap,
+                    username: school.ownerSummary!.username,
+                    email: school.ownerSummary!.email,
+                    sekolah_nama: school.nama,
+                  })
+                }
+                title="Reset Sandi Pemilik/Admin Tenant"
+                className="px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold cursor-pointer flex items-center gap-1"
+              >
+                <KeyRound className="size-3" />
+                <span>Sandi</span>
+              </button>
+            )}
+            {school.tipe_lisensi === "FREEMIUM" && school.id !== currentUser?.sekolah_id && (
+              <button
+                type="button"
+                onClick={() =>
+                  setDeleteTenantTarget({
+                    id: school.id,
+                    nama: school.nama,
+                    tipe_lisensi: school.tipe_lisensi,
+                    _count: school._count,
+                    ownerSummary: school.ownerSummary,
+                  })
+                }
+                title="Hapus Permanen Tenant Trial"
+                aria-label={`Hapus Trial ${school.nama}`}
+                className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-bold cursor-pointer flex items-center gap-1"
+              >
+                <Trash2 className="size-3" />
+                <span>Hapus</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => handleOpenLicenseModal(school)}
@@ -867,31 +1011,89 @@ export function SuperAdminSchoolDirectoryView({
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          5. ACADEMIC DATA TABLE MULTI-TENANT DIRECTORY
+          5. SEGMENTED TAB SWITCHER: TENANT VS PENGGUNA PLATFORM
       ───────────────────────────────────────────────────────────── */}
-      <AcademicDataTable<SchoolTenantItem>
-        data={schools}
-        columns={columns}
-        filters={filters}
-        searchPlaceholder="Cari nama sekolah, NPSN, atau kota/alamat..."
-        searchKeys={["nama", "npsn", "alamat", "email", "telepon"]}
-        exportFilename="direktori-sekolah-lisensi-ruang-pintar"
-        emptyStateTitle="Belum Ada Institusi Sekolah Terdaftar"
-        emptyStateDescription="Platform SaaS Ruang Pintar saat ini belum memiliki tenant sekolah terdaftar atau tidak ada data yang cocok dengan filter pencarian."
-        primaryAction={
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div
+          className="inline-flex flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800"
+          aria-label="Kontrol Direktori Platform"
+        >
           <button
             type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer whitespace-nowrap"
+            aria-pressed={activeTab === "tenants"}
+            onClick={() => setActiveTab("tenants")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              activeTab === "tenants"
+                ? "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
           >
-            <Plus className="size-4" />
-            <span>Tambah Sekolah</span>
+            <Building2 className="size-4" />
+            <span>Direktori Sekolah &amp; Tenant</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-mono text-[10px]">
+              {schools.length}
+            </span>
           </button>
-        }
-        renderMobileCard={renderMobileSchoolCard}
-        pageSizeOptions={[10, 25, 50, 100]}
-        defaultPageSize={10}
-      />
+
+          <button
+            type="button"
+            aria-pressed={activeTab === "users"}
+            onClick={() => setActiveTab("users")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              activeTab === "users"
+                ? "bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <UserCog className="size-4" />
+            <span>Akun Guru Mandiri &amp; Pengguna</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-mono text-[10px]">
+              {platformUsers.length}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {activeTab === "tenants" ? (
+        <AcademicDataTable<SchoolTenantItem>
+          data={schools}
+          columns={columns}
+          filters={filters}
+          searchPlaceholder="Cari nama sekolah, NPSN, pemilik, atau email..."
+          searchKeys={[
+            "nama",
+            "npsn",
+            "alamat",
+            "email",
+            "telepon",
+            (row) => row.ownerSummary?.nama_lengkap,
+            (row) => row.ownerSummary?.email,
+            (row) => row.ownerSummary?.username,
+          ]}
+          exportFilename="direktori-sekolah-lisensi-ruang-pintar"
+          emptyStateTitle="Belum Ada Institusi Sekolah Terdaftar"
+          emptyStateDescription="Platform SaaS Ruang Pintar saat ini belum memiliki tenant sekolah terdaftar atau tidak ada data yang cocok dengan filter pencarian."
+          primaryAction={
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="size-4" />
+              <span>Tambah Sekolah</span>
+            </button>
+          }
+          renderMobileCard={renderMobileSchoolCard}
+          pageSizeOptions={[10, 25, 50, 100]}
+          defaultPageSize={10}
+        />
+      ) : (
+        <PlatformUsersDirectoryPanel
+          users={platformUsers}
+          onResetPassword={(target) => setResetTarget(target)}
+          onDeleteUser={(targetUser) => setDeleteUserTarget(targetUser)}
+        />
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           6. MODAL DAFTARKAN SEKOLAH BARU
@@ -921,6 +1123,47 @@ export function SuperAdminSchoolDirectoryView({
           router.refresh();
         }}
         school={selectedSchoolForLicense}
+      />
+
+      {/* ─────────────────────────────────────────────────────────────
+          8. MODAL KONTROL KREDENSIAL & PENGHAPUSAN TENANT TRIAL
+      ───────────────────────────────────────────────────────────── */}
+      <ResetPlatformPasswordModal
+        key={resetTarget?.userId ?? "reset-closed"}
+        isOpen={Boolean(resetTarget)}
+        onClose={() => setResetTarget(null)}
+        targetUser={resetTarget}
+        onSuccess={() => {
+          router.refresh();
+        }}
+      />
+
+      <DeleteFreemiumTenantModal
+        key={deleteTenantTarget?.id ?? "delete-tenant-closed"}
+        isOpen={Boolean(deleteTenantTarget)}
+        onClose={() => setDeleteTenantTarget(null)}
+        school={deleteTenantTarget}
+        onSuccess={() => {
+          setFeedback({
+            type: "success",
+            text: "Tenant trial FREEMIUM beserta data eksklusifnya berhasil dihapus permanen.",
+          });
+          router.refresh();
+        }}
+      />
+
+      <DeletePlatformUserModal
+        key={deleteUserTarget?.id ?? "delete-user-closed"}
+        isOpen={Boolean(deleteUserTarget)}
+        onClose={() => setDeleteUserTarget(null)}
+        user={deleteUserTarget}
+        onSuccess={() => {
+          setFeedback({
+            type: "success",
+            text: "Akun pengguna berhasil dihapus secara permanen.",
+          });
+          router.refresh();
+        }}
       />
     </div>
   );

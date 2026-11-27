@@ -19,6 +19,7 @@ import { staffCapabilityService } from "@/shared/infrastructure/authorization/st
 import { AcademicShell } from "@/shared/components/shell/academic-shell";
 import { SchoolManagementTabs } from "@/modules/school/presentation/school-management-tabs";
 import { SuperAdminSchoolDirectoryView } from "@/modules/school/presentation/super-admin-school-directory-view";
+import { platformControlService } from "@/modules/school/application/platform-control-service";
 import { schoolProfileService } from "@/modules/school/application/school-profile-service";
 import { organizationUnitService } from "@/modules/school/application/organization-unit-service";
 import { positionService } from "@/modules/school/application/position-service";
@@ -36,33 +37,45 @@ export default async function SchoolManagementPage(props: SchoolManagementPagePr
 
   // Mode 1: SUPER_ADMIN membuka direktori multi-tenant sekolah & lisensi
   if (isSuperAdmin && !searchParams?.sekolahId) {
-    const rawSchools = await prisma.sekolah.findMany({
-      orderBy: { created_at: "desc" },
-      include: {
-        _count: {
-          select: {
-            siswa: true,
-            guru: true,
-            rombel: true,
-            ujian_cbt: true,
-            pengguna: true,
+    const [rawSchools, platformDirectory] = await Promise.all([
+      prisma.sekolah.findMany({
+        orderBy: { created_at: "desc" },
+        include: {
+          _count: {
+            select: {
+              siswa: true,
+              guru: true,
+              rombel: true,
+              ujian_cbt: true,
+              pengguna: true,
+            },
+          },
+          langganan_tenant: {
+            orderBy: { created_at: "desc" },
+            take: 1,
+          },
+          transaksi_langganan: {
+            where: { status: "PAID" },
+            orderBy: { dibayar_pada: "desc" },
+            take: 1,
           },
         },
-        langganan_tenant: {
-          orderBy: { created_at: "desc" },
-          take: 1,
-        },
-        transaksi_langganan: {
-          where: { status: "PAID" },
-          orderBy: { dibayar_pada: "desc" },
-          take: 1,
-        },
-      },
-    });
+      }),
+      platformControlService.listPlatformDirectoryData(),
+    ]);
+
+    const enrichedSchools = rawSchools.map((school) => ({
+      ...school,
+      ownerSummary: platformDirectory.ownerBySchoolId[school.id] ?? null,
+    }));
 
     return (
       <AcademicShell user={user} userCapabilities={[]}>
-        <SuperAdminSchoolDirectoryView schools={rawSchools} currentUser={user} />
+        <SuperAdminSchoolDirectoryView
+          schools={enrichedSchools}
+          platformUsers={platformDirectory.platformUsers}
+          currentUser={user}
+        />
       </AcademicShell>
     );
   }
