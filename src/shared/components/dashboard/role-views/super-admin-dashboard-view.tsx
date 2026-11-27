@@ -3,9 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, ChevronLeft, X, LogIn, LogOut, Loader2, ArrowUpRight } from "lucide-react";
+import { ChevronRight, ChevronLeft, X, LogOut, Loader2, ArrowUpRight } from "lucide-react";
 import { AnimatedCounter } from "@/shared/components/motion/animated-counter";
 import { switchActiveTenantAction, clearActiveTenantAction } from "@/app/actions/tenant-actions";
+import { TenantActionMenu } from "@/modules/school/presentation/tenant-action-menu";
+import {
+  DeleteFreemiumTenantModal,
+  DeleteFreemiumTenantTarget,
+} from "@/modules/school/presentation/platform-control-modals";
 
 export interface SuperAdminDashboardViewProps {
   user: {
@@ -144,6 +149,8 @@ export function SuperAdminDashboardView({
   const [switchingSchoolId, setSwitchingSchoolId] = React.useState<string | null>(null);
   const [isClearingTenant, setIsClearingTenant] = React.useState(false);
   const [tenantActionError, setTenantActionError] = React.useState<string | null>(null);
+  const [deleteTenantTarget, setDeleteTenantTarget] =
+    React.useState<DeleteFreemiumTenantTarget | null>(null);
 
   const handleEnterTenant = async (schoolId: string) => {
     setSwitchingSchoolId(schoolId);
@@ -441,8 +448,8 @@ export function SuperAdminDashboardView({
                     Daftar Sekolah
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Pilih &ldquo;Masuk&rdquo; untuk inspeksi sekolah atau &ldquo;Kelola&rdquo; untuk
-                    mengatur lisensi
+                    Klik menu titik tiga (⋮) untuk melihat informasi, masuk ke sekolah, atau
+                    menghapus tenant trial
                   </p>
                 </div>
                 <Link
@@ -501,43 +508,30 @@ export function SuperAdminDashboardView({
                               {sch.siswaCount} siswa • {sch.guruCount} guru
                             </td>
                             <td className="py-3 text-right whitespace-nowrap">
-                              <div className="inline-flex items-center gap-1.5">
-                                {isCurrentActive ? (
-                                  <button
-                                    type="button"
-                                    onClick={handleExitTenant}
-                                    disabled={isClearingTenant}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
-                                  >
-                                    {isClearingTenant ? (
-                                      <Loader2 className="size-3 animate-spin" />
-                                    ) : (
-                                      <LogOut className="size-3" />
-                                    )}
-                                    <span>Keluar</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEnterTenant(sch.id)}
-                                    disabled={isSwitching || !sch.statusAktif}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
-                                  >
-                                    {isSwitching ? (
-                                      <Loader2 className="size-3 animate-spin" />
-                                    ) : (
-                                      <LogIn className="size-3" />
-                                    )}
-                                    <span>Masuk</span>
-                                  </button>
-                                )}
-                                <Link
-                                  href={`/sekolah?sekolahId=${sch.id}`}
-                                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-[11px] transition"
-                                >
-                                  Kelola
-                                </Link>
-                              </div>
+                              <TenantActionMenu
+                                schoolName={sch.nama}
+                                infoHref={`/sekolah?sekolahId=${sch.id}`}
+                                isCurrentActive={isCurrentActive}
+                                isStatusAktif={sch.statusAktif}
+                                isSwitching={isSwitching}
+                                canDelete={sch.tipe_lisensi === "FREEMIUM" && !isCurrentActive}
+                                onEnterTenant={() => handleEnterTenant(sch.id)}
+                                onExitTenant={handleExitTenant}
+                                onDeleteTenant={() =>
+                                  setDeleteTenantTarget({
+                                    id: sch.id,
+                                    nama: sch.nama,
+                                    tipe_lisensi: sch.tipe_lisensi,
+                                    _count: {
+                                      siswa: sch.siswaCount,
+                                      guru: sch.guruCount,
+                                      rombel: sch.rombelCount,
+                                      ujian_cbt: sch.cbtCount,
+                                      pengguna: sch.guruCount,
+                                    },
+                                  })
+                                }
+                              />
                             </td>
                           </tr>
                         );
@@ -821,6 +815,15 @@ export function SuperAdminDashboardView({
           </div>
         </div>
       )}
+      <DeleteFreemiumTenantModal
+        isOpen={Boolean(deleteTenantTarget)}
+        onClose={() => setDeleteTenantTarget(null)}
+        school={deleteTenantTarget}
+        onSuccess={() => {
+          setDeleteTenantTarget(null);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

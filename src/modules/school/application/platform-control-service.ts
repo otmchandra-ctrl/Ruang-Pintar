@@ -72,30 +72,39 @@ function assertSuperAdmin(actorRole: string) {
   }
 }
 
+function toIsoStringSafe(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 export class PlatformControlService {
   /**
    * Memuat data direktori tenant beserta ringkasan pemilik & daftar pengguna platform non-SUPER_ADMIN.
+   * Menggunakan query skalar datar + join di memori agar aman terhadap batas 100 bind-parameter Cloudflare D1.
    */
   async listPlatformDirectoryData(): Promise<{
     ownerBySchoolId: Record<string, PlatformTenantOwnerSummary | null>;
     platformUsers: PlatformUserAccountItem[];
   }> {
-    const [memberships, rawUsers] = await Promise.all([
+    const [schools, memberships, rawUsers, gurus, teachingAssignments] = await Promise.all([
+      prisma.sekolah.findMany({
+        select: {
+          id: true,
+          nama: true,
+          tipe_lisensi: true,
+        },
+      }),
       prisma.keanggotaanSekolah.findMany({
         where: {
           status_keanggotaan: { in: ["ACTIVE", "PENDING", "SUSPENDED"] },
         },
-        include: {
-          pengguna: {
-            select: {
-              id: true,
-              nama_lengkap: true,
-              username: true,
-              email: true,
-              peran_dasar: true,
-              status_akun: true,
-            },
-          },
+        select: {
+          sekolah_id: true,
+          pengguna_id: true,
+          is_owner: true,
+          created_at: true,
         },
         orderBy: [{ is_owner: "desc" }, { created_at: "asc" }],
       }),
@@ -103,43 +112,76 @@ export class PlatformControlService {
         where: {
           peran_dasar: { not: "SUPER_ADMIN" },
         },
-        include: {
-          sekolah: {
-            select: {
-              id: true,
-              nama: true,
-              tipe_lisensi: true,
-            },
-          },
-          keanggotaan_sekolah: {
-            where: { is_owner: true },
-            select: { sekolah_id: true },
-          },
-          guru: {
-            select: {
-              id: true,
-              _count: {
-                select: {
-                  penugasan_mengajar: true,
-                },
-              },
-            },
-          },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          nama_lengkap: true,
+          peran_dasar: true,
+          status_akun: true,
+          harus_ganti_password: true,
+          percobaan_login_gagal: true,
+          dikunci_sampai: true,
+          terakhir_login_pada: true,
+          created_at: true,
+          sekolah_id: true,
         },
         orderBy: { created_at: "desc" },
       }),
+      prisma.guru.findMany({
+        select: {
+          id: true,
+          pengguna_id: true,
+        },
+      }),
+      prisma.penugasanMengajar.findMany({
+        select: {
+          guru_id: true,
+        },
+      }),
     ]);
+
+    const schoolById = new Map(schools.map((s) => [s.id, s]));
+    const userById = new Map(rawUsers.map((u) => [u.id, u]));
+
+    const ownerSchoolIdsByUser = new Map<string, Set<string>>();
+    for (const m of memberships) {
+      if (m.is_owner) {
+        let set = ownerSchoolIdsByUser.get(m.pengguna_id);
+        if (!set) {
+          set = new Set<string>();
+          ownerSchoolIdsByUser.set(m.pengguna_id, set);
+        }
+        set.add(m.sekolah_id);
+      }
+    }
+
+    const assignmentCountByGuruId = new Map<string, number>();
+    for (const a of teachingAssignments) {
+      assignmentCountByGuruId.set(a.guru_id, (assignmentCountByGuruId.get(a.guru_id) ?? 0) + 1);
+    }
+
+    const guruByUserId = new Map<string, { id: string; penugasanCount: number }>();
+    for (const g of gurus) {
+      if (g.pengguna_id && !guruByUserId.has(g.pengguna_id)) {
+        guruByUserId.set(g.pengguna_id, {
+          id: g.id,
+          penugasanCount: assignmentCountByGuruId.get(g.id) ?? 0,
+        });
+      }
+    }
 
     const ownerBySchoolId: Record<string, PlatformTenantOwnerSummary | null> = {};
     for (const m of memberships) {
-      if (!m.pengguna || m.pengguna.peran_dasar === "SUPER_ADMIN") continue;
+      const user = userById.get(m.pengguna_id);
+      if (!user) continue;
       if (!ownerBySchoolId[m.sekolah_id]) {
         ownerBySchoolId[m.sekolah_id] = {
-          userId: m.pengguna.id,
-          nama_lengkap: m.pengguna.nama_lengkap,
-          username: m.pengguna.username,
-          email: m.pengguna.email,
-          status_akun: m.pengguna.status_akun,
+          userId: user.id,
+          nama_lengkap: user.nama_lengkap,
+          username: user.username,
+          email: user.email,
+          status_akun: user.status_akun,
         };
       }
     }
@@ -157,25 +199,30 @@ export class PlatformControlService {
       }
     }
 
-    const platformUsers: PlatformUserAccountItem[] = rawUsers.map((u) => ({
-      id: u.id,
-      username: u.username,
-      email: u.email,
-      nama_lengkap: u.nama_lengkap,
-      peran_dasar: u.peran_dasar,
-      status_akun: u.status_akun,
-      harus_ganti_password: u.harus_ganti_password,
-      percobaan_login_gagal: u.percobaan_login_gagal,
-      dikunci_sampai: u.dikunci_sampai ? u.dikunci_sampai.toISOString() : null,
-      terakhir_login: u.terakhir_login_pada ? u.terakhir_login_pada.toISOString() : null,
-      created_at: u.created_at.toISOString(),
-      sekolah_id: u.sekolah?.id ?? u.sekolah_id ?? null,
-      sekolah_nama: u.sekolah?.nama ?? null,
-      sekolah_tipe_lisensi: u.sekolah?.tipe_lisensi ?? null,
-      is_owner: u.keanggotaan_sekolah.length > 0,
-      guru_id: u.guru?.id ?? null,
-      guru_penugasan_count: u.guru?._count?.penugasan_mengajar ?? 0,
-    }));
+    const platformUsers: PlatformUserAccountItem[] = rawUsers.map((u) => {
+      const school = u.sekolah_id ? schoolById.get(u.sekolah_id) : undefined;
+      const guruInfo = guruByUserId.get(u.id);
+      const ownerSchools = ownerSchoolIdsByUser.get(u.id);
+      return {
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        nama_lengkap: u.nama_lengkap,
+        peran_dasar: u.peran_dasar,
+        status_akun: u.status_akun,
+        harus_ganti_password: Boolean(u.harus_ganti_password),
+        percobaan_login_gagal: u.percobaan_login_gagal ?? 0,
+        dikunci_sampai: toIsoStringSafe(u.dikunci_sampai),
+        terakhir_login: toIsoStringSafe(u.terakhir_login_pada),
+        created_at: toIsoStringSafe(u.created_at) ?? new Date(0).toISOString(),
+        sekolah_id: school?.id ?? u.sekolah_id ?? null,
+        sekolah_nama: school?.nama ?? null,
+        sekolah_tipe_lisensi: school?.tipe_lisensi ?? null,
+        is_owner: Boolean(ownerSchools && ownerSchools.size > 0),
+        guru_id: guruInfo?.id ?? null,
+        guru_penugasan_count: guruInfo?.penugasanCount ?? 0,
+      };
+    });
 
     return { ownerBySchoolId, platformUsers };
   }

@@ -14,12 +14,9 @@ import {
   Mail,
   MapPin,
   Sparkles,
-  ChevronRight,
   Clock,
   CheckCircle2,
   XCircle,
-  CreditCard,
-  LogIn,
   LogOut,
   Users,
   BookOpen,
@@ -29,8 +26,6 @@ import {
   AlertTriangle,
   Radio,
   ArrowRight,
-  KeyRound,
-  Trash2,
   UserCog,
 } from "lucide-react";
 import {
@@ -56,6 +51,7 @@ import {
 } from "./platform-control-modals";
 import { PlatformUsersDirectoryPanel } from "./platform-users-directory-panel";
 import { PlatformActivityAnalyticsSection } from "./platform-activity-analytics-section";
+import { TenantActionMenu } from "./tenant-action-menu";
 
 export interface SchoolTenantItem {
   id: string;
@@ -182,7 +178,7 @@ export function SuperAdminSchoolDirectoryView({
   );
 
   // Exit Impersonation / Clear Tenant
-  const handleClearImpersonation = async () => {
+  const handleClearImpersonation = React.useCallback(async () => {
     setIsClearingTenant(true);
     setFeedback(null);
     try {
@@ -205,7 +201,7 @@ export function SuperAdminSchoolDirectoryView({
     } finally {
       setIsClearingTenant(false);
     }
-  };
+  }, [router]);
 
   // Toggle Active / Suspended
   const handleToggleStatus = React.useCallback(
@@ -491,94 +487,45 @@ export function SuperAdminSchoolDirectoryView({
           const isSwitching = switchingSchoolId === school.id;
 
           return (
-            <div className="flex items-center justify-end gap-1.5">
-              {/* Tombol 1: Masuk Sebagai Sekolah (Ghost Mode / Impersonate) */}
-              {isCurrentActive ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-300 dark:border-blue-800">
+            <div className="flex items-center justify-end gap-2">
+              {isCurrentActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[11px] font-bold border border-blue-300 dark:border-blue-800">
                   <Radio className="size-3 animate-pulse text-blue-600" />
                   <span>Sesi Aktif</span>
                 </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleImpersonate(school.id)}
-                  disabled={isSwitching || !school.status_aktif}
-                  title="Masuk sebagai administrator sekolah ini tanpa password"
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs transition hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
-                >
-                  {isSwitching ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : (
-                    <LogIn className="size-3" />
-                  )}
-                  <span>Masuk</span>
-                </button>
               )}
-
-              {/* Tombol 2: Atur Lisensi & Kuota */}
-              <button
-                type="button"
-                onClick={() => handleOpenLicenseModal(school)}
-                title="Kelola Lisensi, Kuota Siswa, dan Masa Aktif"
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/50 text-slate-700 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-300 text-xs font-bold transition cursor-pointer"
-              >
-                <CreditCard className="size-3" />
-                <span>Lisensi</span>
-              </button>
-
-              {/* Tombol 2b: Reset Sandi Pemilik/Admin Tenant */}
-              {school.ownerSummary && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setResetTarget({
-                      userId: school.ownerSummary!.userId,
-                      nama_lengkap: school.ownerSummary!.nama_lengkap,
-                      username: school.ownerSummary!.username,
-                      email: school.ownerSummary!.email,
-                      sekolah_nama: school.nama,
-                    })
-                  }
-                  title="Reset Sandi Pemilik/Admin Tenant"
-                  aria-label={`Reset Sandi ${school.ownerSummary.nama_lengkap}`}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 text-xs font-bold transition cursor-pointer"
-                >
-                  <KeyRound className="size-3.5" />
-                  <span className="hidden xl:inline">Reset Sandi</span>
-                </button>
-              )}
-
-              {/* Tombol 2c: Hapus Permanen Tenant FREEMIUM (Terproteksi) */}
-              {school.tipe_lisensi === "FREEMIUM" && school.id !== currentUser?.sekolah_id && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDeleteTenantTarget({
-                      id: school.id,
-                      nama: school.nama,
-                      tipe_lisensi: school.tipe_lisensi,
-                      _count: school._count,
-                      ownerSummary: school.ownerSummary,
-                    })
-                  }
-                  title="Hapus Permanen Tenant Trial"
-                  aria-label={`Hapus Trial ${school.nama}`}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800 text-xs font-bold transition cursor-pointer"
-                >
-                  <Trash2 className="size-3.5" />
-                  <span className="hidden xl:inline">Hapus</span>
-                </button>
-              )}
-
-              {/* Tombol 3: Kelola Struktur & Profil */}
-              <Link
-                href={`/sekolah?sekolahId=${school.id}`}
-                title="Buka Struktur Organisasi, Jabatan & Profil Sekolah"
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition cursor-pointer"
-              >
-                <Building2 className="size-3" />
-                <ChevronRight className="size-3.5" />
-              </Link>
+              <TenantActionMenu
+                schoolName={school.nama}
+                infoHref={`/sekolah?sekolahId=${school.id}`}
+                isCurrentActive={isCurrentActive}
+                isStatusAktif={school.status_aktif}
+                isSwitching={isSwitching}
+                canDelete={school.tipe_lisensi === "FREEMIUM" && !isCurrentActive}
+                onEnterTenant={() => handleImpersonate(school.id)}
+                onExitTenant={handleClearImpersonation}
+                onManageLicense={() => handleOpenLicenseModal(school)}
+                onResetOwnerPassword={
+                  school.ownerSummary
+                    ? () =>
+                        setResetTarget({
+                          userId: school.ownerSummary!.userId,
+                          nama_lengkap: school.ownerSummary!.nama_lengkap,
+                          username: school.ownerSummary!.username,
+                          email: school.ownerSummary!.email,
+                          sekolah_nama: school.nama,
+                        })
+                    : undefined
+                }
+                onDeleteTenant={() =>
+                  setDeleteTenantTarget({
+                    id: school.id,
+                    nama: school.nama,
+                    tipe_lisensi: school.tipe_lisensi,
+                    _count: school._count,
+                    ownerSummary: school.ownerSummary,
+                  })
+                }
+              />
             </div>
           );
         },
@@ -589,6 +536,7 @@ export function SuperAdminSchoolDirectoryView({
       switchingSchoolId,
       togglingSchoolId,
       handleImpersonate,
+      handleClearImpersonation,
       handleToggleStatus,
       now,
     ]
@@ -705,79 +653,50 @@ export function SuperAdminSchoolDirectoryView({
         </div>
 
         {/* Mobile Action Buttons */}
-        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
           {isCurrentActive ? (
-            <span className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center gap-1">
+            <span className="px-3 py-1 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center gap-1">
               <Radio className="size-3 text-blue-600" />
               <span>Sesi Aktif</span>
             </span>
           ) : (
-            <button
-              type="button"
-              onClick={() => handleImpersonate(school.id)}
-              disabled={!school.status_aktif}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
-            >
-              <LogIn className="size-3" />
-              <span>Masuk</span>
-            </button>
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              Menu aksi cepat tenant
+            </span>
           )}
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {school.ownerSummary && (
-              <button
-                type="button"
-                onClick={() =>
-                  setResetTarget({
-                    userId: school.ownerSummary!.userId,
-                    nama_lengkap: school.ownerSummary!.nama_lengkap,
-                    username: school.ownerSummary!.username,
-                    email: school.ownerSummary!.email,
-                    sekolah_nama: school.nama,
-                  })
-                }
-                title="Reset Sandi Pemilik/Admin Tenant"
-                className="px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold cursor-pointer flex items-center gap-1"
-              >
-                <KeyRound className="size-3" />
-                <span>Sandi</span>
-              </button>
-            )}
-            {school.tipe_lisensi === "FREEMIUM" && school.id !== currentUser?.sekolah_id && (
-              <button
-                type="button"
-                onClick={() =>
-                  setDeleteTenantTarget({
-                    id: school.id,
-                    nama: school.nama,
-                    tipe_lisensi: school.tipe_lisensi,
-                    _count: school._count,
-                    ownerSummary: school.ownerSummary,
-                  })
-                }
-                title="Hapus Permanen Tenant Trial"
-                aria-label={`Hapus Trial ${school.nama}`}
-                className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-bold cursor-pointer flex items-center gap-1"
-              >
-                <Trash2 className="size-3" />
-                <span>Hapus</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => handleOpenLicenseModal(school)}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
-            >
-              Lisensi
-            </button>
-            <Link
-              href={`/sekolah?sekolahId=${school.id}`}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer flex items-center gap-1"
-            >
-              <span>Detail</span>
-              <ChevronRight className="size-3" />
-            </Link>
-          </div>
+          <TenantActionMenu
+            schoolName={school.nama}
+            infoHref={`/sekolah?sekolahId=${school.id}`}
+            isCurrentActive={isCurrentActive}
+            isStatusAktif={school.status_aktif}
+            isSwitching={switchingSchoolId === school.id}
+            canDelete={school.tipe_lisensi === "FREEMIUM" && !isCurrentActive}
+            onEnterTenant={() => handleImpersonate(school.id)}
+            onExitTenant={handleClearImpersonation}
+            onManageLicense={() => handleOpenLicenseModal(school)}
+            onResetOwnerPassword={
+              school.ownerSummary
+                ? () =>
+                    setResetTarget({
+                      userId: school.ownerSummary!.userId,
+                      nama_lengkap: school.ownerSummary!.nama_lengkap,
+                      username: school.ownerSummary!.username,
+                      email: school.ownerSummary!.email,
+                      sekolah_nama: school.nama,
+                    })
+                : undefined
+            }
+            onDeleteTenant={() =>
+              setDeleteTenantTarget({
+                id: school.id,
+                nama: school.nama,
+                tipe_lisensi: school.tipe_lisensi,
+                _count: school._count,
+                ownerSummary: school.ownerSummary,
+              })
+            }
+          />
         </div>
       </div>
     );

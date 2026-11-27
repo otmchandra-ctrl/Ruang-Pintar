@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -365,6 +365,12 @@ describe("Role Dashboard Views & Page Contracts (Phase 05)", () => {
     expect(screen.getByText("Log Audit")).toBeInTheDocument();
     expect(screen.queryByText("e-Rapor Merdeka")).not.toBeInTheDocument();
     expect(screen.queryByText("Lihat Kelas")).not.toBeInTheDocument();
+
+    // Verify 3-dots menu renders Lihat Informasi and Masuk ke Sekolah
+    const menuTrigger = screen.getAllByRole("button", { name: /Aksi tenant/i })[0];
+    fireEvent.click(menuTrigger);
+    expect(screen.getByRole("menuitem", { name: /Lihat Informasi/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Masuk ke Sekolah/i })).toBeInTheDocument();
     unmount();
 
     const tenantJsx = await SuperAdminDashboard({

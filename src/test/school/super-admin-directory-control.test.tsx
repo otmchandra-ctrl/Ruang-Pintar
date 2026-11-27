@@ -134,13 +134,19 @@ describe("SuperAdminSchoolDirectoryView — Tenant & User Control", () => {
     expect(screen.getAllByText(/Budi Trial/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/budi@gmail\.com/i).length).toBeGreaterThan(0);
 
-    // Only 1 FREEMIUM delete button should exist (desktop + mobile render; check by aria-label/title)
-    const deleteButtons = screen.getAllByTitle(/Hapus Permanen Tenant Trial/i);
-    expect(deleteButtons.length).toBeGreaterThan(0);
-    // Paid SMK Otomindo must not have delete trial button
-    expect(
-      screen.queryByRole("button", { name: /Hapus Trial SMK Otomindo/i })
-    ).not.toBeInTheDocument();
+    // Open 3-dots menu on FREEMIUM tenant "Guru Mandiri" -> Eye, Door, Trash must appear
+    const freeMenuBtn = screen.getAllByRole("button", { name: /Aksi tenant Guru Mandiri/i })[0];
+    fireEvent.click(freeMenuBtn);
+    expect(screen.getByRole("menuitem", { name: /Lihat Informasi/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Masuk ke Sekolah/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Hapus Tenant/i })).toBeInTheDocument();
+
+    // Close first menu, then open 3-dots menu on paid "SMK Otomindo" -> Hapus Tenant must NOT exist
+    fireEvent.click(freeMenuBtn);
+    const paidMenuBtn = screen.getAllByRole("button", { name: /Aksi tenant SMK Otomindo/i })[0];
+    fireEvent.click(paidMenuBtn);
+    expect(screen.getByRole("menuitem", { name: /Lihat Informasi/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Hapus Tenant/i })).not.toBeInTheDocument();
   });
 
   it("switches to Akun Guru Mandiri & Pengguna tab and opens reset password modal", () => {

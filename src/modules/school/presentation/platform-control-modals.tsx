@@ -291,22 +291,18 @@ export function DeleteFreemiumTenantModal({
   school,
   onSuccess,
 }: DeleteFreemiumTenantModalProps) {
-  const [confirmName, setConfirmName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen || !school) return null;
 
-  const isMatched = confirmName.trim() === school.nama.trim();
-
   const handleConfirmDelete = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isMatched) return;
 
     setErrorMsg(null);
     setIsSubmitting(true);
     try {
-      const res = await deleteFreemiumTenantAction(school.id, confirmName.trim());
+      const res = await deleteFreemiumTenantAction(school.id, school.nama.trim());
       if (!res.success) {
         setErrorMsg(res.error);
         return;
@@ -381,26 +377,6 @@ export function DeleteFreemiumTenantModal({
             </div>
           )}
 
-          <div>
-            <label
-              htmlFor="confirm-delete-tenant-name"
-              className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5"
-            >
-              Ketik nama tenant persis berikut untuk konfirmasi:{" "}
-              <span className="font-mono text-rose-600 dark:text-rose-400 select-all">
-                {school.nama}
-              </span>
-            </label>
-            <input
-              id="confirm-delete-tenant-name"
-              type="text"
-              value={confirmName}
-              onChange={(e) => setConfirmName(e.target.value)}
-              placeholder={school.nama}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-            />
-          </div>
-
           <div className="flex items-center justify-end gap-2.5 pt-2">
             <button
               type="button"
@@ -412,7 +388,7 @@ export function DeleteFreemiumTenantModal({
             </button>
             <button
               type="submit"
-              disabled={!isMatched || isSubmitting}
+              disabled={isSubmitting}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold transition cursor-pointer"
             >
               {isSubmitting && <Loader2 className="size-3.5 animate-spin" />}

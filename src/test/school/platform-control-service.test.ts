@@ -152,6 +152,14 @@ const { mockPrisma, mockIdentityService, mockRecordAuditEvent } = vi.hoisted(() 
         findUnique: vi.fn(),
         findMany: vi.fn(),
       },
+      guru: {
+        ...txMock.guru,
+        findMany: vi.fn(),
+      },
+      penugasanMengajar: {
+        ...txMock.penugasanMengajar,
+        findMany: vi.fn(),
+      },
       $transaction: vi.fn(async (cb: (tx: typeof txMock) => Promise<unknown>) => cb(txMock)),
     },
     mockIdentityService: {
@@ -361,5 +369,52 @@ describe("PlatformControlService (SUPER_ADMIN Tenant & Account Control)", () => 
     expect(analytics.attendance.alphaPct).toBe(3.0);
     expect(analytics.totalRapor).toBe(12);
     expect(analytics.totalMataPelajaran).toBe(58);
+  });
+
+  it("loads directory data using flat scalar queries without relation IN joins (D1 safe)", async () => {
+    mockPrisma.sekolah.findMany.mockResolvedValueOnce([
+      { id: "sch_1", nama: "Guru Mandiri", tipe_lisensi: "FREEMIUM" },
+    ]);
+    mockPrisma.keanggotaanSekolah.findMany.mockResolvedValueOnce([
+      {
+        sekolah_id: "sch_1",
+        pengguna_id: "usr_1",
+        is_owner: true,
+        created_at: "2026-11-27T01:00:00.000Z",
+      },
+    ]);
+    mockPrisma.pengguna.findMany.mockResolvedValueOnce([
+      {
+        id: "usr_1",
+        username: "budi_trial",
+        email: "budi@gmail.com",
+        nama_lengkap: "Budi Trial",
+        peran_dasar: "TEACHER",
+        status_akun: "AKTIF",
+        harus_ganti_password: false,
+        percobaan_login_gagal: 0,
+        dikunci_sampai: null,
+        terakhir_login_pada: null,
+        created_at: "2026-11-27T01:00:00.000Z",
+        sekolah_id: "sch_1",
+      },
+    ]);
+    mockPrisma.guru.findMany.mockResolvedValueOnce([{ id: "guru_1", pengguna_id: "usr_1" }]);
+    mockPrisma.penugasanMengajar.findMany.mockResolvedValueOnce([
+      { guru_id: "guru_1" },
+      { guru_id: "guru_1" },
+    ]);
+
+    const res = await platformControlService.listPlatformDirectoryData();
+
+    expect(res.ownerBySchoolId["sch_1"]?.username).toBe("budi_trial");
+    expect(res.platformUsers[0]).toMatchObject({
+      id: "usr_1",
+      sekolah_nama: "Guru Mandiri",
+      sekolah_tipe_lisensi: "FREEMIUM",
+      is_owner: true,
+      guru_id: "guru_1",
+      guru_penugasan_count: 2,
+    });
   });
 });
