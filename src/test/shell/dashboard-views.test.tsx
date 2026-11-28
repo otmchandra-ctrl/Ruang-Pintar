@@ -14,6 +14,7 @@ import { GuardianDashboard } from "@/shared/components/dashboard/role-views/guar
 import { StaffDashboard } from "@/shared/components/dashboard/role-views/staff-dashboard";
 import { SuperAdminDashboard } from "@/shared/components/dashboard/role-views/super-admin-dashboard";
 import { AuthenticatedUser } from "@/shared/infrastructure/auth/auth-service";
+import { prisma } from "@/shared/infrastructure/database/prisma";
 
 const mockTeacher: AuthenticatedUser = {
   id: "01J000000000000000000TEACH1",
@@ -359,7 +360,8 @@ describe("Role Dashboard Views & Page Contracts (Phase 05)", () => {
     expect(screen.getByText("Total Sekolah")).toBeInTheDocument();
     expect(screen.getByText("Total Siswa")).toBeInTheDocument();
     expect(screen.getByText("Perlu Tindak Lanjut")).toBeInTheDocument();
-    expect(screen.getByText("Estimasi MRR")).toBeInTheDocument();
+    expect(screen.getByText("Total Pemasukan")).toBeInTheDocument();
+    expect(screen.queryByText("Estimasi MRR")).not.toBeInTheDocument();
     expect(screen.getByText("Daftar Sekolah")).toBeInTheDocument();
     expect(screen.getByText("Ringkasan Platform")).toBeInTheDocument();
     expect(screen.getByText("Log Audit")).toBeInTheDocument();
@@ -382,5 +384,24 @@ describe("Role Dashboard Views & Page Contracts (Phase 05)", () => {
     expect(screen.getByText(/Mode Dukungan Sekolah • SMK Otomindo/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Keluar ke Mode Platform/i })).toBeInTheDocument();
     expect(screen.getByText("Kurikulum")).toBeInTheDocument();
+  });
+
+  it("displays Rp 0 for Total Pemasukan when no PAID subscription transactions exist", async () => {
+    const aggSpy = vi
+      .spyOn(prisma.transaksiLangganan, "aggregate")
+      .mockResolvedValueOnce({ _sum: { total_bayar: null } } as never);
+
+    try {
+      const jsx = await SuperAdminDashboard({
+        user: { ...mockAdmin, sekolah_id: null },
+      });
+      render(jsx);
+
+      expect(screen.getByText("Total Pemasukan")).toBeInTheDocument();
+      expect(screen.getByText("Rp 0")).toBeInTheDocument();
+      expect(screen.queryByText("Estimasi MRR")).not.toBeInTheDocument();
+    } finally {
+      aggSpy.mockRestore();
+    }
   });
 });

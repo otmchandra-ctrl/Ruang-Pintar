@@ -321,11 +321,8 @@ export async function SuperAdminDashboard({ user, activeSchoolName }: SuperAdmin
     ((totalUkuranBerkasByte._sum.ukuran_byte || 0) / (1024 * 1024)).toFixed(2)
   );
 
-  // Estimated MRR calculation
-  const totalPaidRevenue = paidTransactions._sum.total_bayar || 0;
-  // Perkiraan MRR institusi: total sekolah institusi * Rp 2.500.000 + siswa kuota aktif * Rp 5.000
-  const estimatedMrr =
-    totalPaidRevenue > 0 ? totalPaidRevenue : totalSekolahInstitusi * 2500000 + totalSiswa * 5000;
+  // Kalkulasi pemasukan riil dari transaksi langganan yang berstatus PAID (tanpa rumus perkiraan)
+  const totalPaidRevenue = paidTransactions._sum.total_bayar ?? 0;
 
   const activeTenant = user.sekolah_id
     ? {
@@ -365,7 +362,7 @@ export async function SuperAdminDashboard({ user, activeSchoolName }: SuperAdmin
         storageTotalMb,
         aiRequestsCount: totalAiRequests,
         failedLoginLast24h,
-        estimatedMrr,
+        totalPaidRevenue,
       }}
       attendance={{
         totalPresensiRecorded,

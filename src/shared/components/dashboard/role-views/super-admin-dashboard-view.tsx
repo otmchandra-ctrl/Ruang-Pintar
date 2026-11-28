@@ -45,7 +45,7 @@ export interface SuperAdminDashboardViewProps {
     storageTotalMb: number;
     aiRequestsCount: number;
     failedLoginLast24h: number;
-    estimatedMrr: number;
+    totalPaidRevenue: number;
   };
   attendance: {
     totalPresensiRecorded: number;
@@ -427,11 +427,11 @@ export function SuperAdminDashboardView({
 
               <div className="p-4 rounded-2xl bg-white/75 dark:bg-slate-900/75 backdrop-blur-[16px] border border-slate-200/80 dark:border-white/15 shadow-2xs flex flex-col justify-between">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Estimasi MRR
+                  Total Pemasukan
                 </span>
                 <div className="mt-2.5">
                   <div className="font-mono text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none truncate">
-                    {formatCompactRupiah(telemetry.estimatedMrr)}
+                    {formatCompactRupiah(telemetry.totalPaidRevenue)}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 truncate">
                     {telemetry.cbtRunningSessions} CBT Live • {telemetry.storageTotalMb} MB
